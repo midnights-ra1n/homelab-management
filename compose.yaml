@@ -1,0 +1,17 @@
+services:
+  homelab:
+    # Image publiée par GitHub Actions (amd64 + arm64) ; décommente « build » pour construire localement
+    image: ghcr.io/midnights-ra1n/homelab-management:latest
+    # build: .
+    container_name: homelab-management
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: Europe/Paris
+      # Clé de chiffrement des secrets (sinon générée dans /data/secret.key)
+      # APP_SECRET: "change-moi-par-une-longue-chaine-aleatoire"
+      # COOKIE_SECURE: "true"   # si servi en HTTPS
+      # AUTH_DISABLED: "true"   # si protégé par un SSO (Authelia, Authentik…)
