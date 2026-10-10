@@ -1,5 +1,11 @@
 # Homelab Management
 
+> [!NOTE]
+> **Projet personnel, développé avec l'aide d'une IA.** Cette application a été conçue et écrite avec un assistant
+> d'intelligence artificielle (Claude, d'Anthropic), pour mon usage personnel sur mon homelab. Elle est partagée
+> telle quelle, sans garantie ni support : relis le code et teste-la avant de t'en servir, en particulier pour les
+> actions Proxmox (démarrage, arrêt, migration) et l'exposition sur un réseau.
+
 Application web auto-hébergée pour piloter un homelab : inventaire, IPAM, déploiements, tâches, page d'accueil,
 carte interactive, gestion multi-nœuds Proxmox et monitoring centralisé (Beszel, Maintenant, PatchMon).
 
