@@ -14,8 +14,10 @@ type Params = Record<string, SQLInputValue> | SQLInputValue[];
 function open(): DatabaseSync {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   const db = new DatabaseSync(path.join(DATA_DIR, "homelab.db"));
-  db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
+  db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
+  // Clés étrangères coupées pendant les migrations : reconstruire une table ne doit rien cascader.
   migrate(db);
+  db.exec("PRAGMA foreign_keys = ON");
   return db;
 }
 
@@ -25,6 +27,7 @@ function migrate(db: DatabaseSync) {
     db.exec("BEGIN");
     try {
       db.exec(migrations[v]);
+      if (db.prepare("PRAGMA foreign_key_check").all().length) throw new Error(`Migration ${v + 1} : clés étrangères invalides`);
       db.exec(`PRAGMA user_version = ${v + 1}`);
       db.exec("COMMIT");
     } catch (err) {

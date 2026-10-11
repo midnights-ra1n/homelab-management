@@ -319,4 +319,31 @@ export const migrations: string[] = [
     PRIMARY KEY (monitor_id, day)
   );
   `,
+
+  /* 005 — Webmin + clés SSH (reconstruction de « integrations » pour étendre le CHECK) */
+  `
+  CREATE TABLE ssh_keys (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    type        TEXT NOT NULL,
+    public_key  TEXT NOT NULL,
+    private_key TEXT NOT NULL,             -- chiffrée (AES-256-GCM)
+    fingerprint TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE integrations_new (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    type       TEXT NOT NULL CHECK (type IN ('proxmox','beszel','maintenant','patchmon','webmin')),
+    name       TEXT NOT NULL,
+    url        TEXT NOT NULL,
+    config     TEXT NOT NULL DEFAULT '',
+    enabled    INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  INSERT INTO integrations_new SELECT id, type, name, url, config, enabled, created_at, updated_at FROM integrations;
+  DROP TABLE integrations;
+  ALTER TABLE integrations_new RENAME TO integrations;
+  `,
 ];

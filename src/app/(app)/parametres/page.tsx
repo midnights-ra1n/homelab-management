@@ -14,6 +14,8 @@ import { ThemeSwitch } from "@/components/layout/theme-switch";
 import { AppIcon } from "@/features/apps/app-icon";
 import { IntegrationDialog } from "@/features/settings/integration-dialog";
 import { BackupForms, PasswordForm } from "@/features/settings/account-forms";
+import { SshKeyDialog, SshKeyList } from "@/features/settings/ssh-keys";
+import { listSshKeys } from "@/lib/data/ssh-keys";
 import { timeAgo } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Paramètres" };
@@ -23,7 +25,7 @@ export default function SettingsPage() {
     <>
       <PageHeader
         title="Configuration"
-        description="Intégrations Proxmox et monitoring, apparence, compte et sauvegardes."
+        description="Intégrations Proxmox, monitoring et Webmin, clés SSH, apparence, compte et sauvegardes."
       />
       <Suspense fallback={<Skeleton className="h-[40rem] rounded-2xl" />}>
         <Settings />
@@ -35,6 +37,7 @@ export default function SettingsPage() {
 async function Settings() {
   const user = await requireUser();
   const integrations = listIntegrations().map(toPublic);
+  const sshKeys = listSshKeys();
   const counts = get<{ assets: number; ips: number; deployments: number; tasks: number; shortcuts: number }>(
     `SELECT (SELECT COUNT(*) FROM assets) AS assets, (SELECT COUNT(*) FROM ip_addresses) AS ips,
        (SELECT COUNT(*) FROM deployments) AS deployments, (SELECT COUNT(*) FROM tasks) AS tasks,
@@ -58,7 +61,7 @@ async function Settings() {
                       {meta.label}
                     </span>
                   }
-                  actions={<IntegrationDialog type={type} />}
+                  actions={<IntegrationDialog type={type} sshKeys={sshKeys} />}
                 />
                 <CardBody className="pt-3">
                   <p className="mb-4 text-sm text-body">{meta.description}</p>
@@ -73,7 +76,7 @@ async function Settings() {
                             <span className="block truncate font-mono text-xs text-meta">{i.url}</span>
                           </span>
                           <Badge tone={i.enabled ? "green" : "muted"}>{i.enabled ? "Active" : "Désactivée"}</Badge>
-                          <IntegrationDialog type={type} integration={i} />
+                          <IntegrationDialog type={type} integration={i} sshKeys={sshKeys} />
                           <ConfirmButton
                             action={deleteIntegrationAction.bind(null, i.id)}
                             message={`Supprimer l'intégration « ${i.name} » et ses identifiants ?`}
@@ -87,6 +90,19 @@ async function Settings() {
             );
           })}
         </div>
+      </section>
+
+      <section id="ssh" aria-labelledby="ssh-title" className="scroll-mt-32">
+        <SectionTitle id="ssh-title">Clés SSH</SectionTitle>
+        <Card>
+          <CardBody className="grid gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-body">Accès aux hôtes Webmin. Les clés privées sont chiffrées en base (AES-256-GCM).</p>
+              <SshKeyDialog />
+            </div>
+            <SshKeyList keys={sshKeys} />
+          </CardBody>
+        </Card>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2 xl:gap-8">

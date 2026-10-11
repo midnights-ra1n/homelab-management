@@ -106,7 +106,7 @@ export const LINK_KIND_META: Record<LinkKind, { label: string; tone: Tone; dashe
   logical: { label: "Logique", tone: "muted", dashed: true },
 };
 
-export const INTEGRATION_TYPES = ["proxmox", "beszel", "maintenant", "patchmon"] as const;
+export const INTEGRATION_TYPES = ["proxmox", "beszel", "maintenant", "patchmon", "webmin"] as const;
 export type IntegrationType = (typeof INTEGRATION_TYPES)[number];
 
 export const INTEGRATION_META: Record<
@@ -136,6 +136,12 @@ export const INTEGRATION_META: Record<
     description: "Suivi des mises à jour de paquets et des correctifs de sécurité Linux.",
     icon: "patchmon",
     urlPlaceholder: "https://patchmon.lan",
+  },
+  webmin: {
+    label: "Webmin",
+    description: "Toutes tes instances Webmin centralisées : état, système et mises à jour via SSH par clé.",
+    icon: "webmin",
+    urlPlaceholder: "https://192.168.1.20:10000",
   },
 };
 

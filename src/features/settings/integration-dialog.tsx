@@ -6,9 +6,10 @@ import { saveIntegrationAction, testIntegrationAction } from "@/actions/integrat
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormDialog } from "@/components/ui/form-dialog";
-import { Switch, TextField } from "@/components/ui/form";
+import { SelectField, Switch, TextField } from "@/components/ui/form";
 import { INTEGRATION_META, type IntegrationType } from "@/lib/constants";
 import type { IntegrationPublic } from "@/lib/data/integrations";
+import type { SshKey } from "@/lib/data/ssh-keys";
 
 const HELP: Record<IntegrationType, string> = {
   proxmox:
@@ -17,9 +18,19 @@ const HELP: Record<IntegrationType, string> = {
   maintenant:
     "Maintenant n'a pas d'authentification native : si ton reverse proxy en exige une, renseigne l'en-tête complet (ex. « Authorization: Basic … »).",
   patchmon: "Paramètres → Intégrations → identifiants API avec la portée « host:get ». Authentification Basic (clé + secret).",
+  webmin:
+    "URL de l'interface Webmin. Pour l'état système, choisis une clé SSH (Paramètres → Clés SSH) et ajoute sa clé publique dans ~/.ssh/authorized_keys de l'utilisateur. Un compte non-root suffit : tout est en lecture seule.",
 };
 
-export function IntegrationDialog({ type, integration }: { type: IntegrationType; integration?: IntegrationPublic }) {
+export function IntegrationDialog({
+  type,
+  integration,
+  sshKeys = [],
+}: {
+  type: IntegrationType;
+  integration?: IntegrationPublic;
+  sshKeys?: SshKey[];
+}) {
   const meta = INTEGRATION_META[type];
   const secretHint = integration?.config.has_secret ? "Laisser vide pour conserver la valeur enregistrée" : undefined;
   return (
@@ -124,6 +135,43 @@ export function IntegrationDialog({ type, integration }: { type: IntegrationType
           </>
         )}
 
+        {type === "webmin" && (
+          <>
+            <SelectField
+              label="Clé SSH"
+              name="ssh_key_id"
+              defaultValue={integration?.config.ssh_key_id ?? ""}
+              placeholder="Aucune (interface web seulement)"
+              options={sshKeys.map((k) => ({ value: k.id, label: `${k.name} (${k.type})` }))}
+              hint={sshKeys.length ? undefined : "Aucune clé : crée-en une dans Paramètres → Clés SSH"}
+            />
+            <div className="grid grid-cols-[1fr_6rem] gap-3">
+              <TextField
+                label="Utilisateur SSH"
+                name="ssh_user"
+                defaultValue={integration?.config.ssh_user}
+                placeholder="root"
+                className="font-mono"
+                autoComplete="off"
+              />
+              <TextField
+                label="Port"
+                name="ssh_port"
+                type="number"
+                min={1}
+                max={65535}
+                defaultValue={integration?.config.ssh_port ?? 22}
+                className="font-mono"
+              />
+            </div>
+            {integration?.config.ssh_host_key && (
+              <p className="font-mono text-xs text-meta sm:col-span-2">
+                Empreinte de l&apos;hôte mémorisée : {integration.config.ssh_host_key}
+              </p>
+            )}
+          </>
+        )}
+
         {type === "maintenant" && (
           <TextField
             label="En-tête d'authentification (optionnel)"
@@ -137,13 +185,18 @@ export function IntegrationDialog({ type, integration }: { type: IntegrationType
         )}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
+        {type !== "webmin" && (
         <Switch
           name="verify_tls"
           label="Vérifier le certificat TLS"
           hint={type === "proxmox" ? "À désactiver pour le certificat auto-signé de Proxmox" : "Désactiver pour un certificat auto-signé"}
           defaultChecked={integration ? !!integration.config.verify_tls : type !== "proxmox"}
         />
+        )}
         <Switch name="enabled" label="Activée" defaultChecked={integration ? !!integration.enabled : true} />
+        {type === "webmin" && integration?.config.ssh_host_key && (
+          <Switch name="reset_host_key" label="Oublier l'empreinte SSH" hint="Après réinstallation de l'hôte" />
+        )}
         {type === "maintenant" && integration?.config.has_header && (
           <Switch name="clear_header" label="Supprimer l'en-tête enregistré" />
         )}

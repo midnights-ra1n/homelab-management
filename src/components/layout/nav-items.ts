@@ -8,6 +8,7 @@ import {
   Rocket,
   Server,
   Share2,
+  SquareTerminal,
   type LucideIcon,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/taches", label: "Tâches", short: "Tâches", icon: ClipboardList },
   { href: "/carte", label: "Carte", short: "Carte", icon: Share2 },
   { href: "/proxmox", label: "Proxmox", short: "Proxmox", icon: Server },
+  { href: "/webmin", label: "Webmin", short: "Webmin", icon: SquareTerminal },
   { href: "/monitoring", label: "Monitoring", short: "Monitoring", icon: Activity },
 ];
 

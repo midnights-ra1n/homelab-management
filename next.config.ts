@@ -34,7 +34,7 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   reactCompiler: true,
-  serverExternalPackages: ["undici"],
+  serverExternalPackages: ["undici", "ssh2"],
   experimental: {
     serverActions: {
       // Upload d'icônes personnalisées (max 1 Mo) + marge multipart

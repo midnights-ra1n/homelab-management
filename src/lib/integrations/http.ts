@@ -6,11 +6,10 @@ const insecureAgent = new Agent({ connect: { rejectUnauthorized: false } });
 const secureAgent = new Agent();
 
 export class IntegrationError extends Error {
-  constructor(
-    message: string,
-    public status?: number,
-  ) {
+  status?: number;
+  constructor(message: string, status?: number) {
     super(message);
+    this.status = status;
   }
 }
 

@@ -254,6 +254,15 @@ export const shortcutSchema = z.object({
 });
 export type ShortcutInput = z.infer<typeof shortcutSchema>;
 
+export const sshKeySchema = z.object({
+  name: z.preprocess(
+    (v) => (v == null ? "" : String(v).trim()),
+    z.string().min(1, "Le nom est requis").max(60).regex(/^[\w .@-]+$/, "Lettres, chiffres, espace, « . @ - _ » uniquement"),
+  ),
+  mode: z.enum(["ed25519", "rsa", "import"]),
+  private_key: text(20000),
+});
+
 export const groupSchema = z.object({ name: required("Le nom", 60) });
 
 /* ----------------------------------------------------------------------------
@@ -275,6 +284,13 @@ export const integrationSchema = z.object({
   token_secret: text(500),
   auth_header: text(1000),
   verify_tls: checkbox,
+  ssh_key_id: optId,
+  ssh_user: z.preprocess(
+    (v) => (v == null ? "" : String(v).trim()),
+    z.string().max(32).regex(/^([a-z_][a-z0-9_.-]*)?$/i, "Nom d'utilisateur SSH invalide"),
+  ),
+  ssh_port: optNumber({ int: true, min: 1, max: 65535 }),
+  reset_host_key: checkbox,
 });
 export type IntegrationInput = z.infer<typeof integrationSchema>;
 

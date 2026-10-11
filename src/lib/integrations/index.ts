@@ -5,6 +5,7 @@ import { beszelSystems, testBeszel, type BeszelSystem } from "./beszel";
 import { maintenantData, testMaintenant, type MaintenantData } from "./maintenant";
 import { patchmonHosts, testPatchmon, type PatchmonHost } from "./patchmon";
 import { proxmoxOverview, testProxmox, type ProxmoxOverview } from "./proxmox";
+import { testWebmin, webminInstance, type WebminInstance } from "./webmin";
 
 export type Source<T> = {
   id: number;
@@ -30,6 +31,7 @@ export const fetchBeszel = () => collect<BeszelSystem[]>("beszel", beszelSystems
 export const fetchMaintenant = () => collect<MaintenantData>("maintenant", maintenantData);
 export const fetchPatchmon = () => collect<PatchmonHost[]>("patchmon", patchmonHosts);
 export const fetchProxmox = () => collect<ProxmoxOverview>("proxmox", proxmoxOverview);
+export const fetchWebmin = () => collect<WebminInstance>("webmin", webminInstance);
 
 export async function testIntegration(i: Integration): Promise<string> {
   switch (i.type) {
@@ -41,6 +43,8 @@ export async function testIntegration(i: Integration): Promise<string> {
       return testMaintenant(i);
     case "patchmon":
       return testPatchmon(i);
+    case "webmin":
+      return testWebmin(i);
   }
 }
 

@@ -12,6 +12,12 @@ export type IntegrationConfig = {
   token_secret?: string;
   auth_header?: string;
   verify_tls?: boolean;
+  // Webmin : accès SSH par clé (hôte = celui de l'URL)
+  ssh_key_id?: number;
+  ssh_user?: string;
+  ssh_port?: number;
+  /** Empreinte SHA256 de la clé d'hôte, mémorisée à la première connexion (TOFU). */
+  ssh_host_key?: string;
 };
 
 export type Integration = {
@@ -27,7 +33,17 @@ export type Integration = {
 
 /** Vue sans secrets, sûre à transmettre au client. */
 export type IntegrationPublic = Omit<Integration, "config"> & {
-  config: { username?: string; token_id?: string; verify_tls?: boolean; has_secret: boolean; has_header: boolean };
+  config: {
+    username?: string;
+    token_id?: string;
+    verify_tls?: boolean;
+    has_secret: boolean;
+    has_header: boolean;
+    ssh_key_id?: number;
+    ssh_user?: string;
+    ssh_port?: number;
+    ssh_host_key?: string;
+  };
 };
 
 type Row = Omit<Integration, "config"> & { config: string };
@@ -70,12 +86,17 @@ export function toPublic(i: Integration): IntegrationPublic {
       verify_tls: i.config.verify_tls,
       has_secret: !!(i.config.password || i.config.token_secret),
       has_header: !!i.config.auth_header,
+      ssh_key_id: i.config.ssh_key_id,
+      ssh_user: i.config.ssh_user,
+      ssh_port: i.config.ssh_port,
+      ssh_host_key: i.config.ssh_host_key,
     },
   };
 }
 
 /** Fusionne la saisie avec la config existante : un secret laissé vide est conservé. */
-export function buildConfig(input: IntegrationInput, previous?: IntegrationConfig): IntegrationConfig {
+export function buildConfig(input: IntegrationInput, previous?: IntegrationConfig, previousUrl?: string): IntegrationConfig {
+  const sameHost = !!previousUrl && hostOf(previousUrl) === hostOf(input.url) && previous?.ssh_port === (input.ssh_port ?? undefined);
   return {
     username: input.username || undefined,
     password: input.password || previous?.password,
@@ -83,7 +104,27 @@ export function buildConfig(input: IntegrationInput, previous?: IntegrationConfi
     token_secret: input.token_secret || previous?.token_secret,
     auth_header: input.auth_header || previous?.auth_header,
     verify_tls: input.verify_tls,
+    ssh_key_id: input.ssh_key_id ?? undefined,
+    ssh_user: input.ssh_user || undefined,
+    ssh_port: input.ssh_port ?? undefined,
+    // Changer d'hôte ou demander l'oubli réinitialise l'empreinte mémorisée.
+    ssh_host_key: sameHost && !input.reset_host_key ? previous?.ssh_host_key : undefined,
   };
+}
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
+/** Mémorise l'empreinte SSH vue à la première connexion. */
+export function rememberHostKey(id: number, fingerprint: string) {
+  const i = getIntegration(id);
+  if (!i || i.config.ssh_host_key) return;
+  run("UPDATE integrations SET config = ? WHERE id = ?", [encrypt(JSON.stringify({ ...i.config, ssh_host_key: fingerprint })), id]);
 }
 
 export function createIntegration(input: IntegrationInput) {
@@ -101,7 +142,7 @@ export function createIntegration(input: IntegrationInput) {
 
 export function updateIntegration(id: number, input: IntegrationInput, clearHeader = false) {
   const previous = getIntegration(id);
-  const config = buildConfig(input, previous?.config);
+  const config = buildConfig(input, previous?.config, previous?.url);
   if (clearHeader) delete config.auth_header;
   run(
     "UPDATE integrations SET name = ?, url = ?, config = ?, enabled = ?, updated_at = datetime('now') WHERE id = ?",

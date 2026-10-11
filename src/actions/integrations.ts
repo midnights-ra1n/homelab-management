@@ -40,7 +40,7 @@ export async function testIntegrationAction(id: number | null, fd: FormData): Pr
     name: parsed.data.name,
     url: parsed.data.url,
     enabled: 1,
-    config: buildConfig(parsed.data, previous?.config),
+    config: buildConfig(parsed.data, previous?.config, previous?.url),
     created_at: "",
     updated_at: "",
   };

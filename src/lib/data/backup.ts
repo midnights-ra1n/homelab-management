@@ -11,6 +11,7 @@ const TABLES = [
   "vlans",
   "subnets",
   "integrations",
+  "ssh_keys",
   "assets",
   "ip_addresses",
   "deployments",
@@ -48,6 +49,14 @@ export function exportBackup(includeSecrets: boolean): Backup {
       return { ...row, config: "" };
     }
   });
+  tables.ssh_keys = tables.ssh_keys.map((row) => {
+    if (!includeSecrets) return { ...row, private_key: "" };
+    try {
+      return { ...row, private_key: decrypt(String(row.private_key)) };
+    } catch {
+      return { ...row, private_key: "" };
+    }
+  });
   const files: Record<string, string> = {};
   for (const icon of tables.uploaded_icons) {
     const file = path.join(/*turbopackIgnore: true*/ UPLOADS_DIR, path.basename(String(icon.filename)));
@@ -77,6 +86,11 @@ export function importBackup(backup: Backup) {
         if (t === "integrations") {
           const c = row.config;
           row.config = c && typeof c === "object" ? encrypt(JSON.stringify(c)) : typeof c === "string" && c.startsWith("v1.") ? c : encrypt("{}");
+        }
+        if (t === "ssh_keys") {
+          const k = String(row.private_key ?? "");
+          if (!k) continue; // sauvegarde sans secrets : la clé est inutilisable
+          if (!k.startsWith("v1.")) row.private_key = encrypt(k);
         }
         const keys = Object.keys(row).filter((k) => allowed.has(k));
         if (!keys.length) continue;
