@@ -12,20 +12,34 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { href: string; label: string; short: string; icon: LucideIcon };
+export type NavItem = { href: string; label: string; short: string; icon: LucideIcon; description?: string };
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Tableau de bord", short: "Accueil", icon: LayoutDashboard },
   { href: "/applications", label: "Applications", short: "Apps", icon: AppWindow },
-  { href: "/inventaire", label: "Inventaire", short: "Inventaire", icon: Boxes },
-  { href: "/reseau", label: "Réseau", short: "Réseau", icon: Network },
-  { href: "/deploiements", label: "Déploiements", short: "Déploiements", icon: Rocket },
-  { href: "/taches", label: "Tâches", short: "Tâches", icon: ClipboardList },
-  { href: "/carte", label: "Carte", short: "Carte", icon: Share2 },
-  { href: "/proxmox", label: "Proxmox", short: "Proxmox", icon: Server },
-  { href: "/webmin", label: "Webmin", short: "Webmin", icon: SquareTerminal },
+  { href: "/inventaire", label: "Inventaire", short: "Inventaire", icon: Boxes, description: "Serveurs, VM, conteneurs et équipements" },
+  { href: "/reseau", label: "Réseau", short: "Réseau", icon: Network, description: "IPAM, VLAN, VPN et pare-feu" },
+  { href: "/carte", label: "Carte", short: "Carte", icon: Share2, description: "Topologie interactive du homelab" },
+  { href: "/deploiements", label: "Déploiements", short: "Déploiements", icon: Rocket, description: "Ce qui arrive et où ça en est" },
+  { href: "/taches", label: "Tâches", short: "Tâches", icon: ClipboardList, description: "Kanban de maintenance et d'idées" },
+  { href: "/proxmox", label: "Proxmox", short: "Proxmox", icon: Server, description: "Nœuds, invités et migrations" },
+  { href: "/webmin", label: "Webmin", short: "Webmin", icon: SquareTerminal, description: "Instances et état système via SSH" },
   { href: "/monitoring", label: "Monitoring", short: "Monitoring", icon: Activity },
 ];
+
+const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
+
+/** Barre desktop : entrées directes et groupes ouverts en sous-menu. */
+export type NavGroup = { id: string; label: string; items: NavItem[] };
+export const NAV_DESKTOP: (NavItem | NavGroup)[] = [
+  byHref("/"),
+  byHref("/applications"),
+  { id: "infra", label: "Infrastructure", items: ["/inventaire", "/reseau", "/carte"].map(byHref) },
+  { id: "suivi", label: "Suivi", items: ["/deploiements", "/taches"].map(byHref) },
+  { id: "serveurs", label: "Serveurs", items: ["/proxmox", "/webmin"].map(byHref) },
+  byHref("/monitoring"),
+];
+export const isGroup = (e: NavItem | NavGroup): e is NavGroup => "items" in e;
 
 /** Onglets principaux de la barre mobile (le reste est dans « Plus »). */
 export const MOBILE_TABS = ["/", "/applications", "/inventaire", "/deploiements"];

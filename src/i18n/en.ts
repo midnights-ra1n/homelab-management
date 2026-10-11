@@ -4,6 +4,13 @@
  * aussi à reconnaître les messages dynamiques venus du serveur.
  */
 export const en: Record<string, string> = {
+  "Serveurs, VM, conteneurs et équipements": "Servers, VMs, containers and devices",
+  "IPAM, VLAN, VPN et pare-feu": "IPAM, VLANs, VPN and firewall",
+  "Topologie interactive du homelab": "Interactive homelab topology",
+  "Ce qui arrive et où ça en est": "What's coming and where it stands",
+  "Kanban de maintenance et d'idées": "Kanban for maintenance and ideas",
+  "Nœuds, invités et migrations": "Nodes, guests and migrations",
+  "Instances et état système via SSH": "Instances and system status over SSH",
   "#{id} (supprimé)": "#{id} (deleted)",
   "(auth. désactivée)": "(auth. disabled)",
   ") sur": ") on",
