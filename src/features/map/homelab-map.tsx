@@ -39,6 +39,7 @@ import {
   type Tone,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 export type MapAsset = {
   id: number;
@@ -127,6 +128,7 @@ function autoLayout(assets: MapAsset[]): Record<number, { x: number; y: number }
 /* ------------------------------------------------------------------------ */
 
 const AssetNodeView = memo(function AssetNodeView({ data, selected }: NodeProps<AssetNode>) {
+  const tr = useT();
   const kindTone = TONE_VAR[ASSET_KIND_META[data.kind].tone];
   const vlanTone = data.vlan_color ? TONE_VAR[data.vlan_color] : "var(--mm-border)";
   const status = ASSET_STATUS_META[data.status];
@@ -148,11 +150,11 @@ const AssetNodeView = memo(function AssetNodeView({ data, selected }: NodeProps<
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[status.tone] }} title={status.label} />
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[status.tone] }} title={tr(status.label)} />
           <span className="truncate text-sm font-medium text-h1">{data.name}</span>
         </span>
         <span className="block truncate font-mono text-[0.68rem] text-meta">
-          {data.ip ?? data.hostname ?? ASSET_KIND_META[data.kind].label}
+          {data.ip ?? data.hostname ?? tr(ASSET_KIND_META[data.kind].label)}
           {data.vlan ? ` · v${data.vlan}` : ""}
         </span>
       </span>
@@ -164,6 +166,7 @@ const AssetNodeView = memo(function AssetNodeView({ data, selected }: NodeProps<
 type ExternalNode = Node<{ label: string; sub: string }, "external">;
 
 const ExternalNodeView = memo(function ExternalNodeView({ data, selected }: NodeProps<ExternalNode>) {
+  const tr = useT();
   return (
     <div
       className={cn(
@@ -175,7 +178,7 @@ const ExternalNodeView = memo(function ExternalNodeView({ data, selected }: Node
       <Globe size={15} className="text-purple" aria-hidden />
       <span>
         <span className="block text-sm font-medium text-h1">{data.label}</span>
-        <span className="block font-mono text-[0.65rem] text-meta">{data.sub}</span>
+        <span className="block font-mono text-[0.65rem] text-meta">{tr(data.sub)}</span>
       </span>
       <Handle type="source" position={Position.Bottom} className="!h-2 !w-2" isConnectable={false} />
     </div>
@@ -212,6 +215,7 @@ function Flow({
   vlans: { vlan_id: number; name: string; color: Tone }[];
   saved: Record<number, { x: number; y: number }>;
 }) {
+  const tr = useT();
   const toast = useToast();
   const { fitView } = useReactFlow();
   const [, start] = useTransition();
@@ -232,7 +236,7 @@ function Flow({
       id: `ext-${t.id}`,
       type: "external",
       position: { x: maxX + NODE_W + 120, y: i * 110 },
-      data: { label: t.bLabel, sub: `${t.typeLabel} · hors inventaire` },
+      data: { label: t.bLabel, sub: tr("{typeLabel} · hors inventaire", { typeLabel: t.typeLabel }) },
     }));
 
   const assetNodes: AssetNode[] = visible.map((a) => ({
@@ -312,10 +316,10 @@ function Flow({
       if (!source || !target || source === target) return;
       start(async () => {
         await createLinkAction(source, target, linkKind, "");
-        toast("success", `Lien ${LINK_KIND_META[linkKind].label} ajouté`);
+        toast("success", tr("Lien {kind} ajouté", { kind: tr(LINK_KIND_META[linkKind].label) }));
       });
     },
-    [linkKind, toast],
+    [linkKind, toast, tr],
   );
 
   const selectedAsset = assets.find((a) => a.id === selectedNode);
@@ -382,7 +386,7 @@ function Flow({
                     else next.add(k);
                     setHiddenKinds(next);
                   }}
-                  title={`${hidden ? "Afficher" : "Masquer"} : ${ASSET_KIND_META[k].plural}`}
+                  title={`${hidden ? tr("Afficher") : tr("Masquer")} : ${ASSET_KIND_META[k].plural}`}
                   className={cn(
                     "flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs transition-colors",
                     hidden ? "text-meta line-through" : "text-h2 hover:bg-box",
@@ -396,15 +400,15 @@ function Flow({
           </div>
           {vlans.length > 0 && (
             <select
-              aria-label="Mettre en évidence un VLAN"
+              aria-label={tr("Mettre en évidence un VLAN")}
               value={vlanFilter ?? ""}
               onChange={(e) => setVlanFilter(e.target.value ? Number(e.target.value) : null)}
               className="field rounded-full bg-page/90 px-4 py-2 text-xs backdrop-blur"
             >
-              <option value="">Tous les VLAN</option>
+              <option value="">{tr("Tous les VLAN")}</option>
               {vlans.map((v) => (
                 <option key={v.vlan_id} value={v.vlan_id}>
-                  VLAN {v.vlan_id} · {v.name}
+                  {tr("VLAN ")}{v.vlan_id} · {v.name}
                 </option>
               ))}
             </select>
@@ -413,15 +417,14 @@ function Flow({
 
         <Panel position="top-right" className="!m-3 flex items-center gap-2">
           <label className="flex items-center gap-2 rounded-full border border-line bg-page/90 py-1 pl-3 pr-1 text-xs text-meta backdrop-blur">
-            Nouveau lien
-            <select
+            {tr("Nouveau lien")}<select
               value={linkKind}
               onChange={(e) => setLinkKind(e.target.value as LinkKind)}
               className="field rounded-full px-3 py-1 text-xs"
             >
               {LINK_KINDS.map((k) => (
                 <option key={k} value={k}>
-                  {LINK_KIND_META[k].label}
+                  {tr(LINK_KIND_META[k].label)}
                 </option>
               ))}
             </select>
@@ -430,8 +433,8 @@ function Flow({
             variant="secondary"
             size="icon"
             className="bg-page/90 backdrop-blur"
-            title="Ajuster à l'écran"
-            aria-label="Ajuster à l'écran"
+            title={tr("Ajuster à l'écran")}
+            aria-label={tr("Ajuster à l'écran")}
             onClick={() => fitView({ padding: 0.2, maxZoom: 1, duration: 600 })}
             icon={<Maximize size={15} />}
           />
@@ -439,8 +442,8 @@ function Flow({
             variant="secondary"
             size="icon"
             className="bg-page/90 backdrop-blur"
-            title="Disposition automatique"
-            aria-label="Disposition automatique"
+            title={tr("Disposition automatique")}
+            aria-label={tr("Disposition automatique")}
             onClick={() =>
               start(async () => {
                 await resetPositionsAction();
@@ -460,25 +463,25 @@ function Flow({
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
-                      {ASSET_KIND_META[selectedAsset.kind].label}
+                      {tr(ASSET_KIND_META[selectedAsset.kind].label)}
                     </p>
                     <p className="mt-1 truncate font-semibold text-h1">{selectedAsset.name}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Badge tone={ASSET_STATUS_META[selectedAsset.status].tone} dot>
-                        {ASSET_STATUS_META[selectedAsset.status].label}
+                        {tr(ASSET_STATUS_META[selectedAsset.status].label)}
                       </Badge>
                       {selectedAsset.ip && <Badge tone="muted">{selectedAsset.ip}</Badge>}
-                      {selectedAsset.vlan && <Badge tone={selectedAsset.vlan_color ?? "accent"}>VLAN {selectedAsset.vlan}</Badge>}
+                      {selectedAsset.vlan && <Badge tone={selectedAsset.vlan_color ?? "accent"}>{tr("VLAN ")}{selectedAsset.vlan}</Badge>}
                     </div>
                   </div>
                   <Link
                     href={`/inventaire/${selectedAsset.id}`}
                     className="flex h-9 w-9 items-center justify-center rounded-full text-accent-text hover:bg-accent-soft"
-                    aria-label="Ouvrir la fiche"
+                    aria-label={tr("Ouvrir la fiche")}
                   >
                     <ArrowUpRight size={17} />
                   </Link>
-                  <button type="button" onClick={() => setSelectedNode(null)} className="p-2 text-meta hover:text-h1" aria-label="Fermer">
+                  <button type="button" onClick={() => setSelectedNode(null)} className="p-2 text-meta hover:text-h1" aria-label={tr("Fermer")}>
                     <X size={15} />
                   </button>
                 </div>
@@ -486,12 +489,12 @@ function Flow({
               {selectedLink && (
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">Lien</p>
+                    <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Lien")}</p>
                     <p className="mt-1 truncate text-sm text-h1">
                       {assets.find((a) => a.id === selectedLink.source_id)?.name} →{" "}
                       {assets.find((a) => a.id === selectedLink.target_id)?.name}
                     </p>
-                    <p className="text-xs text-meta">{LINK_KIND_META[selectedLink.kind].label}</p>
+                    <p className="text-xs text-meta">{tr(LINK_KIND_META[selectedLink.kind].label)}</p>
                   </div>
                   <Button
                     variant="danger"
@@ -504,8 +507,7 @@ function Flow({
                       })
                     }
                   >
-                    Supprimer
-                  </Button>
+                    {tr("Supprimer")}</Button>
                 </div>
               )}
             </div>

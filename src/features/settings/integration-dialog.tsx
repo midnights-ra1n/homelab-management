@@ -10,6 +10,7 @@ import { SelectField, Switch, TextField } from "@/components/ui/form";
 import { INTEGRATION_META, type IntegrationType } from "@/lib/constants";
 import type { IntegrationPublic } from "@/lib/data/integrations";
 import type { SshKey } from "@/lib/data/ssh-keys";
+import { useT } from "@/i18n/client";
 
 const HELP: Record<IntegrationType, string> = {
   proxmox:
@@ -31,32 +32,33 @@ export function IntegrationDialog({
   integration?: IntegrationPublic;
   sshKeys?: SshKey[];
 }) {
+  const tr = useT();
   const meta = INTEGRATION_META[type];
-  const secretHint = integration?.config.has_secret ? "Laisser vide pour conserver la valeur enregistrée" : undefined;
+  const secretHint = integration?.config.has_secret ? tr("Laisser vide pour conserver la valeur enregistrée") : undefined;
   return (
     <FormDialog
-      title={integration ? `Modifier « ${integration.name} »` : `Connecter ${meta.label}`}
-      description={meta.description}
+      title={integration ? tr("Modifier « {name} »", { name: integration.name }) : tr("Connecter {label}", { label: meta.label })}
+      description={tr(meta.description)}
       action={saveIntegrationAction.bind(null, integration?.id ?? null)}
-      trigger={integration ? undefined : "Ajouter"}
+      trigger={integration ? undefined : tr("Ajouter")}
       triggerVariant={integration ? "subtle" : "ghost"}
       triggerSize={integration ? "icon-sm" : "sm"}
       triggerIcon={integration ? <Pencil size={14} /> : <Plus size={14} />}
-      triggerLabel={integration ? "Modifier l'intégration" : `Ajouter ${meta.label}`}
+      triggerLabel={integration ? tr("Modifier l'intégration") : tr("Ajouter {label}", { label: meta.label })}
       size="lg"
     >
       <input type="hidden" name="type" value={type} />
-      <Alert kind="info" title="Où trouver ces informations ?">
-        {HELP[type]}
+      <Alert kind="info" title={tr("Où trouver ces informations ?")}>
+        {tr(HELP[type])}
       </Alert>
       <div className="grid gap-5 sm:grid-cols-2">
         <TextField
-          label="Nom"
+          label={tr("Nom")}
           name="name"
           defaultValue={integration?.name}
           placeholder={type === "proxmox" ? "pve-01" : meta.label}
           required
-          hint={type === "proxmox" ? "Un nom par nœud (ex. son hostname)" : undefined}
+          hint={type === "proxmox" ? tr("Un nom par nœud (ex. son hostname)") : undefined}
         />
         <TextField
           label="URL"
@@ -71,7 +73,7 @@ export function IntegrationDialog({
         {type === "proxmox" && (
           <>
             <TextField
-              label="ID du jeton"
+              label={tr("ID du jeton")}
               name="token_id"
               defaultValue={integration?.config.token_id}
               placeholder="homelab@pve!dashboard"
@@ -80,7 +82,7 @@ export function IntegrationDialog({
               autoComplete="off"
             />
             <TextField
-              label="Secret du jeton"
+              label={tr("Secret du jeton")}
               name="token_secret"
               type="password"
               placeholder={integration?.config.has_secret ? "••••••••" : "xxxxxxxx-xxxx-…"}
@@ -94,7 +96,7 @@ export function IntegrationDialog({
         {type === "patchmon" && (
           <>
             <TextField
-              label="Clé (token key)"
+              label={tr("Clé (token key)")}
               name="token_id"
               defaultValue={integration?.config.token_id}
               required
@@ -102,7 +104,7 @@ export function IntegrationDialog({
               autoComplete="off"
             />
             <TextField
-              label="Secret"
+              label={tr("Secret")}
               name="token_secret"
               type="password"
               placeholder={integration?.config.has_secret ? "••••••••" : undefined}
@@ -125,7 +127,7 @@ export function IntegrationDialog({
               autoComplete="off"
             />
             <TextField
-              label="Mot de passe"
+              label={tr("Mot de passe")}
               name="password"
               type="password"
               placeholder={integration?.config.has_secret ? "••••••••" : undefined}
@@ -138,16 +140,16 @@ export function IntegrationDialog({
         {type === "webmin" && (
           <>
             <SelectField
-              label="Clé SSH"
+              label={tr("Clé SSH")}
               name="ssh_key_id"
               defaultValue={integration?.config.ssh_key_id ?? ""}
-              placeholder="Aucune (interface web seulement)"
+              placeholder={tr("Aucune (interface web seulement)")}
               options={sshKeys.map((k) => ({ value: k.id, label: `${k.name} (${k.type})` }))}
-              hint={sshKeys.length ? undefined : "Aucune clé : crée-en une dans Paramètres → Clés SSH"}
+              hint={sshKeys.length ? undefined : tr("Aucune clé : crée-en une dans Paramètres → Clés SSH")}
             />
             <div className="grid grid-cols-[1fr_6rem] gap-3">
               <TextField
-                label="Utilisateur SSH"
+                label={tr("Utilisateur SSH")}
                 name="ssh_user"
                 defaultValue={integration?.config.ssh_user}
                 placeholder="root"
@@ -155,7 +157,7 @@ export function IntegrationDialog({
                 autoComplete="off"
               />
               <TextField
-                label="Port"
+                label={tr("Port")}
                 name="ssh_port"
                 type="number"
                 min={1}
@@ -166,7 +168,7 @@ export function IntegrationDialog({
             </div>
             {integration?.config.ssh_host_key && (
               <p className="font-mono text-xs text-meta sm:col-span-2">
-                Empreinte de l&apos;hôte mémorisée : {integration.config.ssh_host_key}
+                {tr("Empreinte de l'hôte mémorisée : ")}{integration.config.ssh_host_key}
               </p>
             )}
           </>
@@ -174,11 +176,11 @@ export function IntegrationDialog({
 
         {type === "maintenant" && (
           <TextField
-            label="En-tête d'authentification (optionnel)"
+            label={tr("En-tête d'authentification (optionnel)")}
             name="auth_header"
             type="password"
-            placeholder={integration?.config.has_header ? "•••••••• (enregistré)" : "Authorization: Basic dXNlcjpwYXNz"}
-            hint={integration?.config.has_header ? "Laisser vide pour conserver l'en-tête enregistré" : "Format « Nom: valeur »"}
+            placeholder={integration?.config.has_header ? tr("•••••••• (enregistré)") : tr("Authorization: Basic dXNlcjpwYXNz")}
+            hint={integration?.config.has_header ? tr("Laisser vide pour conserver l'en-tête enregistré") : tr("Format « Nom: valeur »")}
             className="font-mono sm:col-span-2"
             autoComplete="off"
           />
@@ -188,17 +190,17 @@ export function IntegrationDialog({
         {type !== "webmin" && (
         <Switch
           name="verify_tls"
-          label="Vérifier le certificat TLS"
-          hint={type === "proxmox" ? "À désactiver pour le certificat auto-signé de Proxmox" : "Désactiver pour un certificat auto-signé"}
+          label={tr("Vérifier le certificat TLS")}
+          hint={type === "proxmox" ? tr("À désactiver pour le certificat auto-signé de Proxmox") : tr("Désactiver pour un certificat auto-signé")}
           defaultChecked={integration ? !!integration.config.verify_tls : type !== "proxmox"}
         />
         )}
-        <Switch name="enabled" label="Activée" defaultChecked={integration ? !!integration.enabled : true} />
+        <Switch name="enabled" label={tr("Activée")} defaultChecked={integration ? !!integration.enabled : true} />
         {type === "webmin" && integration?.config.ssh_host_key && (
-          <Switch name="reset_host_key" label="Oublier l'empreinte SSH" hint="Après réinstallation de l'hôte" />
+          <Switch name="reset_host_key" label={tr("Oublier l'empreinte SSH")} hint={tr("Après réinstallation de l'hôte")} />
         )}
         {type === "maintenant" && integration?.config.has_header && (
-          <Switch name="clear_header" label="Supprimer l'en-tête enregistré" />
+          <Switch name="clear_header" label={tr("Supprimer l'en-tête enregistré")} />
         )}
       </div>
       <TestConnection id={integration?.id ?? null} />
@@ -208,6 +210,7 @@ export function IntegrationDialog({
 
 /** Teste la connexion avec les valeurs saisies, sans enregistrer. */
 function TestConnection({ id }: { id: number | null }) {
+  const tr = useT();
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
   return (
@@ -224,11 +227,11 @@ function TestConnection({ id }: { id: number | null }) {
             start(async () => setResult(await testIntegrationAction(id, fd)));
           }}
         >
-          {pending ? "Test en cours…" : "Tester la connexion"}
+          {pending ? tr("Test en cours…") : tr("Tester la connexion")}
         </Button>
       </div>
       {result && (
-        <Alert kind={result.ok ? "success" : "error"} title={result.ok ? "Connexion réussie" : "Échec de la connexion"}>
+        <Alert kind={result.ok ? "success" : "error"} title={result.ok ? tr("Connexion réussie") : tr("Échec de la connexion")}>
           {result.message}
         </Alert>
       )}

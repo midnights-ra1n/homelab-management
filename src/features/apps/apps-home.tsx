@@ -20,6 +20,7 @@ import type { Shortcut, ShortcutGroup, UploadedIcon } from "@/lib/data/shortcuts
 import { cn } from "@/lib/utils";
 import { AppIcon } from "./app-icon";
 import { IconPicker } from "./icon-picker";
+import { useT } from "@/i18n/client";
 
 type Probe = { up: boolean; status?: number; ms: number };
 type Props = {
@@ -32,6 +33,7 @@ type Props = {
 const UNGROUPED = 0;
 
 export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
+  const tr = useT();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(false);
   const [probes, setProbes] = useState<Record<string, Probe>>({});
@@ -81,7 +83,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
 
   const sections = [
     ...groups.map((g) => ({ id: g.id, name: g.name, group: g })),
-    { id: UNGROUPED, name: groups.length ? "Sans groupe" : "Applications", group: null },
+    { id: UNGROUPED, name: groups.length ? tr("Sans groupe") : tr("Applications"), group: null },
   ]
     .map((s) => ({ ...s, items: filtered.filter((i) => (i.group_id ?? UNGROUPED) === s.id) }))
     .filter((s) => s.items.length > 0 || (editing && s.group));
@@ -116,8 +118,8 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
               if (e.key === "Enter" && filtered[0]) window.open(filtered[0].url, filtered[0].new_tab ? "_blank" : "_self");
               if (e.key === "Escape") setQuery("");
             }}
-            placeholder="Rechercher une application… (Entrée pour ouvrir)"
-            aria-label="Rechercher une application"
+            placeholder={tr("Rechercher une application… (Entrée pour ouvrir)")}
+            aria-label={tr("Rechercher une application")}
             className="field w-full rounded-full py-3.5 pl-13 pr-14 text-base"
           />
           <kbd className="pointer-events-none absolute right-5 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-1.5 font-mono text-[0.7rem] text-meta sm:block">
@@ -127,8 +129,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
         <div className="flex items-center gap-2">
           {checked > 0 && (
             <span className="mr-2 font-mono text-xs text-meta">
-              {upCount}/{checked} en ligne
-            </span>
+              {upCount}/{checked} {tr("en ligne")}</span>
           )}
           <Button
             variant={editing ? "primary" : "secondary"}
@@ -136,7 +137,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
             icon={<LayoutGrid size={16} />}
             aria-pressed={editing}
           >
-            {editing ? "Terminer" : "Organiser"}
+            {editing ? tr("Terminer") : tr("Organiser")}
           </Button>
           <GroupDialog />
           <ShortcutDialog groups={groups} uploads={uploads} assets={assets} />
@@ -146,13 +147,12 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
       {items.length === 0 ? (
         <EmptyState
           icon={<LayoutGrid size={22} />}
-          title="Aucun raccourci"
+          title={tr("Aucun raccourci")}
           action={<ShortcutDialog groups={groups} uploads={uploads} assets={assets} />}
         >
-          Ajoute des raccourcis vers tes applications auto-hébergées, avec leur icône et une vérification de disponibilité.
-        </EmptyState>
+          {tr("Ajoute des raccourcis vers tes applications auto-hébergées, avec leur icône et une vérification de disponibilité.")}</EmptyState>
       ) : sections.length === 0 ? (
-        <p className="py-12 text-center text-sm text-meta">Aucune application ne correspond à « {query} ».</p>
+        <p className="py-12 text-center text-sm text-meta">{tr("Aucune application ne correspond à « ")}{query} ».</p>
       ) : (
         sections.map((section, si) => (
           <section
@@ -175,7 +175,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
                   <Button
                     variant="subtle"
                     size="icon-sm"
-                    aria-label="Monter le groupe"
+                    aria-label={tr("Monter le groupe")}
                     disabled={si === 0}
                     onClick={() => start(() => moveGroupAction(section.group!.id, -1))}
                     icon={<ArrowUp size={14} />}
@@ -183,7 +183,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
                   <Button
                     variant="subtle"
                     size="icon-sm"
-                    aria-label="Descendre le groupe"
+                    aria-label={tr("Descendre le groupe")}
                     disabled={si >= groups.length - 1}
                     onClick={() => start(() => moveGroupAction(section.group!.id, 1))}
                     icon={<ArrowDown size={14} />}
@@ -191,7 +191,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
                   <GroupDialog group={section.group} />
                   <ConfirmButton
                     action={() => deleteGroupAction(section.group!.id)}
-                    message={`Supprimer le groupe « ${section.name} » ? Ses raccourcis seront conservés sans groupe.`}
+                    message={tr("Supprimer le groupe « {name} » ? Ses raccourcis seront conservés sans groupe.", { name: section.name })}
                   />
                 </div>
               )}
@@ -228,8 +228,8 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
                                 "h-2 w-2 shrink-0 rounded-full",
                                 !probe ? "bg-line-strong" : probe.up ? "bg-green" : "bg-red",
                               )}
-                              title={!probe ? "Vérification…" : probe.up ? `En ligne · ${probe.ms} ms` : "Injoignable"}
-                              aria-label={!probe ? "Vérification en cours" : probe.up ? "En ligne" : "Injoignable"}
+                              title={!probe ? tr("Vérification…") : probe.up ? tr("En ligne · {ms} ms", { ms: probe.ms }) : tr("Injoignable")}
+                              aria-label={!probe ? tr("Vérification en cours") : probe.up ? tr("En ligne") : tr("Injoignable")}
                             />
                           ) : null}
                         </span>
@@ -238,13 +238,13 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
                         </span>
                       </span>
                       {probe?.up && !editing && (
-                        <span className="hidden font-mono text-[0.65rem] text-meta group-hover:block">{probe.ms} ms</span>
+                        <span className="hidden font-mono text-[0.65rem] text-meta group-hover:block">{probe.ms} {tr("ms")}</span>
                       )}
                     </a>
                     {editing && (
                       <div className="absolute right-2 top-2 flex rounded-lg border border-line bg-elevated">
                         <ShortcutDialog shortcut={s} groups={groups} uploads={uploads} assets={assets} />
-                        <ConfirmButton action={() => deleteShortcutAction(s.id)} message={`Supprimer le raccourci « ${s.name} » ?`} />
+                        <ConfirmButton action={() => deleteShortcutAction(s.id)} message={tr("Supprimer le raccourci « {name} » ?", { name: s.name })} />
                       </div>
                     )}
                   </li>
@@ -252,8 +252,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
               })}
               {editing && section.items.length === 0 && (
                 <li className="col-span-full rounded-2xl border border-dashed border-line p-6 text-center text-sm text-meta">
-                  Glisse des raccourcis ici
-                </li>
+                  {tr("Glisse des raccourcis ici")}</li>
               )}
             </ul>
           </section>
@@ -274,33 +273,34 @@ function ShortcutDialog({
   uploads: UploadedIcon[];
   assets: { id: number; display_name: string }[];
 }) {
+  const tr = useT();
   return (
     <FormDialog
-      title={shortcut ? `Modifier « ${shortcut.name} »` : "Nouveau raccourci"}
+      title={shortcut ? tr("Modifier « {name} »", { name: shortcut.name }) : tr("Nouveau raccourci")}
       action={saveShortcutAction.bind(null, shortcut?.id ?? null)}
-      trigger={shortcut ? undefined : "Raccourci"}
+      trigger={shortcut ? undefined : tr("Raccourci")}
       triggerVariant={shortcut ? "subtle" : "primary"}
       triggerSize={shortcut ? "icon-sm" : "md"}
       triggerIcon={shortcut ? <Pencil size={14} /> : <Plus size={16} />}
-      triggerLabel={shortcut ? "Modifier le raccourci" : "Nouveau raccourci"}
+      triggerLabel={shortcut ? tr("Modifier le raccourci") : tr("Nouveau raccourci")}
       size="lg"
     >
       <div className="grid gap-5 sm:grid-cols-2">
-        <TextField label="Nom" name="name" defaultValue={shortcut?.name} placeholder="Jellyfin" required />
+        <TextField label={tr("Nom")} name="name" defaultValue={shortcut?.name} placeholder={tr("Jellyfin")} required />
         <TextField label="URL" name="url" type="url" defaultValue={shortcut?.url} placeholder="https://jellyfin.lan" required className="font-mono" />
-        <TextField label="Description" name="description" defaultValue={shortcut?.description} placeholder="Médiathèque" className="sm:col-span-2" />
+        <TextField label={tr("Description")} name="description" defaultValue={shortcut?.description} placeholder={tr("Médiathèque")} className="sm:col-span-2" />
         <SelectField
-          label="Groupe"
+          label={tr("Groupe")}
           name="group_id"
           defaultValue={shortcut?.group_id ?? ""}
-          placeholder="— Sans groupe —"
+          placeholder={tr("— Sans groupe —")}
           options={groups.map((g) => ({ value: g.id, label: g.name }))}
         />
         <SelectField
-          label="Hébergé sur"
+          label={tr("Hébergé sur")}
           name="asset_id"
           defaultValue={shortcut?.asset_id ?? ""}
-          placeholder="— Non lié —"
+          placeholder={tr("— Non lié —")}
           options={assets.map((a) => ({ value: a.id, label: a.display_name }))}
         />
       </div>
@@ -311,11 +311,11 @@ function ShortcutDialog({
         suggestion={shortcut?.name.toLowerCase()}
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <Switch name="new_tab" label="Ouvrir dans un nouvel onglet" defaultChecked={shortcut ? !!shortcut.new_tab : true} />
+        <Switch name="new_tab" label={tr("Ouvrir dans un nouvel onglet")} defaultChecked={shortcut ? !!shortcut.new_tab : true} />
         <Switch
           name="status_check"
-          label="Vérifier la disponibilité"
-          hint="Requête HEAD depuis le serveur chaque minute"
+          label={tr("Vérifier la disponibilité")}
+          hint={tr("Requête HEAD depuis le serveur chaque minute")}
           defaultChecked={shortcut ? !!shortcut.status_check : true}
         />
       </div>
@@ -324,18 +324,19 @@ function ShortcutDialog({
 }
 
 function GroupDialog({ group }: { group?: ShortcutGroup }) {
+  const tr = useT();
   return (
     <FormDialog
-      title={group ? "Renommer le groupe" : "Nouveau groupe"}
+      title={group ? tr("Renommer le groupe") : tr("Nouveau groupe")}
       action={saveGroupAction.bind(null, group?.id ?? null)}
       trigger={undefined}
       triggerVariant={group ? "subtle" : "secondary"}
       triggerSize={group ? "icon-sm" : "icon"}
       triggerIcon={group ? <Pencil size={14} /> : <FolderPlus size={16} />}
-      triggerLabel={group ? "Renommer le groupe" : "Nouveau groupe"}
+      triggerLabel={group ? tr("Renommer le groupe") : tr("Nouveau groupe")}
       size="sm"
     >
-      <TextField label="Nom du groupe" name="name" defaultValue={group?.name} placeholder="Médias, Infrastructure, Domotique…" required />
+      <TextField label={tr("Nom du groupe")} name="name" defaultValue={group?.name} placeholder={tr("Médias, Infrastructure, Domotique…")} required />
     </FormDialog>
   );
 }

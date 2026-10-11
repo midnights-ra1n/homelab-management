@@ -9,6 +9,7 @@ import { inputClass } from "@/components/ui/form";
 import { TONE_VAR } from "@/lib/constants";
 import type { HopKind, SimEndpoint, SimResult } from "@/lib/net/engine";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 type AssetOpt = { id: number; label: string; ip: string | null; group: string };
 
@@ -38,6 +39,7 @@ function toEndpoint(s: Side): SimEndpoint | null {
 }
 
 function EndpointPicker({ label, side, onChange, assets }: { label: string; side: Side; onChange: (s: Side) => void; assets: AssetOpt[] }) {
+  const tr = useT();
   const groups = [...new Set(assets.map((a) => a.group))];
   return (
     <fieldset className="grid gap-2">
@@ -54,13 +56,13 @@ function EndpointPicker({ label, side, onChange, assets }: { label: string; side
               side.mode === m ? "bg-accent text-on-accent" : "text-body hover:text-h1",
             )}
           >
-            {m === "asset" ? "Élément" : "Adresse IP"}
+            {m === "asset" ? tr("Élément") : tr("Adresse IP")}
           </button>
         ))}
       </div>
       {side.mode === "asset" ? (
         <select aria-label={label} className={inputClass} value={side.assetId} onChange={(e) => onChange({ ...side, assetId: e.target.value })}>
-          <option value="">— Choisir —</option>
+          <option value="">{tr("— Choisir —")}</option>
           {groups.map((g) => (
             <optgroup key={g} label={g}>
               {assets
@@ -68,7 +70,7 @@ function EndpointPicker({ label, side, onChange, assets }: { label: string; side
                 .map((a) => (
                   <option key={a.id} value={a.id} disabled={!a.ip}>
                     {a.label}
-                    {a.ip ? ` · ${a.ip}` : " · sans IP"}
+                    {a.ip ? ` · ${a.ip}` : tr(" · sans IP")}
                   </option>
                 ))}
             </optgroup>
@@ -90,6 +92,7 @@ function EndpointPicker({ label, side, onChange, assets }: { label: string; side
 
 /** Mode simulation « Packet Tracer » : suit un paquet saut par saut. */
 export function Simulator({ assets }: { assets: AssetOpt[] }) {
+  const tr = useT();
   const [src, setSrc] = useState<Side>({ mode: "asset", assetId: "", ip: "" });
   const [dst, setDst] = useState<Side>({ mode: "asset", assetId: "", ip: "" });
   const [protocol, setProtocol] = useState<"icmp" | "tcp" | "udp">("icmp");
@@ -120,7 +123,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
     <div className="grid gap-6 xl:grid-cols-[24rem_1fr] xl:gap-8">
       {/* Paramètres du paquet */}
       <div className="grid content-start gap-5 rounded-2xl border border-line-subtle bg-box p-5 sm:p-6">
-        <EndpointPicker label="Source" side={src} onChange={setSrc} assets={assets} />
+        <EndpointPicker label={tr("Source")} side={src} onChange={setSrc} assets={assets} />
         <div className="flex justify-center">
           <Button
             variant="secondary"
@@ -131,13 +134,12 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
               setDst(src);
             }}
           >
-            Inverser
-          </Button>
+            {tr("Inverser")}</Button>
         </div>
-        <EndpointPicker label="Destination" side={dst} onChange={setDst} assets={assets} />
+        <EndpointPicker label={tr("Destination")} side={dst} onChange={setDst} assets={assets} />
 
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-h1">Protocole</legend>
+          <legend className="mb-2 text-sm font-medium text-h1">{tr("Protocole")}</legend>
           <div className="inline-flex items-center gap-1 rounded-full border border-line bg-page p-1">
             {(["icmp", "tcp", "udp"] as const).map((p) => (
               <button
@@ -150,7 +152,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                   protocol === p ? "bg-accent text-on-accent" : "text-body hover:text-h1",
                 )}
               >
-                {p === "icmp" ? "ICMP (ping)" : p.toUpperCase()}
+                {p === "icmp" ? tr("ICMP (ping)") : p.toUpperCase()}
               </button>
             ))}
           </div>
@@ -159,8 +161,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
         {protocol !== "icmp" && (
           <div>
             <label htmlFor="sim-port" className="mb-2 block text-sm font-medium text-h1">
-              Port de destination
-            </label>
+              {tr("Port de destination")}</label>
             <input
               id="sim-port"
               className={cn(inputClass, "font-mono")}
@@ -193,12 +194,12 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
           onClick={() => send()}
           icon={<Play size={15} />}
         >
-          {pending ? "Simulation…" : "Envoyer le paquet"}
+          {pending ? tr("Simulation…") : tr("Envoyer le paquet")}
         </Button>
 
         {history.length > 0 && (
           <div>
-            <p className="mb-2 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">Scénarios récents</p>
+            <p className="mb-2 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Scénarios récents")}</p>
             <ul className="grid gap-1">
               {history.map((h, i) => (
                 <li key={i}>
@@ -213,7 +214,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                     }}
                     className="flex w-full items-center gap-2 rounded-full px-3 py-1.5 text-left text-xs text-body transition-colors hover:bg-page hover:text-h1"
                   >
-                    <span className={cn("h-2 w-2 shrink-0 rounded-full", h.ok ? "bg-green" : "bg-red")} aria-label={h.ok ? "passe" : "bloqué"} />
+                    <span className={cn("h-2 w-2 shrink-0 rounded-full", h.ok ? "bg-green" : "bg-red")} aria-label={h.ok ? "passe" : tr("bloqué")} />
                     <span className="truncate">{h.label}</span>
                   </button>
                 </li>
@@ -230,20 +231,18 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft text-accent-text">
               <Cloud size={22} />
             </span>
-            <p className="mt-4 font-semibold text-h1">Prêt à simuler</p>
+            <p className="mt-4 font-semibold text-h1">{tr("Prêt à simuler")}</p>
             <p className="mt-1 max-w-md text-sm text-meta">
-              Choisis une source et une destination : le paquet traverse les commutateurs, la passerelle, le pare-feu et les tunnels VPN
-              tels que décrits dans l&apos;IPAM. Idéal pour valider une règle avant la mise en prod.
-            </p>
+              {tr("Choisis une source et une destination : le paquet traverse les commutateurs, la passerelle, le pare-feu et les tunnels VPN tels que décrits dans l'IPAM. Idéal pour valider une règle avant la mise en prod.")}</p>
           </div>
         ) : (
           <div key={run} className="grid gap-5">
-            <Alert kind={result.ok ? "success" : "error"} title={result.ok ? "Le paquet passe" : "Le paquet est bloqué"}>
-              {result.summary}
+            <Alert kind={result.ok ? "success" : "error"} title={result.ok ? tr("Le paquet passe") : tr("Le paquet est bloqué")}>
+              {tr(result.summary)}
               {result.srcIp && result.dstIp && (
                 <span className="mt-1 block font-mono text-xs text-meta">
                   {result.srcIp} → {result.dstIp}
-                  {result.rule ? ` · règle : ${result.rule.name}` : ""}
+                  {result.rule ? tr(" · règle : {name}", { name: result.rule.name }) : ""}
                 </span>
               )}
             </Alert>
@@ -298,7 +297,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                           )}
                         </span>
                         <span className="mt-2 block w-full truncate text-sm font-medium text-h1">{h.label}</span>
-                        {h.sub && <span className="block w-full truncate font-mono text-[0.7rem] text-meta">{h.sub}</span>}
+                        {h.sub && <span className="block w-full truncate font-mono text-[0.7rem] text-meta">{tr(h.sub)}</span>}
                       </li>
                     );
                   })}
@@ -320,7 +319,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium text-h1">{h.label}</span>
-                        {h.sub && <span className="block truncate font-mono text-[0.7rem] text-meta">{h.sub}</span>}
+                        {h.sub && <span className="block truncate font-mono text-[0.7rem] text-meta">{tr(h.sub)}</span>}
                       </span>
                     </li>
                   );
@@ -336,22 +335,22 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm text-h1">
                       {h.label}
-                      {h.sub && <span className="ml-2 font-mono text-xs text-meta">{h.sub}</span>}
+                      {h.sub && <span className="ml-2 font-mono text-xs text-meta">{tr(h.sub)}</span>}
                     </span>
-                    <span className="block text-sm text-body">{h.detail}</span>
+                    <span className="block text-sm text-body">{tr(h.detail)}</span>
                   </span>
                   <span
                     className="shrink-0 font-mono text-xs font-semibold"
                     style={{ color: h.status === "ok" ? TONE_VAR.green : h.status === "warn" ? TONE_VAR.yellow : TONE_VAR.red }}
                   >
-                    {h.status === "ok" ? "OK" : h.status === "warn" ? "ATTENTION" : "ÉCHEC"}
+                    {h.status === "ok" ? "OK" : h.status === "warn" ? "ATTENTION" : tr("ÉCHEC")}
                   </span>
                 </li>
               ))}
             </ol>
 
             {result.warnings.length > 0 && (
-              <Alert kind="warning" title="À vérifier">
+              <Alert kind="warning" title={tr("À vérifier")}>
                 <ul className="list-disc pl-4">
                   {result.warnings.map((w) => (
                     <li key={w}>{w}</li>

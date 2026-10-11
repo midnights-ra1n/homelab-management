@@ -10,6 +10,7 @@ import { ICON_PROVIDERS } from "@/lib/icons";
 import type { IconType, UploadedIcon } from "@/lib/data/shortcuts";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "./app-icon";
+import { useT } from "@/i18n/client";
 
 const TABS: { value: IconType; label: string }[] = [
   { value: "dashboard", label: "Dashboard Icons" },
@@ -31,6 +32,7 @@ export function IconPicker({
   uploads: UploadedIcon[];
   suggestion?: string;
 }) {
+  const tr = useT();
   const [type, setType] = useState<IconType>(defaultValue ? defaultType : "dashboard");
   const [value, setValue] = useState(defaultValue);
   const [query, setQuery] = useState(defaultValue && (defaultType === "dashboard" || defaultType === "selfhst") ? defaultValue : "");
@@ -75,12 +77,12 @@ export function IconPicker({
           <AppIcon type={value ? type : "none"} value={value} name={suggestion || "?"} size={36} />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-h1">Icône</p>
-          <p className="truncate font-mono text-xs text-meta">{value ? `${type} · ${value}` : "Initiales par défaut"}</p>
+          <p className="text-sm font-medium text-h1">{tr("Icône")}</p>
+          <p className="truncate font-mono text-xs text-meta">{value ? `${type} · ${value}` : tr("Initiales par défaut")}</p>
         </div>
       </div>
 
-      <div role="tablist" aria-label="Source de l'icône" className="mb-4 flex flex-wrap gap-1">
+      <div role="tablist" aria-label={tr("Source de l'icône")} className="mb-4 flex flex-wrap gap-1">
         {TABS.map((t) => (
           <button
             key={t.value}
@@ -96,7 +98,7 @@ export function IconPicker({
               type === t.value ? "bg-accent text-on-accent" : "text-body hover:bg-box hover:text-h1",
             )}
           >
-            {t.label}
+            {tr(t.label)}
           </button>
         ))}
       </div>
@@ -107,8 +109,8 @@ export function IconPicker({
             <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-meta" aria-hidden="true" />
             <input
               className={cn(inputClass, "pl-10")}
-              placeholder={`Rechercher dans ${ICON_PROVIDERS[type].label}…`}
-              aria-label="Rechercher une icône"
+              placeholder={tr("Rechercher dans {label}…", { label: ICON_PROVIDERS[type].label })}
+              aria-label={tr("Rechercher une icône")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -131,16 +133,15 @@ export function IconPicker({
               </button>
             ))}
             {!searching && results.length === 0 && (
-              <p className="col-span-full py-6 text-center text-sm text-meta">Aucune icône trouvée (ou index injoignable).</p>
+              <p className="col-span-full py-6 text-center text-sm text-meta">{tr("Aucune icône trouvée (ou index injoignable).")}</p>
             )}
           </div>
           <p className="mt-2 text-xs text-meta">
-            Source :{" "}
+            {tr("Source :")}{" "}
             <a href={ICON_PROVIDERS[type].homepage} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
-              {ICON_PROVIDERS[type].label}
+              {tr(ICON_PROVIDERS[type].label)}
             </a>{" "}
-            via jsDelivr
-          </p>
+            {tr("via jsDelivr")}</p>
         </div>
       )}
 
@@ -170,7 +171,7 @@ export function IconPicker({
                     if (value === u.filename) setValue("");
                   }}
                   className="absolute -right-1 -top-1 hidden rounded-full border border-line bg-elevated p-1 text-meta hover:text-red group-hover:block"
-                  aria-label={`Supprimer l'icône ${u.label}`}
+                  aria-label={tr("Supprimer l'icône {label}", { label: u.label })}
                 >
                   <Trash2 size={11} />
                 </button>
@@ -191,7 +192,7 @@ export function IconPicker({
               }}
             />
             <span className="flex items-center gap-1.5 text-xs text-meta">
-              <Upload size={13} aria-hidden="true" /> {uploading ? "Envoi…" : "PNG, SVG, WebP, JPG · 1 Mo max"}
+              <Upload size={13} aria-hidden="true" /> {uploading ? tr("Envoi…") : tr("PNG, SVG, WebP, JPG · 1 Mo max")}
             </span>
           </div>
           {uploadError && <p className="text-xs text-red">✕ {uploadError}</p>}
@@ -202,18 +203,17 @@ export function IconPicker({
         <input
           className={inputClass}
           placeholder="https://exemple.lan/favicon.svg"
-          aria-label="URL de l'icône"
+          aria-label={tr("URL de l'icône")}
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
       )}
 
-      {type === "none" && <p className="text-sm text-meta">Les initiales du raccourci seront affichées.</p>}
+      {type === "none" && <p className="text-sm text-meta">{tr("Les initiales du raccourci seront affichées.")}</p>}
 
       {value && type !== "none" && (
         <Button variant="subtle" size="sm" className="mt-3" onClick={() => setValue("")}>
-          Retirer l&apos;icône
-        </Button>
+          {tr("Retirer l'icône")}</Button>
       )}
     </div>
   );

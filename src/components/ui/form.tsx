@@ -15,6 +15,7 @@ import type { FormState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 import { Alert } from "./alert";
 import { Button, type ButtonVariant } from "./button";
+import { useT } from "@/i18n/client";
 
 const FormStateContext = createContext<{ state: FormState; pending: boolean }>({ state: {}, pending: false });
 
@@ -42,6 +43,7 @@ export function ActionForm({
   resetOnSuccess?: boolean;
   showMessage?: boolean;
 } & Omit<ComponentProps<"form">, "action" | "children">) {
+  const tr = useT();
   const [state, formAction, pending] = useActionState(action, {});
   const formRef = useRef<HTMLFormElement>(null);
   const lastNonce = useRef<number | undefined>(undefined);
@@ -69,12 +71,12 @@ export function ActionForm({
       >
         {showMessage && state.message && !state.ok && (
           <Alert kind="error" className="mb-5">
-            {state.message}
+            {tr(state.message)}
           </Alert>
         )}
         {showMessage && state.message && state.ok && (
           <Alert kind="success" className="mb-5">
-            {state.message}
+            {tr(state.message)}
           </Alert>
         )}
         {children}
@@ -107,6 +109,7 @@ export function Field({
   required?: boolean;
   children: (props: { id: string; name: string; "aria-invalid"?: boolean; "aria-describedby"?: string }) => ReactNode;
 }) {
+  const tr = useT();
   const id = useId();
   const error = useFieldError(name);
   const describedBy = error || hint ? `${id}-help` : undefined;
@@ -123,7 +126,7 @@ export function Field({
       {children({ id, name, "aria-invalid": error ? true : undefined, "aria-describedby": describedBy })}
       {error ? (
         <p id={describedBy} className="mt-2 flex items-center gap-1.5 text-xs text-red">
-          <span aria-hidden="true">✕</span> {error}
+          <span aria-hidden="true">✕</span> {tr(error)}
         </p>
       ) : hint ? (
         <p id={describedBy} className="mt-2 text-xs text-meta">
@@ -241,6 +244,8 @@ export function SubmitButton({
   className?: string;
   icon?: ReactNode;
 }) {
+  const tr = useT();
+  pendingLabel = tr(pendingLabel);
   const { pending } = useContext(FormStateContext);
   return (
     <Button type="submit" variant={variant} disabled={pending} className={className} icon={icon} aria-busy={pending}>

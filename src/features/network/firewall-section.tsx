@@ -12,6 +12,8 @@ import { Field, inputClass, SelectField, Switch, TextField } from "@/components/
 import { FW_PROTOCOLS, FW_PROTOCOL_LABEL, FW_TARGETS, FW_TARGET_LABEL, type FwTarget } from "@/lib/constants";
 import type { FirewallRule } from "@/lib/data/firewall";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
+import type { Translate } from "@/i18n/translate";
 
 export type FwOptions = {
   vlans: { id: number; label: string }[];
@@ -20,11 +22,11 @@ export type FwOptions = {
   tunnels: { id: number; label: string }[];
 };
 
-export function targetLabel(type: FwTarget, value: string, o: FwOptions) {
-  const find = (list: { id: number; label: string }[]) => list.find((x) => String(x.id) === value)?.label ?? `#${value} (supprimé)`;
+export function targetLabel(type: FwTarget, value: string, o: FwOptions, tr: Translate) {
+  const find = (list: { id: number; label: string }[]) => list.find((x) => String(x.id) === value)?.label ?? tr("#{id} (supprimé)", { id: value });
   switch (type) {
     case "any":
-      return "N'importe où";
+      return tr("N'importe où");
     case "internet":
       return "Internet";
     case "cidr":
@@ -41,19 +43,18 @@ export function targetLabel(type: FwTarget, value: string, o: FwOptions) {
 }
 
 export function FirewallSection({ rules, policy, options }: { rules: FirewallRule[]; policy: "allow" | "deny"; options: FwOptions }) {
+  const tr = useT();
   const [current, setCurrent] = useState(policy);
   const [, start] = useTransition();
   return (
     <div className="grid gap-6">
       <div className="flex flex-col gap-4 rounded-2xl border border-line-subtle bg-box p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
-          <p className="font-medium text-h1">Politique par défaut</p>
+          <p className="font-medium text-h1">{tr("Politique par défaut")}</p>
           <p className="mt-1 max-w-xl text-sm text-body">
-            Appliquée au trafic routé (entre VLAN, vers un VPN ou Internet) quand aucune règle ne correspond. Le trafic au sein d&apos;un même
-            sous-réseau ne passe pas par le pare-feu.
-          </p>
+            {tr("Appliquée au trafic routé (entre VLAN, vers un VPN ou Internet) quand aucune règle ne correspond. Le trafic au sein d'un même sous-réseau ne passe pas par le pare-feu.")}</p>
         </div>
-        <div role="radiogroup" aria-label="Politique par défaut" className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-page p-1">
+        <div role="radiogroup" aria-label={tr("Politique par défaut")} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-page p-1">
           {(["allow", "deny"] as const).map((p) => (
             <button
               key={p}
@@ -71,21 +72,20 @@ export function FirewallSection({ rules, policy, options }: { rules: FirewallRul
                 current === p ? (p === "allow" ? "bg-green text-on-accent" : "bg-red text-on-accent") : "text-body hover:text-h1",
               )}
             >
-              {p === "allow" ? "Tout autoriser" : "Tout bloquer"}
+              {p === "allow" ? tr("Tout autoriser") : tr("Tout bloquer")}
             </button>
           ))}
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-meta">Évaluées de haut en bas : la première règle qui correspond s&apos;applique.</p>
+        <p className="text-sm text-meta">{tr("Évaluées de haut en bas : la première règle qui correspond s'applique.")}</p>
         <RuleDialog options={options} />
       </div>
 
       {rules.length === 0 ? (
-        <EmptyState icon={<ShieldHalf size={22} />} title="Aucune règle" action={<RuleDialog options={options} />}>
-          Exemple : bloquer le VLAN IoT vers le VLAN Serveurs, mais autoriser IoT → Home Assistant en TCP 8123.
-        </EmptyState>
+        <EmptyState icon={<ShieldHalf size={22} />} title={tr("Aucune règle")} action={<RuleDialog options={options} />}>
+          {tr("Exemple : bloquer le VLAN IoT vers le VLAN Serveurs, mais autoriser IoT → Home Assistant en TCP 8123.")}</EmptyState>
       ) : (
         <ol className="grid gap-2">
           {rules.map((r, i) => (
@@ -99,36 +99,36 @@ export function FirewallSection({ rules, policy, options }: { rules: FirewallRul
               <div className="flex items-center gap-3">
                 <span className="w-6 text-center font-mono text-xs text-meta">{i + 1}</span>
                 <Badge tone={r.action === "allow" ? "green" : "red"} className="min-w-20 justify-center">
-                  {r.action === "allow" ? "Autoriser" : "Bloquer"}
+                  {r.action === "allow" ? tr("Autoriser") : tr("Bloquer")}
                 </Badge>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-h1">
-                  <span className="font-medium">{targetLabel(r.src_type, r.src_value, options)}</span>
+                  <span className="font-medium">{targetLabel(r.src_type, r.src_value, options, tr)}</span>
                   <span className="mx-2 text-meta">→</span>
-                  <span className="font-medium">{targetLabel(r.dst_type, r.dst_value, options)}</span>
+                  <span className="font-medium">{targetLabel(r.dst_type, r.dst_value, options, tr)}</span>
                 </p>
                 <p className="mt-0.5 truncate font-mono text-xs text-meta">
                   {FW_PROTOCOL_LABEL[r.protocol]}
-                  {r.ports ? ` · ports ${r.ports}` : r.protocol !== "icmp" && r.protocol !== "any" ? " · tous les ports" : ""}
+                  {r.ports ? ` · ports ${r.ports}` : r.protocol !== "icmp" && r.protocol !== "any" ? tr(" · tous les ports") : ""}
                   {r.name ? ` · ${r.name}` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-1 self-end sm:self-auto">
-                <Button variant="subtle" size="icon-sm" aria-label="Monter" disabled={i === 0} onClick={() => moveRuleAction(r.id, -1)} icon={<ArrowUp size={14} />} />
+                <Button variant="subtle" size="icon-sm" aria-label={tr("Monter")} disabled={i === 0} onClick={() => moveRuleAction(r.id, -1)} icon={<ArrowUp size={14} />} />
                 <Button
                   variant="subtle"
                   size="icon-sm"
-                  aria-label="Descendre"
+                  aria-label={tr("Descendre")}
                   disabled={i === rules.length - 1}
                   onClick={() => moveRuleAction(r.id, 1)}
                   icon={<ArrowDown size={14} />}
                 />
                 <Button variant="subtle" size="sm" onClick={() => toggleRuleAction(r.id)}>
-                  {r.enabled ? "Désactiver" : "Activer"}
+                  {r.enabled ? tr("Désactiver") : tr("Activer")}
                 </Button>
                 <RuleDialog rule={r} options={options} />
-                <ConfirmButton action={() => deleteRuleAction(r.id)} message="Supprimer cette règle ?" />
+                <ConfirmButton action={() => deleteRuleAction(r.id)} message={tr("Supprimer cette règle ?")} />
               </div>
             </li>
           ))}
@@ -139,6 +139,7 @@ export function FirewallSection({ rules, policy, options }: { rules: FirewallRul
 }
 
 function TargetPicker({ prefix, label, rule, options }: { prefix: "src" | "dst"; label: string; rule?: FirewallRule; options: FwOptions }) {
+  const tr = useT();
   const [type, setType] = useState<FwTarget>(rule?.[`${prefix}_type`] ?? "any");
   const value = rule?.[`${prefix}_value`] ?? "";
   const list =
@@ -146,7 +147,7 @@ function TargetPicker({ prefix, label, rule, options }: { prefix: "src" | "dst";
   return (
     <div className="grid gap-3 rounded-2xl border border-line-subtle bg-page p-4">
       <p className="font-mono text-xs uppercase tracking-[0.14em] text-meta">{label}</p>
-      <Field label="Type" name={`${prefix}_type`}>
+      <Field label={tr("Type")} name={`${prefix}_type`}>
         {(p) => (
           <select {...p} className={inputClass} value={type} onChange={(e) => setType(e.target.value as FwTarget)}>
             {FW_TARGETS.map((t) => (
@@ -176,36 +177,37 @@ function TargetPicker({ prefix, label, rule, options }: { prefix: "src" | "dst";
 }
 
 function RuleDialog({ rule, options }: { rule?: FirewallRule; options: FwOptions }) {
+  const tr = useT();
   const [protocol, setProtocol] = useState(rule?.protocol ?? "tcp");
   return (
     <FormDialog
-      title={rule ? "Modifier la règle" : "Nouvelle règle"}
+      title={rule ? tr("Modifier la règle") : tr("Nouvelle règle")}
       action={saveRuleAction.bind(null, rule?.id ?? null)}
-      trigger={rule ? undefined : "Règle"}
+      trigger={rule ? undefined : tr("Règle")}
       triggerVariant={rule ? "subtle" : "primary"}
       triggerSize={rule ? "icon-sm" : "md"}
       triggerIcon={rule ? <Pencil size={14} /> : <Plus size={16} />}
-      triggerLabel={rule ? "Modifier la règle" : "Nouvelle règle"}
+      triggerLabel={rule ? tr("Modifier la règle") : tr("Nouvelle règle")}
       size="lg"
     >
       <div className="grid gap-5 sm:grid-cols-[10rem_1fr]">
         <SelectField
-          label="Action"
+          label={tr("Action")}
           name="action"
           defaultValue={rule?.action ?? "deny"}
           options={[
-            { value: "deny", label: "Bloquer" },
-            { value: "allow", label: "Autoriser" },
+            { value: "deny", label: tr("Bloquer") },
+            { value: "allow", label: tr("Autoriser") },
           ]}
         />
-        <TextField label="Nom" name="name" defaultValue={rule?.name} placeholder="IoT ne voit pas les serveurs" />
+        <TextField label={tr("Nom")} name="name" defaultValue={rule?.name} placeholder={tr("IoT ne voit pas les serveurs")} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <TargetPicker prefix="src" label="Source" rule={rule} options={options} />
-        <TargetPicker prefix="dst" label="Destination" rule={rule} options={options} />
+        <TargetPicker prefix="src" label={tr("Source")} rule={rule} options={options} />
+        <TargetPicker prefix="dst" label={tr("Destination")} rule={rule} options={options} />
       </div>
       <div className="grid gap-5 sm:grid-cols-[12rem_1fr]">
-        <Field label="Protocole" name="protocol">
+        <Field label={tr("Protocole")} name="protocol">
           {(p) => (
             <select {...p} className={inputClass} value={protocol} onChange={(e) => setProtocol(e.target.value as typeof protocol)}>
               {FW_PROTOCOLS.map((x) => (
@@ -217,16 +219,16 @@ function RuleDialog({ rule, options }: { rule?: FirewallRule; options: FwOptions
           )}
         </Field>
         <TextField
-          label="Ports"
+          label={tr("Ports")}
           name="ports"
           defaultValue={rule?.ports}
           placeholder="22,80,443,8000-8100"
-          hint={protocol === "icmp" ? "Sans objet pour ICMP" : "Vide = tous les ports"}
+          hint={protocol === "icmp" ? tr("Sans objet pour ICMP") : tr("Vide = tous les ports")}
           disabled={protocol === "icmp"}
           className="font-mono"
         />
       </div>
-      <Switch name="enabled" label="Règle active" defaultChecked={rule ? !!rule.enabled : true} />
+      <Switch name="enabled" label={tr("Règle active")} defaultChecked={rule ? !!rule.enabled : true} />
     </FormDialog>
   );
 }

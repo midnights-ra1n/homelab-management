@@ -10,11 +10,13 @@ import { PRIORITY_META, TASK_STATUSES, TASK_STATUS_META, TONE_VAR, type TaskStat
 import type { Task } from "@/lib/data/tasks";
 import { cn, formatDate, isOverdue } from "@/lib/utils";
 import { TaskDialog, type TaskOptions } from "./task-dialog";
+import { useT } from "@/i18n/client";
 
 type Move = { id: number; status: TaskStatus; beforeId: number | null };
 
 /** Tableau Kanban : glisser-déposer entre colonnes (souris) + menu de déplacement (clavier). */
 export function TaskBoard({ tasks, options }: { tasks: Task[]; options: TaskOptions }) {
+  const tr = useT();
   const [optimistic, applyMove] = useOptimistic(tasks, (state, m: Move) => {
     const task = state.find((t) => t.id === m.id);
     if (!task) return state;
@@ -43,7 +45,7 @@ export function TaskBoard({ tasks, options }: { tasks: Task[]; options: TaskOpti
         return (
           <section
             key={status}
-            aria-label={meta.label}
+            aria-label={tr(meta.label)}
             onDragOver={(e) => {
               if (dragId === null) return;
               e.preventDefault();
@@ -69,10 +71,10 @@ export function TaskBoard({ tasks, options }: { tasks: Task[]; options: TaskOpti
             <header className="mb-3 flex items-center justify-between px-2 pt-1">
               <h2 className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-h2">
                 <span className="h-2 w-2 rounded-full" style={{ background: TONE_VAR[meta.tone] }} aria-hidden="true" />
-                {meta.label}
+                {tr(meta.label)}
                 <span className="text-meta">{column.length}</span>
               </h2>
-              <TaskDialog options={options} defaultStatus={status} variant="icon" label={`Ajouter dans « ${meta.label} »`} />
+              <TaskDialog options={options} defaultStatus={status} variant="icon" label={tr("Ajouter dans « {label} »", { label: tr(meta.label) })} />
             </header>
             <ol className="grid content-start gap-2">
               {column.map((t) => (
@@ -93,8 +95,7 @@ export function TaskBoard({ tasks, options }: { tasks: Task[]; options: TaskOpti
             </ol>
             {column.length === 0 && (
               <p className="m-2 flex flex-1 items-center justify-center rounded-2xl border border-dashed border-line p-6 text-center text-sm text-meta">
-                Dépose une tâche ici
-              </p>
+                {tr("Dépose une tâche ici")}</p>
             )}
           </section>
         );
@@ -120,6 +121,7 @@ function TaskCard({
   onDragEnd: () => void;
   onMove: (s: TaskStatus) => void;
 }) {
+  const tr = useT();
   const late = task.status !== "done" && isOverdue(task.due_date);
   const priority = PRIORITY_META[task.priority];
   return (
@@ -140,20 +142,20 @@ function TaskCard({
       )}
     >
       <div className="flex items-start gap-3">
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[priority.tone] }} title={`Priorité ${priority.label}`} />
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[priority.tone] }} title={tr("Priorité {label}", { label: tr(priority.label) })} />
         <p className={cn("flex-1 text-sm font-medium", task.status === "done" ? "text-meta line-through" : "text-h1")}>{task.title}</p>
         <div className="-mr-2 -mt-2 flex opacity-100 transition-opacity lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
           <TaskDialog task={task} options={options} />
-          <ConfirmButton action={() => deleteTaskAction(task.id)} message={`Supprimer la tâche « ${task.title} » ?`} />
+          <ConfirmButton action={() => deleteTaskAction(task.id)} message={tr("Supprimer la tâche « {title} » ?", { title: task.title })} />
         </div>
       </div>
       {task.description && <p className="ml-5 mt-1 line-clamp-3 whitespace-pre-line text-xs text-body">{task.description}</p>}
       <div className="ml-5 mt-3 flex flex-wrap items-center gap-2 text-xs text-meta">
-        {task.priority === "critical" || task.priority === "high" ? <Badge tone={priority.tone}>{priority.label}</Badge> : null}
+        {task.priority === "critical" || task.priority === "high" ? <Badge tone={priority.tone}>{tr(priority.label)}</Badge> : null}
         {task.due_date && (
           <span className={cn("flex items-center gap-1 font-mono", late && "text-red")}>
             <CalendarDays size={12} aria-hidden="true" />
-            {formatDate(task.due_date)}
+            {formatDate(task.due_date, tr.locale)}
           </span>
         )}
         {task.asset_id && (
@@ -172,8 +174,7 @@ function TaskCard({
       </div>
       {/* Déplacement accessible au clavier */}
       <label className="sr-only" htmlFor={`move-${task.id}`}>
-        Déplacer vers
-      </label>
+        {tr("Déplacer vers")}</label>
       <select
         id={`move-${task.id}`}
         value={task.status}
@@ -182,7 +183,7 @@ function TaskCard({
       >
         {TASK_STATUSES.map((s) => (
           <option key={s} value={s}>
-            → {TASK_STATUS_META[s].label}
+            → {tr(TASK_STATUS_META[s].label)}
           </option>
         ))}
       </select>

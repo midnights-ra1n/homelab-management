@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { Dialog } from "./dialog";
+import { useT } from "@/i18n/client";
 
 /** Bouton qui demande confirmation avant d'exécuter une action destructrice. */
 export function ConfirmButton({
@@ -27,6 +28,10 @@ export function ConfirmButton({
   icon?: ReactNode;
   label?: string;
 }) {
+  const tr = useT();
+  label = tr(label);
+  confirmLabel = tr(confirmLabel);
+  title = tr(title);
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   return (
@@ -38,8 +43,7 @@ export function ConfirmButton({
         <p className="text-sm leading-relaxed text-body">{message}</p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" onClick={() => setOpen(false)}>
-            Annuler
-          </Button>
+            {tr("Annuler")}</Button>
           <Button
             variant="danger"
             disabled={pending}
@@ -50,7 +54,7 @@ export function ConfirmButton({
               })
             }
           >
-            {pending ? "Suppression…" : confirmLabel}
+            {pending ? tr("Suppression…") : confirmLabel}
           </Button>
         </div>
       </Dialog>

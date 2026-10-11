@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 /** Bascule de vue (pilule) ; le choix est mémorisé un an dans un cookie. */
 export function ViewSwitch({
@@ -14,8 +15,9 @@ export function ViewSwitch({
   value: string;
   options: { value: string; label: string; icon: ReactNode; href: string }[];
 }) {
+  const tr = useT();
   return (
-    <nav aria-label="Affichage" className="inline-flex items-center gap-1 rounded-full border border-line bg-box p-1">
+    <nav aria-label={tr("Affichage")} className="inline-flex items-center gap-1 rounded-full border border-line bg-box p-1">
       {options.map((o) => (
         <Link
           key={o.value}

@@ -5,7 +5,8 @@ import { LogOut, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/actions/auth";
 import { cn } from "@/lib/utils";
-import { ThemeSwitch } from "./theme-switch";
+import { LanguageSwitch, ThemeSwitch } from "./theme-switch";
+import { useT } from "@/i18n/client";
 
 function Avatar({ username }: { username: string }) {
   return (
@@ -17,6 +18,7 @@ function Avatar({ username }: { username: string }) {
 
 /** Menu du compte (desktop) : ouverture / fermeture en fondu. */
 export function UserDropdown({ username, canLogout }: { username: string; canLogout: boolean }) {
+  const tr = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -41,7 +43,7 @@ export function UserDropdown({ username, canLogout }: { username: string; canLog
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={`Compte ${username}`}
+        aria-label={tr("Compte {username}", { username: username })}
         className="rounded-full transition-[box-shadow] duration-200 hover:shadow-[0_0_0_3px_var(--mm-accent-soft)]"
       >
         <Avatar username={username} />
@@ -56,10 +58,11 @@ export function UserDropdown({ username, canLogout }: { username: string; canLog
         )}
       >
         <p className="px-3 pb-2 pt-1.5 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
-          Connecté · <span className="normal-case tracking-normal text-h2">{username}</span>
+          {tr("Connecté · ")}<span className="normal-case tracking-normal text-h2">{username}</span>
         </p>
         <div className="px-2 pb-2">
           <ThemeSwitch className="w-full justify-between" />
+          <LanguageSwitch className="mt-2 w-full justify-between" />
         </div>
         <Link
           role="menuitem"
@@ -67,8 +70,7 @@ export function UserDropdown({ username, canLogout }: { username: string; canLog
           onClick={() => setOpen(false)}
           className="flex items-center gap-2.5 rounded-full px-3 py-2.5 text-sm text-h2 transition-colors hover:bg-box hover:text-h1"
         >
-          <Settings size={16} className="text-meta" /> Paramètres
-        </Link>
+          <Settings size={16} className="text-meta" /> {tr("Paramètres")}</Link>
         {canLogout && (
           <form action={logoutAction}>
             <button
@@ -76,8 +78,7 @@ export function UserDropdown({ username, canLogout }: { username: string; canLog
               type="submit"
               className="flex w-full items-center gap-2.5 rounded-full px-3 py-2.5 text-sm text-h2 transition-colors hover:bg-box hover:text-red"
             >
-              <LogOut size={16} className="text-meta" /> Se déconnecter
-            </button>
+              <LogOut size={16} className="text-meta" /> {tr("Se déconnecter")}</button>
           </form>
         )}
       </div>
@@ -87,6 +88,7 @@ export function UserDropdown({ username, canLogout }: { username: string; canLog
 
 /** Ligne de compte dans le menu mobile. */
 export function UserRow({ username, canLogout }: { username: string; canLogout: boolean }) {
+  const tr = useT();
   return (
     <div className="flex items-center justify-between gap-3 rounded-full border border-line px-2 py-2">
       <span className="flex items-center gap-3 text-sm text-h2">
@@ -99,8 +101,7 @@ export function UserRow({ username, canLogout }: { username: string; canLogout: 
             type="submit"
             className="flex h-10 items-center gap-2 rounded-full px-4 text-sm text-body transition-colors hover:bg-box hover:text-red"
           >
-            <LogOut size={16} /> Se déconnecter
-          </button>
+            <LogOut size={16} /> {tr("Se déconnecter")}</button>
         </form>
       )}
     </div>

@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/locales";
+
 export function cn(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
 }
@@ -11,39 +13,40 @@ export function parseJson<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
-const dateFmt = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
-const dateTimeFmt = new Intl.DateTimeFormat("fr-FR", {
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
+const fmtCache = new Map<string, Intl.DateTimeFormat>();
+/** Intl.DateTimeFormat mis en cache par langue (fr-FR / en-GB : jour avant le mois). */
+export function dateFormat(locale: Locale, opts: Intl.DateTimeFormatOptions) {
+  const key = locale + JSON.stringify(opts);
+  let f = fmtCache.get(key);
+  if (!f) fmtCache.set(key, (f = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", opts)));
+  return f;
+}
 
 /** Les dates SQLite datetime('now') sont en UTC sans suffixe. */
 export function toDate(value: string): Date {
   return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) || value.length <= 10 ? value : value.replace(" ", "T") + "Z");
 }
 
-export function formatDate(value: string | null | undefined) {
-  return value ? dateFmt.format(toDate(value)) : "—";
+export function formatDate(value: string | null | undefined, locale: Locale = "fr") {
+  return value ? dateFormat(locale, { day: "2-digit", month: "short", year: "numeric" }).format(toDate(value)) : "—";
 }
 
-export function formatDateTime(value: string | null | undefined) {
-  return value ? dateTimeFmt.format(toDate(value)) : "—";
+export function formatDateTime(value: string | null | undefined, locale: Locale = "fr") {
+  return value ? dateFormat(locale, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(toDate(value)) : "—";
 }
 
-export function timeAgo(value: string) {
+export function timeAgo(value: string, locale: Locale = "fr") {
   const diff = (Date.now() - toDate(value).getTime()) / 1000;
-  const rtf = new Intl.RelativeTimeFormat("fr", { numeric: "auto" });
-  if (Math.abs(diff) < 60) return "à l'instant";
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (Math.abs(diff) < 60) return locale === "en" ? "just now" : "à l'instant";
   if (Math.abs(diff) < 3600) return rtf.format(-Math.round(diff / 60), "minute");
   if (Math.abs(diff) < 86400) return rtf.format(-Math.round(diff / 3600), "hour");
   return rtf.format(-Math.round(diff / 86400), "day");
 }
 
-export function formatBytes(bytes: number | null | undefined, digits = 1) {
+export function formatBytes(bytes: number | null | undefined, locale: Locale = "fr", digits = 1) {
   if (bytes == null || !Number.isFinite(bytes)) return "—";
-  const units = ["o", "Ko", "Mo", "Go", "To", "Po"];
+  const units = locale === "en" ? ["B", "KB", "MB", "GB", "TB", "PB"] : ["o", "Ko", "Mo", "Go", "To", "Po"];
   let i = 0;
   let v = bytes;
   while (v >= 1024 && i < units.length - 1) {
@@ -53,17 +56,18 @@ export function formatBytes(bytes: number | null | undefined, digits = 1) {
   return `${v.toFixed(i === 0 ? 0 : digits)} ${units[i]}`;
 }
 
-export function formatGb(gb: number | null | undefined) {
+export function formatGb(gb: number | null | undefined, locale: Locale = "fr") {
   if (gb == null) return "—";
-  return gb >= 1024 ? `${+(gb / 1024).toFixed(2)} To` : `${+gb.toFixed(1)} Go`;
+  const [tb, g] = locale === "en" ? ["TB", "GB"] : ["To", "Go"];
+  return gb >= 1024 ? `${+(gb / 1024).toFixed(2)} ${tb}` : `${+gb.toFixed(1)} ${g}`;
 }
 
-export function formatUptime(seconds: number | null | undefined) {
+export function formatUptime(seconds: number | null | undefined, locale: Locale = "fr") {
   if (!seconds) return "—";
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d} j ${h} h`;
+  if (d > 0) return `${d} ${locale === "en" ? "d" : "j"} ${h} h`;
   if (h > 0) return `${h} h ${m} min`;
   return `${m} min`;
 }

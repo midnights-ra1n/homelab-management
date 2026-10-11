@@ -1,9 +1,10 @@
 "use client";
 
 import { Search, X } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
+import { usePathname, useT } from "@/i18n/client";
 
 type SelectFilter = { name: string; label: string; options: { value: string; label: string }[] };
 
@@ -17,6 +18,8 @@ export function FilterBar({
   selects?: SelectFilter[];
   className?: string;
 }) {
+  const tr = useT();
+  placeholder = tr(placeholder);
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -69,7 +72,7 @@ export function FilterBar({
             type="button"
             onClick={() => setQ("")}
             className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-meta hover:text-h1"
-            aria-label="Effacer la recherche"
+            aria-label={tr("Effacer la recherche")}
           >
             <X size={15} />
           </button>

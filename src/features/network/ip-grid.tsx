@@ -4,6 +4,7 @@ import { useState } from "react";
 import { IP_STATUS_META, TONE_VAR, type AssetKind, type IpStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { IpAssignDialog } from "./dialogs";
+import { useT } from "@/i18n/client";
 
 export type GridCell = {
   address: string;
@@ -35,6 +36,7 @@ export function IpGrid({
   subnets: { id: number; name: string; cidr: string }[];
   assets: { id: number; display_name: string; kind: AssetKind }[];
 }) {
+  const tr = useT();
   const [selected, setSelected] = useState<string | null>(null);
   return (
     <>
@@ -65,7 +67,7 @@ export function IpGrid({
         {(["used", "reserved", "dhcp", "gateway", "dhcp-range", "free"] as const).map((k) => (
           <li key={k} className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-sm border border-line" style={{ background: CELL_STYLE[k].bg }} aria-hidden="true" />
-            {CELL_STYLE[k].label}
+            {tr(CELL_STYLE[k].label)}
           </li>
         ))}
       </ul>

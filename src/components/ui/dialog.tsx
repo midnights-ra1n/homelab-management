@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 /** Modale native <dialog> : focus piégé, Échap pour fermer, fond flouté. */
 export function Dialog({
@@ -20,6 +21,7 @@ export function Dialog({
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
 }) {
+  const tr = useT();
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export function Dialog({
               type="button"
               onClick={onClose}
               className="-mr-2 -mt-1 rounded-full p-2 text-meta transition-colors hover:bg-box hover:text-h1"
-              aria-label="Fermer"
+              aria-label={tr("Fermer")}
             >
               <X size={18} />
             </button>

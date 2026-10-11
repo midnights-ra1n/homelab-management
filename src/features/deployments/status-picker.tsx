@@ -6,9 +6,11 @@ import { Popover } from "@/components/ui/popover";
 import { setDeploymentStatusAction } from "@/actions/deployments";
 import { DEPLOYMENT_STATUSES, DEPLOYMENT_STATUS_META, TONE_TEXT_VAR, TONE_VAR, type DeploymentStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 /** Badge d'état cliquable : ouvre une petite liste (fondu) pour changer l'état. */
 export function StatusPicker({ id, status }: { id: number; status: DeploymentStatus }) {
+  const tr = useT();
   const [current, setCurrent] = useOptimistic(status);
   const [open, setOpen] = useState(false);
   const [, start] = useTransition();
@@ -24,7 +26,7 @@ export function StatusPicker({ id, status }: { id: number; status: DeploymentSta
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`État : ${meta.label}. Changer l'état`}
+        aria-label={tr("État : {label}. Changer l'état", { label: tr(meta.label) })}
         className="inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-[filter] hover:brightness-110"
         style={{
           color: TONE_TEXT_VAR[meta.tone],
@@ -33,11 +35,11 @@ export function StatusPicker({ id, status }: { id: number; status: DeploymentSta
         }}
       >
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[meta.tone] }} />
-        {meta.label}
+        {tr(meta.label)}
         <ChevronDown size={12} className={cn("transition-transform duration-200", open && "rotate-180")} />
       </button>
-      <Popover open={open} onClose={close} anchorRef={anchorRef} className="w-48" label="Changer l'état">
-        <ul role="listbox" aria-label="Changer l'état">
+      <Popover open={open} onClose={close} anchorRef={anchorRef} className="w-48" label={tr("Changer l'état")}>
+        <ul role="listbox" aria-label={tr("Changer l'état")}>
           {DEPLOYMENT_STATUSES.map((s) => {
             const m = DEPLOYMENT_STATUS_META[s];
             return (

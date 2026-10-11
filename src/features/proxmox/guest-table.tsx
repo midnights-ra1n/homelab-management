@@ -11,6 +11,7 @@ import { inputClass } from "@/components/ui/form";
 import { Meter } from "@/components/ui/meter";
 import { useToast } from "@/components/ui/toaster";
 import { cn, formatBytes, formatUptime } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 export type GuestRow = {
   key: string;
@@ -51,6 +52,7 @@ export function GuestTable({
   guests: GuestRow[];
   integrations: { id: number; name: string }[];
 }) {
+  const tr = useT();
   const toast = useToast();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export function GuestTable({
     setBusy(g.key);
     start(async () => {
       const r = await guestActionAction(g.integrationId, g.node, g.type, g.vmid, action);
-      toast(r.ok ? "success" : "error", `${g.name} : ${r.message}`);
+      toast(r.ok ? "success" : "error", `${g.name} : ${tr(r.message)}`);
       setBusy(null);
     });
   };
@@ -85,18 +87,18 @@ export function GuestTable({
           <input
             type="search"
             className={cn(inputClass, "pl-10")}
-            placeholder="Nom, VMID, nœud, tag…"
-            aria-label="Filtrer les invités"
+            placeholder={tr("Nom, VMID, nœud, tag…")}
+            aria-label={tr("Filtrer les invités")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <div role="radiogroup" aria-label="État" className="inline-flex items-center gap-1 rounded-full border border-line bg-box p-1">
+        <div role="radiogroup" aria-label={tr("État")} className="inline-flex items-center gap-1 rounded-full border border-line bg-box p-1">
           {(
             [
-              ["all", "Tous"],
-              ["running", "Démarrés"],
-              ["stopped", "Arrêtés"],
+              ["all", tr("Tous")],
+              ["running", tr("Démarrés")],
+              ["stopped", tr("Arrêtés")],
             ] as const
           ).map(([v, l]) => (
             <button
@@ -131,7 +133,7 @@ export function GuestTable({
                   <p className="truncate font-medium text-h1">{g.name}</p>
                   <p className="font-mono text-xs text-meta">
                     {g.type === "qemu" ? "VM" : "CT"} {g.vmid} · {g.node}
-                    {running && ` · ${Math.round(g.cpu * 100)} % CPU · ${formatBytes(g.mem)}`}
+                    {running && ` · ${Math.round(g.cpu * 100)} % CPU · ${formatBytes(g.mem, tr.locale)}`}
                   </p>
                 </div>
               </div>
@@ -142,22 +144,21 @@ export function GuestTable({
                     variant="secondary"
                     size="sm"
                     disabled={pending && busy === g.key}
-                    onClick={() => (a.action === "start" || a.action === "resume" ? run(g, a.action) : setConfirm({ g, action: a.action, label: a.label }))}
+                    onClick={() => (a.action === "start" || a.action === "resume" ? run(g, a.action) : setConfirm({ g, action: a.action, label: tr(a.label) }))}
                     icon={<a.icon size={13} />}
                   >
-                    {a.label}
+                    {tr(a.label)}
                   </Button>
                 ))}
                 {integrations.length > 1 && (
                   <Button variant="secondary" size="sm" onClick={() => setMigrating(g)} icon={<ArrowRightLeft size={13} />}>
-                    Migrer
-                  </Button>
+                    {tr("Migrer")}</Button>
                 )}
               </div>
             </li>
           );
         })}
-        {rows.length === 0 && <li className="py-8 text-center text-sm text-meta">Aucun invité ne correspond.</li>}
+        {rows.length === 0 && <li className="py-8 text-center text-sm text-meta">{tr("Aucun invité ne correspond.")}</li>}
       </ul>
 
       <div className="hidden overflow-hidden rounded-2xl border border-line-subtle bg-box md:block">
@@ -165,13 +166,13 @@ export function GuestTable({
           <table className="w-full min-w-[64rem] text-left text-sm">
             <thead>
               <tr className="border-b border-line-subtle font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
-                <th className="px-5 py-3 font-medium">Invité</th>
-                <th className="px-3 py-3 font-medium">Nœud</th>
-                <th className="w-32 px-3 py-3 font-medium">CPU</th>
-                <th className="w-40 px-3 py-3 font-medium">Mémoire</th>
-                <th className="px-3 py-3 font-medium">Disque</th>
-                <th className="px-3 py-3 font-medium">Uptime</th>
-                <th className="px-5 py-3 text-right font-medium">Actions</th>
+                <th className="px-5 py-3 font-medium">{tr("Invité")}</th>
+                <th className="px-3 py-3 font-medium">{tr("Nœud")}</th>
+                <th className="w-32 px-3 py-3 font-medium">{tr("CPU")}</th>
+                <th className="w-40 px-3 py-3 font-medium">{tr("Mémoire")}</th>
+                <th className="px-3 py-3 font-medium">{tr("Disque")}</th>
+                <th className="px-3 py-3 font-medium">{tr("Uptime")}</th>
+                <th className="px-5 py-3 text-right font-medium">{tr("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -209,13 +210,13 @@ export function GuestTable({
                     </td>
                     <td className="px-3 py-3">
                       {running ? (
-                        <Meter size="sm" value={(g.mem / g.maxmem) * 100} label=" " detail={`${formatBytes(g.mem)} / ${formatBytes(g.maxmem)}`} />
+                        <Meter size="sm" value={(g.mem / g.maxmem) * 100} label=" " detail={`${formatBytes(g.mem, tr.locale)} / ${formatBytes(g.maxmem, tr.locale)}`} />
                       ) : (
-                        <span className="font-mono text-xs text-meta">{formatBytes(g.maxmem)}</span>
+                        <span className="font-mono text-xs text-meta">{formatBytes(g.maxmem, tr.locale)}</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 font-mono text-xs text-body">{formatBytes(g.maxdisk)}</td>
-                    <td className="px-3 py-3 font-mono text-xs text-body">{running ? formatUptime(g.uptime) : "—"}</td>
+                    <td className="px-3 py-3 font-mono text-xs text-body">{formatBytes(g.maxdisk, tr.locale)}</td>
+                    <td className="px-3 py-3 font-mono text-xs text-body">{running ? formatUptime(g.uptime, tr.locale) : "—"}</td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-0.5">
                         {ACTIONS.filter((a) => a.when(g.status) && !(g.type === "lxc" && (a.action === "suspend" || a.action === "resume"))).map(
@@ -225,11 +226,11 @@ export function GuestTable({
                               variant="subtle"
                               size="icon-sm"
                               disabled={pending && busy === g.key}
-                              title={a.label}
-                              aria-label={`${a.label} ${g.name}`}
+                              title={tr(a.label)}
+                              aria-label={`${tr(a.label)} ${g.name}`}
                               className={a.danger ? "hover:text-red" : undefined}
                               onClick={() =>
-                                a.action === "start" || a.action === "resume" ? run(g, a.action) : setConfirm({ g, action: a.action, label: a.label })
+                                a.action === "start" || a.action === "resume" ? run(g, a.action) : setConfirm({ g, action: a.action, label: tr(a.label) })
                               }
                               icon={<a.icon size={14} />}
                             />
@@ -239,8 +240,8 @@ export function GuestTable({
                           <Button
                             variant="subtle"
                             size="icon-sm"
-                            title="Migrer vers un autre nœud"
-                            aria-label={`Migrer ${g.name}`}
+                            title={tr("Migrer vers un autre nœud")}
+                            aria-label={tr("Migrer {name}", { name: g.name })}
                             onClick={() => setMigrating(g)}
                             icon={<ArrowRightLeft size={14} />}
                           />
@@ -250,8 +251,8 @@ export function GuestTable({
                           target="_blank"
                           rel="noreferrer"
                           className="flex h-8 w-8 items-center justify-center rounded-full text-body hover:bg-elevated hover:text-h1"
-                          title="Ouvrir dans Proxmox"
-                          aria-label={`Ouvrir ${g.name} dans Proxmox`}
+                          title={tr("Ouvrir dans Proxmox")}
+                          aria-label={tr("Ouvrir {name} dans Proxmox", { name: g.name })}
                         >
                           <ExternalLink size={14} />
                         </a>
@@ -263,8 +264,7 @@ export function GuestTable({
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-5 py-10 text-center text-sm text-meta">
-                    Aucun invité ne correspond.
-                  </td>
+                    {tr("Aucun invité ne correspond.")}</td>
                 </tr>
               )}
             </tbody>
@@ -276,13 +276,12 @@ export function GuestTable({
         {confirm && (
           <>
             <p className="text-sm text-body">
-              {confirm.label} <strong className="text-h1">{confirm.g.name}</strong> ({confirm.g.vmid}) sur {confirm.g.node}.
-              {confirm.action === "stop" && " L'arrêt forcé équivaut à couper l'alimentation."}
+              {confirm.label} <strong className="text-h1">{confirm.g.name}</strong> ({confirm.g.vmid}{tr(") sur ")}{confirm.g.node}.
+              {confirm.action === "stop" && tr(" L'arrêt forcé équivaut à couper l'alimentation.")}
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setConfirm(null)}>
-                Annuler
-              </Button>
+                {tr("Annuler")}</Button>
               <Button
                 variant={confirm.action === "stop" ? "danger" : "primary"}
                 onClick={() => {
@@ -311,6 +310,7 @@ function MigrateDialog({
   integrations: { id: number; name: string }[];
   onClose: () => void;
 }) {
+  const tr = useT();
   const toast = useToast();
   const [targetId, setTargetId] = useState<string>("");
   const [targets, setTargets] = useState<{ storages: { storage: string; avail: number | null }[]; bridges: string[]; node: string } | null>(null);
@@ -350,22 +350,19 @@ function MigrateDialog({
         setTargets(null);
         setError(null);
       }}
-      title={guest ? `Migrer ${guest.name}` : ""}
-      description={guest ? `${guest.type === "qemu" ? "VM" : "CT"} ${guest.vmid} · depuis ${guest.node}` : undefined}
+      title={guest ? tr("Migrer {name}", { name: guest.name }) : ""}
+      description={guest ? tr("{type} {vmid} · depuis {node}", { type: guest.type === "qemu" ? "VM" : "CT", vmid: guest.vmid, node: guest.node }) : undefined}
     >
       {guest && (
         <div className="grid gap-5">
-          <Alert kind="warning" title="Migration distante (expérimental)">
-            Utilise <code className="font-mono text-xs">remote-migrate</code> de Proxmox VE ≥ 7.3 entre nœuds hors cluster. Le jeton
-            de la cible doit avoir les droits <code className="font-mono text-xs">Sys.Incoming</code>, VM.* et Datastore.* ; celui de
-            la source <code className="font-mono text-xs">VM.Migrate</code>.
+          <Alert kind="warning" title={tr("Migration distante (expérimental)")}>
+            {tr("Utilise ")}<code className="font-mono text-xs">{tr("remote-migrate")}</code> {tr("de Proxmox VE ≥ 7.3 entre nœuds hors cluster. Le jeton de la cible doit avoir les droits ")}<code className="font-mono text-xs">{tr("Sys.Incoming")}</code>{tr(", VM.* et Datastore.* ; celui de la source ")}<code className="font-mono text-xs">{tr("VM.Migrate")}</code>.
           </Alert>
           <div>
             <label htmlFor="mig-target" className="mb-2 block text-sm font-medium text-h1">
-              Nœud cible
-            </label>
+              {tr("Nœud cible")}</label>
             <select id="mig-target" className={inputClass} value={targetId} onChange={(e) => loadTargets(e.target.value)}>
-              <option value="">— Choisir —</option>
+              <option value="">{tr("— Choisir —")}</option>
               {candidates.map((i) => (
                 <option key={i.id} value={i.id}>
                   {i.name}
@@ -373,27 +370,25 @@ function MigrateDialog({
               ))}
             </select>
           </div>
-          {loading && <p className="text-sm text-meta">Lecture des stockages et bridges de la cible…</p>}
+          {loading && <p className="text-sm text-meta">{tr("Lecture des stockages et bridges de la cible…")}</p>}
           {error && <Alert kind="error">{error}</Alert>}
           {targets && (
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <label htmlFor="mig-storage" className="mb-2 block text-sm font-medium text-h1">
-                  Stockage cible
-                </label>
+                  {tr("Stockage cible")}</label>
                 <select id="mig-storage" className={inputClass} value={storage} onChange={(e) => setStorage(e.target.value)}>
                   {targets.storages.map((s) => (
                     <option key={s.storage} value={s.storage}>
                       {s.storage}
-                      {s.avail ? ` · ${formatBytes(s.avail)} libres` : ""}
+                      {s.avail ? tr(" · {size} libres", { size: formatBytes(s.avail, tr.locale) }) : ""}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label htmlFor="mig-bridge" className="mb-2 block text-sm font-medium text-h1">
-                  Bridge réseau cible
-                </label>
+                  {tr("Bridge réseau cible")}</label>
                 <select id="mig-bridge" className={inputClass} value={bridge} onChange={(e) => setBridge(e.target.value)}>
                   {targets.bridges.map((b) => (
                     <option key={b}>{b}</option>
@@ -402,8 +397,7 @@ function MigrateDialog({
               </div>
               <div>
                 <label htmlFor="mig-vmid" className="mb-2 block text-sm font-medium text-h1">
-                  VMID cible
-                </label>
+                  {tr("VMID cible")}</label>
                 <input
                   id="mig-vmid"
                   className={cn(inputClass, "font-mono")}
@@ -413,24 +407,22 @@ function MigrateDialog({
                   value={vmid}
                   onChange={(e) => setVmid(e.target.value)}
                 />
-                <p className="mt-2 text-xs text-meta">Vide = conserver {guest.vmid}</p>
+                <p className="mt-2 text-xs text-meta">{tr("Vide = conserver ")}{guest.vmid}</p>
               </div>
               <div className="grid content-start gap-3 pt-7">
                 <label className="flex items-center gap-2.5 text-sm text-h2">
                   <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} className="h-4 w-4 accent-[var(--mm-accent)]" />
-                  {guest.type === "qemu" ? "Migration à chaud (online)" : "Redémarrer le CT (restart)"}
+                  {guest.type === "qemu" ? tr("Migration à chaud (online)") : tr("Redémarrer le CT (restart)")}
                 </label>
                 <label className="flex items-center gap-2.5 text-sm text-h2">
                   <input type="checkbox" checked={del} onChange={(e) => setDel(e.target.checked)} className="h-4 w-4 accent-[var(--mm-accent)]" />
-                  Supprimer la source après succès
-                </label>
+                  {tr("Supprimer la source après succès")}</label>
               </div>
             </div>
           )}
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={onClose}>
-              Annuler
-            </Button>
+              {tr("Annuler")}</Button>
             <Button
               disabled={!targets || !storage || !bridge || submitting}
               onClick={() =>
@@ -453,7 +445,7 @@ function MigrateDialog({
               }
               icon={<ArrowRightLeft size={15} />}
             >
-              {submitting ? "Lancement…" : "Lancer la migration"}
+              {submitting ? tr("Lancement…") : tr("Lancer la migration")}
             </Button>
           </div>
         </div>

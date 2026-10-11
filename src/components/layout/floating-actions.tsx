@@ -4,6 +4,7 @@ import { ArrowUp, Moon, Sun } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { getEffectiveTheme, setTheme, subscribeTheme, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 /** Rond teinté qui se déplie vers la gauche au survol pour afficher son libellé. */
 function FloatingButton({ label, icon, onClick, hidden = false }: { label: string; icon: ReactNode; onClick: () => void; hidden?: boolean }) {
@@ -28,6 +29,7 @@ function FloatingButton({ label, icon, onClick, hidden = false }: { label: strin
 }
 
 function BackToTop() {
+  const tr = useT();
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > window.innerHeight * 0.6);
@@ -36,7 +38,7 @@ function BackToTop() {
   }, []);
   return (
     <FloatingButton
-      label="Retour en haut"
+      label={tr("Retour en haut")}
       hidden={!visible}
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       icon={<ArrowUp size={16} className="transition-transform duration-300 group-hover:-translate-y-0.5" />}
@@ -45,11 +47,12 @@ function BackToTop() {
 }
 
 function ThemeToggle() {
+  const tr = useT();
   const theme = useSyncExternalStore<Theme>(subscribeTheme, getEffectiveTheme, () => "dark");
   const toLight = theme === "dark";
   return (
     <FloatingButton
-      label={toLight ? "Thème clair" : "Thème sombre"}
+      label={toLight ? tr("Thème clair") : tr("Thème sombre")}
       onClick={() => setTheme(toLight ? "light" : "dark")}
       icon={
         toLight ? (

@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { TONE_VAR } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, dateFormat } from "@/lib/utils";
 import { uptimeTone, formatPct } from "@/lib/monitor/format";
+import { useT } from "@/i18n/client";
+import type { Locale } from "@/i18n/locales";
+import type { Translate } from "@/i18n/translate";
 
 export { uptimeTone, formatPct, formatDuration } from "@/lib/monitor/format";
 
@@ -42,10 +45,10 @@ function niceScale(v: number) {
 
 
 
-const timeFmt = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
-const dayFmt = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" });
-const weekdayFmt = new Intl.DateTimeFormat("fr-FR", { weekday: "short" });
-const fullFmt = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const timeFmt = (l: Locale) => dateFormat(l, { hour: "2-digit", minute: "2-digit" });
+const dayFmt = (l: Locale) => dateFormat(l, { day: "2-digit", month: "short" });
+const weekdayFmt = (l: Locale) => dateFormat(l, { weekday: "short" });
+const fullFmt = (l: Locale) => dateFormat(l, { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 /* --------------------------------------------------------------------------
  * Graphique de temps de réponse (ligne + aire, crosshair, bandes d'incident)
@@ -68,6 +71,8 @@ export function ResponseChart({
   height?: number;
   label?: string;
 }) {
+  const tr = useT();
+  label = tr(label);
   const isClient = useIsClient();
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -103,9 +108,9 @@ export function ResponseChart({
   const xTickCount = Math.max(2, Math.min(7, Math.floor(innerW / 110)));
   const xTicks = Array.from({ length: xTickCount }, (_, i) => from + (span * i) / (xTickCount - 1));
   const fmtTick = (t: number) => {
-    if (span > 2 * 86_400_000) return dayFmt.format(t);
+    if (span > 2 * 86_400_000) return dayFmt(tr.locale).format(t);
     const sameDay = new Date(t).toDateString() === new Date(to).toDateString();
-    return sameDay ? timeFmt.format(t) : `${weekdayFmt.format(t)} ${timeFmt.format(t)}`;
+    return sameDay ? timeFmt(tr.locale).format(t) : `${weekdayFmt(tr.locale).format(t)} ${timeFmt(tr.locale).format(t)}`;
   };
 
   const hp = hover !== null ? points[hover] : null;
@@ -122,7 +127,7 @@ export function ResponseChart({
             width={w}
             height={height}
             role="img"
-            aria-label={`${label} : moyenne ${avg ?? "—"} ms sur la période, ${points.filter((p) => p.ups < p.checks).length} tranche(s) avec échec`}
+            aria-label={tr("{label} : moyenne {1} ms sur la période, {length} tranche(s) avec échec", { label: label, "1": avg ?? "—", length: points.filter((p) => p.ups < p.checks).length })}
             className="block overflow-visible"
           >
             {/* Grille horizontale + graduations */}
@@ -130,8 +135,7 @@ export function ResponseChart({
               <g key={v}>
                 <line x1={pad.left} x2={w - pad.right} y1={y(v)} y2={y(v)} stroke="var(--mm-border-subtle)" strokeWidth={1} />
                 <text x={pad.left - 8} y={y(v)} dy="0.32em" textAnchor="end" className="fill-meta font-mono text-[10px] tabular-nums">
-                  {v} ms
-                </text>
+                  {v} {tr("ms")}</text>
               </g>
             ))}
             {xTicks.map((t, i) => (
@@ -214,14 +218,14 @@ export function ResponseChart({
               }}
             >
               <p className="text-base font-semibold text-h1 tabular-nums">{hp.ms !== null ? `${hp.ms} ms` : "—"}</p>
-              <p className="text-xs text-meta">{fullFmt.format(hp.t)}</p>
+              <p className="text-xs text-meta">{fullFmt(tr.locale).format(hp.t)}</p>
               <p className="mt-1 flex items-center gap-1.5 text-xs text-body">
                 <span
                   className="h-2 w-2 rounded-full"
                   style={{ background: hp.ups === hp.checks ? TONE_VAR.green : hp.ups === 0 ? TONE_VAR.red : TONE_VAR.yellow }}
                   aria-hidden
                 />
-                {hp.ups === hp.checks ? "Disponible" : hp.ups === 0 ? "Indisponible" : "Partiellement disponible"} · {hp.ups}/{hp.checks}
+                {hp.ups === hp.checks ? tr("Disponible") : hp.ups === 0 ? tr("Indisponible") : tr("Partiellement disponible")} · {hp.ups}/{hp.checks}
               </p>
             </div>
           )}
@@ -229,7 +233,7 @@ export function ResponseChart({
       )}
       {(!isClient || width === 0) && <div className="skeleton h-full w-full rounded-xl bg-elevated/50" />}
       {isClient && width > 0 && points.length === 0 && (
-        <p className="absolute inset-0 flex items-center justify-center text-sm text-meta">Pas encore de mesure sur cette période</p>
+        <p className="absolute inset-0 flex items-center justify-center text-sm text-meta">{tr("Pas encore de mesure sur cette période")}</p>
       )}
     </div>
   );
@@ -242,6 +246,7 @@ export function ResponseChart({
 export type DayBar = { day: string; checks: number; uptime: number | null; avg: number | null };
 
 export function UptimeBars({ days: allDays, height = 32, className }: { days: DayBar[]; height?: number; className?: string }) {
+  const tr = useT();
   const isClient = useIsClient();
   const [hover, setHover] = useState<number | null>(null);
   const [ref, width] = useWidth<HTMLDivElement>();
@@ -257,7 +262,7 @@ export function UptimeBars({ days: allDays, height = 32, className }: { days: Da
         className="flex items-end gap-[2px]"
         style={{ height }}
         role="img"
-        aria-label={`Disponibilité sur ${days.length} jours : ${known.length} jour(s) mesuré(s), ${bad} jour(s) dégradé(s)`}
+        aria-label={tr("Disponibilité sur {length} jours : {1} jour(s) mesuré(s), {bad} jour(s) dégradé(s)", { length: days.length, "1": known.length, bad: bad })}
         onPointerLeave={() => setHover(null)}
       >
         {days.map((d, i) => {
@@ -277,14 +282,14 @@ export function UptimeBars({ days: allDays, height = 32, className }: { days: Da
           className="pointer-events-none absolute bottom-[calc(100%+8px)] z-10 min-w-40 -translate-x-1/2 rounded-xl border border-line bg-elevated px-3 py-2 shadow-[var(--mm-shadow-popover)]"
           style={{ left: `clamp(5rem, ${((hover! + 0.5) / days.length) * 100}%, calc(100% - 5rem))` }}
         >
-          <p className="text-xs text-meta">{new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date(h.day))}</p>
+          <p className="text-xs text-meta">{dateFormat(tr.locale, { weekday: "long", day: "numeric", month: "long" }).format(new Date(h.day))}</p>
           {h.uptime === null ? (
-            <p className="text-sm text-body">Aucune mesure</p>
+            <p className="text-sm text-body">{tr("Aucune mesure")}</p>
           ) : (
             <>
-              <p className="text-base font-semibold text-h1">{formatPct(h.uptime)}</p>
+              <p className="text-base font-semibold text-h1">{formatPct(h.uptime, 2, tr.locale)}</p>
               <p className="text-xs text-body">
-                {h.checks} contrôle(s){h.avg !== null ? ` · ${h.avg} ms en moyenne` : ""}
+                {h.checks} {tr("contrôle(s)")}{h.avg !== null ? tr(" · {avg} ms en moyenne", { avg: h.avg }) : ""}
               </p>
             </>
           )}
@@ -326,17 +331,18 @@ export function Sparkline({ values, down, className }: { values: (number | null)
   );
 }
 
-function relative(ts: number) {
+function relative(ts: number, tr: Translate) {
   const s = Math.round((Date.now() - ts) / 1000);
-  return s < 60 ? `il y a ${s} s` : s < 3600 ? `il y a ${Math.round(s / 60)} min` : fullFmt.format(ts);
+  return s < 60 ? tr("il y a {s} s", { s }) : s < 3600 ? tr("il y a {m} min", { m: Math.round(s / 60) }) : fullFmt(tr.locale).format(ts);
 }
 
 /** Date/heure formatée dans le fuseau du navigateur. */
 export function LocalTime({ ts, mode = "full" }: { ts: number; mode?: "full" | "time" | "relative" }) {
   const isClient = useIsClient();
+  const tr = useT();
   if (!isClient) return <span className="opacity-0">…</span>;
-  if (mode === "time") return <>{timeFmt.format(ts)}</>;
-  if (mode === "relative") return <>{relative(ts)}</>;
-  return <>{fullFmt.format(ts)}</>;
+  if (mode === "time") return <>{timeFmt(tr.locale).format(ts)}</>;
+  if (mode === "relative") return <>{relative(ts, tr)}</>;
+  return <>{fullFmt(tr.locale).format(ts)}</>;
 }
 

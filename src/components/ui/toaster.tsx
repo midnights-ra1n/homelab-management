@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { TONE_VAR } from "@/lib/constants";
+import { useT } from "@/i18n/client";
 
 type Toast = { id: number; kind: "success" | "error" | "info"; message: string };
 const ToastContext = createContext<(kind: Toast["kind"], message: string) => void>(() => {});
@@ -19,6 +20,7 @@ const STYLE = {
 
 /** Notifications éphémères (en bas à droite), annoncées aux lecteurs d'écran. */
 export function Toaster({ children }: { children: ReactNode }) {
+  const tr = useT();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const dismiss = (id: number) => setToasts((t) => t.filter((x) => x.id !== id));
   const push = useCallback((kind: Toast["kind"], message: string) => {
@@ -50,8 +52,8 @@ export function Toaster({ children }: { children: ReactNode }) {
               >
                 {s.glyph}
               </span>
-              <p className="min-w-0 flex-1 break-words text-sm text-h2">{t.message}</p>
-              <button type="button" onClick={() => dismiss(t.id)} className="text-meta hover:text-h1" aria-label="Fermer">
+              <p className="min-w-0 flex-1 break-words text-sm text-h2">{tr(t.message)}</p>
+              <button type="button" onClick={() => dismiss(t.id)} className="text-meta hover:text-h1" aria-label={tr("Fermer")}>
                 <X size={14} />
               </button>
             </div>

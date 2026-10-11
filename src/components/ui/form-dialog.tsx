@@ -7,6 +7,7 @@ import { Dialog } from "./dialog";
 import { Alert } from "./alert";
 import { ActionForm, SubmitButton, useFormMessage } from "./form";
 import { useToast } from "./toaster";
+import { useT } from "@/i18n/client";
 
 /** Bouton + modale + formulaire de server action ; se ferme et notifie au succès. */
 export function FormDialog({
@@ -34,6 +35,8 @@ export function FormDialog({
   submitLabel?: string;
   size?: "sm" | "md" | "lg" | "xl";
 }) {
+  const tr = useT();
+  submitLabel = tr(submitLabel);
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState(0);
   const toast = useToast();
@@ -67,8 +70,7 @@ export function FormDialog({
           {children}
           <div className="mt-2 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              Annuler
-            </Button>
+              {tr("Annuler")}</Button>
             <SubmitButton>{submitLabel}</SubmitButton>
           </div>
         </ActionForm>

@@ -12,9 +12,11 @@ import { cn } from "@/lib/utils";
 import { Sparkline, UptimeBars } from "./charts";
 import { formatPct } from "@/lib/monitor/format";
 import { MonitorDialog } from "./monitor-dialog";
+import { getT } from "@/i18n/server";
 
 /** Sondes intégrées : bandeau d'état, chiffres clés et une ligne par sonde (style status page). */
-export function UptimeSection() {
+export async function UptimeSection() {
+  const tr = await getT();
   const list = monitorSummaries();
   const assets = assetOptions().map((a) => ({ id: a.id, label: a.display_name }));
   const active = list.filter((s) => s.monitor.enabled);
@@ -28,9 +30,8 @@ export function UptimeSection() {
 
   const actions = (
     <div className="flex flex-wrap gap-2">
-      <ActionButton action={importMonitorsAction} icon={<Import size={15} />} pendingLabel="Import…" title="Créer une sonde pour chaque application">
-        Importer les applications
-      </ActionButton>
+      <ActionButton action={importMonitorsAction} icon={<Import size={15} />} pendingLabel={tr("Import…")} title={tr("Créer une sonde pour chaque application")}>
+        {tr("Importer les applications")}</ActionButton>
       <MonitorDialog assets={assets} />
     </div>
   );
@@ -39,12 +40,9 @@ export function UptimeSection() {
     return (
       <section aria-labelledby="uptime-title" className="grid gap-6">
         <SectionTitle id="uptime-title" actions={actions}>
-          Disponibilité
-        </SectionTitle>
-        <EmptyState icon={<Activity size={22} />} title="Aucune sonde">
-          Ajoute des sondes HTTP ou TCP : l&apos;application les contrôle en continu et trace temps de réponse, disponibilité sur 90 jours et
-          incidents — sans outil externe.
-        </EmptyState>
+          {tr("Disponibilité")}</SectionTitle>
+        <EmptyState icon={<Activity size={22} />} title={tr("Aucune sonde")}>
+          {tr("Ajoute des sondes HTTP ou TCP : l'application les contrôle en continu et trace temps de réponse, disponibilité sur 90 jours et incidents — sans outil externe.")}</EmptyState>
       </section>
     );
   }
@@ -55,8 +53,7 @@ export function UptimeSection() {
   return (
     <section aria-labelledby="uptime-title" className="grid gap-6">
       <SectionTitle id="uptime-title" actions={actions}>
-        Disponibilité
-      </SectionTitle>
+        {tr("Disponibilité")}</SectionTitle>
 
       {/* Bandeau d'état global */}
       <div
@@ -73,23 +70,23 @@ export function UptimeSection() {
         <div className="min-w-0">
           <p className="text-lg font-semibold text-h1 sm:text-xl">
             {state === "down"
-              ? `${down.length} service${down.length > 1 ? "s" : ""} en panne`
+              ? tr("{length} service{1} en panne", { length: down.length, "1": down.length > 1 ? "s" : "" })
               : state === "paused"
-                ? "Toutes les sondes sont en pause"
-                : "Tous les services sont opérationnels"}
+                ? tr("Toutes les sondes sont en pause")
+                : tr("Tous les services sont opérationnels")}
           </p>
           <p className="text-sm text-body">
-            {state === "down" ? down.map((d) => d.monitor.name).join(", ") : `${active.length} sonde(s) active(s)`}
-            {pending.length > 0 && ` · ${pending.length} en attente du premier contrôle`}
+            {state === "down" ? down.map((d) => d.monitor.name).join(", ") : tr("{n} sonde(s) active(s)", { n: active.length })}
+            {pending.length > 0 && tr(" · {length} en attente du premier contrôle", { length: pending.length })}
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
-        <Stat label="Disponibilité 24 h" value={formatPct(global24)} detail="moyenne des sondes" />
-        <Stat label="Temps de réponse" value={avg !== null ? `${avg} ms` : "—"} detail="moyenne sur 24 h" />
-        <Stat label="Incidents" value={inc7} detail="sur 7 jours" tone={inc7 ? "yellow" : undefined} />
-        <Stat label="Sondes" value={`${down.length ? active.length - down.length : active.length}/${list.length}`} detail="opérationnelles" />
+        <Stat label={tr("Disponibilité 24 h")} value={formatPct(global24, 2, tr.locale)} detail={tr("moyenne des sondes")} />
+        <Stat label={tr("Temps de réponse")} value={avg !== null ? `${avg} ms` : "—"} detail={tr("moyenne sur 24 h")} />
+        <Stat label={tr("Incidents")} value={inc7} detail={tr("sur 7 jours")} tone={inc7 ? "yellow" : undefined} />
+        <Stat label={tr("Sondes")} value={`${down.length ? active.length - down.length : active.length}/${list.length}`} detail={tr("opérationnelles")} />
       </div>
 
       {/* Liste des sondes */}
@@ -98,7 +95,7 @@ export function UptimeSection() {
           const m = s.monitor;
           const up = s.last?.up;
           const dot = !m.enabled ? TONE_VAR.muted : !s.last ? TONE_VAR.blue : s.degraded ? TONE_VAR.yellow : up ? TONE_VAR.green : TONE_VAR.red;
-          const label = !m.enabled ? "En pause" : !s.last ? "En attente" : s.degraded ? "Échec isolé" : up ? "Opérationnel" : "En panne";
+          const label = !m.enabled ? tr("En pause") : !s.last ? tr("En attente") : s.degraded ? tr("Échec isolé") : up ? tr("Opérationnel") : tr("En panne");
           return (
             <li key={m.id}>
               <Link
@@ -127,7 +124,7 @@ export function UptimeSection() {
                 </div>
                 <div className="flex items-baseline justify-between gap-3 lg:block lg:text-right">
                   <p className="text-base font-semibold text-h1">
-                    {formatPct(s.uptime90)}
+                    {formatPct(s.uptime90, 2, tr.locale)}
                   </p>
                   <p className="font-mono text-xs text-meta">{s.last?.ms != null ? `${s.last.ms} ms` : (s.last?.error ?? "—")}</p>
                 </div>
@@ -147,9 +144,8 @@ export function UptimeSection() {
           <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: TONE_VAR.red }} /> &lt; 99 %
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[2px] bg-line-subtle" /> sans mesure
-        </span>
-        <span>· 90 derniers jours · disponibilité sur 90 j à droite</span>
+          <span className="h-2.5 w-2.5 rounded-[2px] bg-line-subtle" /> {tr("sans mesure")}</span>
+        <span>{tr("· 90 derniers jours · disponibilité sur 90 j à droite")}</span>
       </p>
     </section>
   );

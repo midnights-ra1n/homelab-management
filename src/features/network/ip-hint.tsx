@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { checkIpAction } from "@/actions/network";
 import type { Issue } from "@/lib/net/engine";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 const GLYPH = { error: "✕", warning: "!", info: "✓" } as const;
 
@@ -20,6 +21,7 @@ export function IpHint({
   assetId?: number | null;
   ipId?: number | null;
 }) {
+  const tr = useT();
   const [result, setResult] = useState<{ for: string; issues: Issue[] } | null>(null);
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export function IpHint({
           </span>
           {i.href ? (
             <Link href={i.href} className="underline-offset-2 hover:underline">
-              {i.message}
+              {tr(i.message)}
             </Link>
           ) : (
             i.message

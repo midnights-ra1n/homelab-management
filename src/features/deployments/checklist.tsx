@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/form";
 import type { DeploymentStep } from "@/lib/data/deployments";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 /** Checklist interactive d'un déploiement (mise à jour optimiste). */
 export function Checklist({ deploymentId, steps }: { deploymentId: number; steps: DeploymentStep[] }) {
+  const tr = useT();
   const [optimistic, toggle] = useOptimistic(steps, (state, id: number) =>
     state.map((s) => (s.id === id ? { ...s, done: s.done ? 0 : 1 } : s)),
   );
@@ -26,7 +28,7 @@ export function Checklist({ deploymentId, steps }: { deploymentId: number; steps
 
   return (
     <div>
-      {optimistic.length === 0 && <p className="mb-3 text-sm text-meta">Aucune étape définie.</p>}
+      {optimistic.length === 0 && <p className="mb-3 text-sm text-meta">{tr("Aucune étape définie.")}</p>}
       <ol className="grid gap-1.5">
         {optimistic.map((s, i) => (
           <li key={s.id} className="group flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-page">
@@ -54,7 +56,7 @@ export function Checklist({ deploymentId, steps }: { deploymentId: number; steps
               type="button"
               onClick={() => start(() => deleteStepAction(s.id))}
               className="rounded-full p-1 text-meta opacity-0 transition-opacity hover:text-red focus-visible:opacity-100 group-hover:opacity-100"
-              aria-label={`Retirer l'étape « ${s.label} »`}
+              aria-label={tr("Retirer l'étape « {label} »", { label: s.label })}
             >
               <X size={14} />
             </button>
@@ -64,8 +66,8 @@ export function Checklist({ deploymentId, steps }: { deploymentId: number; steps
       <div className="mt-3 flex gap-2">
         <input
           className={cn(inputClass, "py-2")}
-          placeholder="Ajouter une étape…"
-          aria-label="Ajouter une étape"
+          placeholder={tr("Ajouter une étape…")}
+          aria-label={tr("Ajouter une étape")}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -75,7 +77,7 @@ export function Checklist({ deploymentId, steps }: { deploymentId: number; steps
             }
           }}
         />
-        <Button variant="secondary" size="icon" onClick={add} disabled={adding} aria-label="Ajouter l'étape" icon={<Plus size={16} />} />
+        <Button variant="secondary" size="icon" onClick={add} disabled={adding} aria-label={tr("Ajouter l'étape")} icon={<Plus size={16} />} />
       </div>
     </div>
   );

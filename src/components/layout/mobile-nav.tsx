@@ -1,18 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { LayoutGrid, Settings } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { MOBILE_TABS, NAV_ITEMS, isActive } from "./nav-items";
-import { ThemeSwitch } from "./theme-switch";
+import { LanguageSwitch, ThemeSwitch } from "./theme-switch";
+import { usePathname, useT } from "@/i18n/client";
 
 /**
  * Navigation mobile / PWA : barre d'onglets flottante en bas (zone du pouce),
  * onglet « Plus » qui ouvre une feuille glissante (glisser vers le bas pour fermer).
  */
 export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
+  const tr = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [drag, setDrag] = useState(0);
@@ -55,7 +56,7 @@ export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Plus de pages"
+        aria-label={tr("Plus de pages")}
         inert={!open}
         onTouchStart={(e) => (startY.current = e.touches[0].clientY)}
         onTouchMove={(e) => {
@@ -75,8 +76,8 @@ export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
         style={open && drag ? { transform: `translateY(${drag}px)` } : undefined}
       >
         <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-line-strong" aria-hidden />
-        <nav aria-label="Autres pages" className="grid grid-cols-3 gap-2">
-          {[...more, { href: "/parametres", label: "Paramètres", short: "Paramètres", icon: Settings }].map((item) => {
+        <nav aria-label={tr("Autres pages")} className="grid grid-cols-3 gap-2">
+          {[...more, { href: "/parametres", label: tr("Paramètres"), short: tr("Paramètres"), icon: Settings }].map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
             return (
@@ -90,21 +91,25 @@ export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
                 )}
               >
                 <Icon size={22} aria-hidden className={active ? "" : "text-meta"} />
-                {item.short}
+                {tr(item.short)}
               </Link>
             );
           })}
         </nav>
         <div className="mt-5 flex items-center justify-between gap-3 rounded-full border border-line px-4 py-2">
-          <span className="text-sm text-body">Thème</span>
+          <span className="text-sm text-body">{tr("Thème")}</span>
           <ThemeSwitch />
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-full border border-line px-4 py-2">
+          <span className="text-sm text-body">{tr("Langue")}</span>
+          <LanguageSwitch />
         </div>
         <div className="mt-3">{accountSlot}</div>
       </div>
 
       {/* Barre d'onglets */}
       <nav
-        aria-label="Navigation principale"
+        aria-label={tr("Navigation principale")}
         className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[60] mx-auto flex h-16 max-w-md items-center justify-around rounded-full border border-line bg-page/95 px-2 backdrop-blur-md nav-glow"
       >
         {tabs.map((item) => {
@@ -125,7 +130,7 @@ export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
               >
                 <Icon size={20} aria-hidden />
               </span>
-              <span className={cn("text-[0.68rem] font-medium leading-none", active ? "text-h1" : "text-meta")}>{item.short}</span>
+              <span className={cn("text-[0.68rem] font-medium leading-none", active ? "text-h1" : "text-meta")}>{tr(item.short)}</span>
             </Link>
           );
         })}
@@ -143,7 +148,7 @@ export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
           >
             <LayoutGrid size={20} aria-hidden />
           </span>
-          <span className={cn("text-[0.68rem] font-medium leading-none", moreActive ? "text-h1" : "text-meta")}>Plus</span>
+          <span className={cn("text-[0.68rem] font-medium leading-none", moreActive ? "text-h1" : "text-meta")}>{tr("Plus")}</span>
         </button>
       </nav>
     </div>

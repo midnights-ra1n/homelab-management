@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { TONE_VAR, type Tone } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { Tr } from "@/i18n/client";
 
 const KINDS = {
   success: { tone: "green", glyph: "✓", title: "Succès" },
@@ -43,9 +44,10 @@ export function Alert({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold" style={{ color }}>
-          {title ?? k.title}
+          {/* Composant partagé serveur / client : les messages venus des actions sont traduits ici. */}
+          {typeof (title ?? k.title) === "string" ? <Tr>{(title ?? k.title) as string}</Tr> : title}
         </p>
-        {children && <div className="mt-0.5 text-sm text-h2">{children}</div>}
+        {children && <div className="mt-0.5 text-sm text-h2">{typeof children === "string" ? <Tr>{children}</Tr> : children}</div>}
       </div>
       {action}
     </div>

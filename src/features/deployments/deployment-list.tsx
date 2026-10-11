@@ -6,6 +6,7 @@ import { DEPLOYMENT_KIND_META, PRIORITY_META, TONE_VAR } from "@/lib/constants";
 import type { Deployment } from "@/lib/data/deployments";
 import { cn, formatDate, isOverdue, pct } from "@/lib/utils";
 import { StatusPicker } from "./status-picker";
+import { getT } from "@/i18n/server";
 
 function appsSummary(apps: string) {
   const list = apps
@@ -17,7 +18,8 @@ function appsSummary(apps: string) {
 }
 
 /** Vue en lignes : état modifiable d'un clic, le reste via « Modifier ». */
-export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
+export async function DeploymentList({ deployments }: { deployments: Deployment[] }) {
+  const tr = await getT();
   return (
     <>
       <ul className="grid gap-2 md:hidden">
@@ -29,14 +31,14 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
                 <Link href={`/deploiements/${d.id}`} className="min-w-0">
                   <span className="block truncate font-medium text-h1">{d.title}</span>
                   <span className="mt-0.5 block truncate font-mono text-xs text-meta">
-                    {[DEPLOYMENT_KIND_META[d.kind].label, d.target_host_name, d.vmid].filter(Boolean).join(" · ")}
+                    {[tr(DEPLOYMENT_KIND_META[d.kind].label), d.target_host_name, d.vmid].filter(Boolean).join(" · ")}
                   </span>
                 </Link>
                 <ButtonLink
                   href={`/deploiements/${d.id}/modifier`}
                   variant="secondary"
                   size="icon"
-                  aria-label={`Modifier ${d.title}`}
+                  aria-label={tr("Modifier {title}", { title: d.title })}
                   icon={<Pencil size={15} />}
                 />
               </div>
@@ -62,14 +64,14 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
         <table className="w-full min-w-[60rem] text-left text-sm">
           <thead>
             <tr className="border-b border-line-subtle font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
-              <th className="px-5 py-3 font-medium">Déploiement</th>
-              <th className="px-3 py-3 font-medium">Nœud</th>
-              <th className="px-3 py-3 font-medium">ID</th>
-              <th className="px-3 py-3 font-medium">Conteneurs / apps</th>
-              <th className="px-3 py-3 font-medium">État</th>
-              <th className="px-3 py-3 font-medium">Avancement</th>
-              <th className="px-3 py-3 font-medium">Cible</th>
-              <th className="px-5 py-3 text-right font-medium">Actions</th>
+              <th className="px-5 py-3 font-medium">{tr("Déploiement")}</th>
+              <th className="px-3 py-3 font-medium">{tr("Nœud")}</th>
+              <th className="px-3 py-3 font-medium">{tr("ID")}</th>
+              <th className="px-3 py-3 font-medium">{tr("Conteneurs / apps")}</th>
+              <th className="px-3 py-3 font-medium">{tr("État")}</th>
+              <th className="px-3 py-3 font-medium">{tr("Avancement")}</th>
+              <th className="px-3 py-3 font-medium">{tr("Cible")}</th>
+              <th className="px-5 py-3 text-right font-medium">{tr("Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -81,14 +83,14 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
                 <tr key={d.id} className="group border-b border-line-subtle transition-colors last:border-0 hover:bg-elevated/40 [&>td]:py-4">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[priority.tone] }} title={`Priorité ${priority.label}`} />
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[priority.tone] }} title={tr("Priorité {label}", { label: priority.label })} />
                       <div className="min-w-0">
                         <Link href={`/deploiements/${d.id}`} className="block truncate font-medium text-h1 hover:text-accent-text">
                           {d.title}
                         </Link>
                         <span className="mt-0.5 flex items-center gap-2">
                           <Badge tone={DEPLOYMENT_KIND_META[d.kind].tone} className="px-2 py-0 text-[0.68rem]">
-                            {DEPLOYMENT_KIND_META[d.kind].label}
+                            {tr(DEPLOYMENT_KIND_META[d.kind].label)}
                           </Badge>
                           {d.public_fqdn && <span className="truncate font-mono text-xs text-meta">{d.public_fqdn}</span>}
                         </span>
@@ -131,7 +133,7 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
                   <td className={cn("whitespace-nowrap px-3 py-3 font-mono text-xs", late ? "text-red" : "text-meta")}>
                     {d.target_date ? (
                       <span className="flex items-center gap-1.5">
-                        <CalendarDays size={12} aria-hidden /> {formatDate(d.target_date)}
+                        <CalendarDays size={12} aria-hidden /> {formatDate(d.target_date, tr.locale)}
                       </span>
                     ) : (
                       "—"
@@ -139,8 +141,7 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
                   </td>
                   <td className="px-5 py-3 text-right">
                     <ButtonLink href={`/deploiements/${d.id}/modifier`} variant="secondary" size="sm" icon={<Pencil size={13} />}>
-                      Modifier
-                    </ButtonLink>
+                      {tr("Modifier")}</ButtonLink>
                   </td>
                 </tr>
               );

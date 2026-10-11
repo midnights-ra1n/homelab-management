@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { banRemaining, clientIp, recordFailure, wafInspect } from "@/lib/security";
+import { isLocale, LOCALE_COOKIE, pickLocale } from "@/i18n/locales";
 
 const PUBLIC = /^\/(?:login|setup|api\/health|api\/uploads|manifest\.webmanifest|sw\.js|offline\.html|robots\.txt|icons\/|icon|apple-icon)|\.(?:svg|png|ico|webp)$/;
 
@@ -29,13 +30,20 @@ export function proxy(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
-  if (process.env.AUTH_DISABLED === "true" || PUBLIC.test(pathname) || request.cookies.has("hm_session")) {
-    return NextResponse.next();
+  const prefixed = isLocale(pathname.split("/")[1]);
+  const route = prefixed ? pathname.replace(/^\/[a-z]{2}(?=\/|$)/, "") || "/" : pathname;
+  if (process.env.AUTH_DISABLED !== "true" && !PUBLIC.test(route) && !request.cookies.has("hm_session")) {
+    const url = request.nextUrl.clone();
+    url.search = "";
+    if (route !== "/") url.searchParams.set("next", route + request.nextUrl.search);
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
   }
+  // Pages : langue invisible dans l'URL, réécrite vers /[lang]/… (cookie, sinon Accept-Language).
+  if (prefixed || route.startsWith("/api/") || /\.[a-z0-9]+$/i.test(route)) return NextResponse.next();
   const url = request.nextUrl.clone();
-  if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);
-  url.pathname = "/login";
-  return NextResponse.redirect(url);
+  url.pathname = `/${pickLocale(request.cookies.get(LOCALE_COOKIE)?.value, request.headers.get("accept-language"))}${route === "/" ? "" : route}`;
+  return NextResponse.rewrite(url);
 }
 
 export const config = {
