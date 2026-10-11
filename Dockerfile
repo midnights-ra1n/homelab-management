@@ -28,15 +28,19 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     DATA_DIR=/data \
     TZ=Europe/Paris
-RUN apk add --no-cache tzdata \
+# tini : PID 1 qui relaie les signaux (arrêt propre du CT Proxmox) ; su-exec : abandon des droits root.
+RUN apk add --no-cache tzdata tini su-exec \
  && addgroup -S app -g 1001 && adduser -S app -u 1001 -G app \
  && mkdir -p /data && chown app:app /data
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public
-USER app
+COPY --chmod=755 docker/entrypoint.sh /entrypoint.sh
+# Pas de USER : l'entrypoint démarre en root pour corriger les droits de /data, puis passe en 1001.
 VOLUME ["/data"]
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
   CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 CMD ["node", "server.js"]

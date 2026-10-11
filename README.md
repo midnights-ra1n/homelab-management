@@ -67,13 +67,19 @@ accordingly.
 
 ### Proxmox CT from an OCI image (PVE 9.1+)
 
+The image is published with OCI media types and no attestation manifests, so Proxmox can pull it directly:
+*Storage → CT Templates → Pull from OCI registry* → `ghcr.io/midnights-ra1n/homelab-management:latest`.
+
+To upload an archive instead, export it in OCI layout:
+
 ```bash
-docker build -t homelab-management .
-docker save homelab-management | gzip > homelab-management.tar.gz   # or push to a registry
+docker buildx build --platform linux/amd64 --output type=oci,dest=homelab-management.tar .
 ```
 
-Then in Proxmox: *Storage → CT Templates → Pull from OCI registry* (or upload the archive), create the CT and mount
-a volume on `/data`. The exposed port is `3000`.
+Create the CT from the template, add a mount point on `/data` and open port `3000`. The image is built for this:
+`tini` is PID 1 (clean CT shutdown), the entrypoint gives `/data` to the `app` user (UID 1001) even when Proxmox
+creates the mount point as root, then drops root privileges. Environment variables (`APP_SECRET`,
+`COOKIE_SECURE`…) can be set in the CT *Options*.
 
 ### Development
 
@@ -129,6 +135,9 @@ to French, and a test fails if a French string passed to `tr()` has no English t
 - **Brute-force protection**: 5 failures on a username → 30 s lock, doubled on each new failure (max 15 min);
   10 failures from an IP → IP banned from the whole app (60 s doubled, max 1 h). 5 WAF hits → IP banned for 15 min
   (doubled, max 24 h). Response `429` + `Retry-After`. Events are logged (`[auth]`, `[waf]`) for fail2ban / CrowdSec.
+- **Passkeys** (WebAuthn, HTTPS only): add them in *Settings → Account*, then use “Sign in with a passkey”.
+  User verification (biometrics / PIN) is required; failures count toward the IP ban. A passkey is bound to the
+  hostname it was created on.
 - **Headers**: CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP.
 - The client IP is the last entry of `X-Forwarded-For`. **Run the app behind a reverse proxy** that sets this header:
   when exposed directly, the IP can be spoofed and only the per-username lock protects the sign-in.

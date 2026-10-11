@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write   # création de la release GitHub
   packages: write
 
 env:
@@ -73,10 +73,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             NEXT_PUBLIC_APP_VERSION=${{ steps.prep.outputs.version }}
-          outputs: type=image,name=${{ steps.prep.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ steps.prep.outputs.image }},push-by-digest=true,name-canonical=true,push=true,oci-mediatypes=true
           cache-from: type=gha,scope=${{ steps.prep.outputs.pair }}
           cache-to: type=gha,scope=${{ steps.prep.outputs.pair }},mode=max
+          # Pas d'attestation : ses manifestes « unknown/unknown » gênent l'import OCI de Proxmox.
           provenance: false
+          sbom: false
 
       - name: Export du digest
         run: |
@@ -144,3 +146,23 @@ jobs:
 
       - name: Vérification
         run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ steps.meta.outputs.version }}
+
+  release:
+    name: Release GitHub
+    needs: merge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Création de la release (si absente)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "La release $version existe déjà."
+          else
+            gh release create "$version" --target "$GITHUB_SHA" --title "$version" --generate-notes
+          fi
