@@ -5,6 +5,7 @@ import { AppHeader, AppHeaderFallback } from "@/components/layout/app-header";
 import { UserMenu } from "@/components/layout/user-menu";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Toaster } from "@/components/ui/toaster";
+import { AlertStrip } from "@/components/alert-banner";
 import { getT } from "@/i18n/server";
 
 export default async function AppLayout({ children }: LayoutProps<"/[lang]">) {
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: LayoutProps<"/[lang]">) {
         />
       </Suspense>
       <main id="contenu" className="mx-auto w-full max-w-[84rem] flex-1 overflow-x-clip px-4 pb-32 pt-24 sm:px-5 sm:pt-32 xl:pb-24 xl:pt-40">
+        <AlertStrip />
         {children}
       </main>
       <FloatingActions />

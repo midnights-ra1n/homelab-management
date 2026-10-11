@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -23,8 +23,10 @@ import { deploymentCounts, listDeployments } from "@/lib/data/deployments";
 import { openTasks, taskCounts } from "@/lib/data/tasks";
 import { ipamTotals, listSubnets } from "@/lib/data/network";
 import { listIntegrations } from "@/lib/data/integrations";
-import { fetchProxmox, monitoringSummary } from "@/lib/integrations";
-import { confirmedDown, listMonitors } from "@/lib/data/monitors";
+import { fetchProxmox } from "@/lib/integrations";
+import { listMonitors } from "@/lib/data/monitors";
+import { collectAlerts } from "@/lib/monitor/alerts";
+import { AlertBanner } from "@/components/alert-banner";
 import {
   ASSET_KINDS,
   ASSET_KIND_META,
@@ -91,6 +93,12 @@ async function Dashboard() {
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:gap-8">
+      {hasMonitoring && (
+        <Suspense fallback={null}>
+          <DashboardAlertBanner />
+        </Suspense>
+      )}
+
       {/* KPI */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
         <Stat
@@ -234,29 +242,17 @@ async function ProxmoxWidget() {
   );
 }
 
+/** Une seule collecte par requête, partagée par la bannière et le widget. */
+const dashboardAlerts = cache(async () => collectAlerts(await getT()));
+
+async function DashboardAlertBanner() {
+  const { alerts } = await dashboardAlerts();
+  return <AlertBanner initial={alerts} />;
+}
+
 async function MonitoringWidget() {
   const tr = await getT();
-  const m = await monitoringSummary();
-  const probes = listMonitors().filter((x) => x.enabled);
-  const probesDown = probes.filter((x) => confirmedDown(x.id));
-  const alerts: { tone: "red" | "yellow"; text: string; href: string }[] = [
-    ...m.systems.down.map((s) => ({ tone: "red" as const, text: tr("{name} hors ligne (Beszel)", { name: s.name }), href: "/monitoring" })),
-    ...m.systems.hot.map((s) => ({
-      tone: "yellow" as const,
-      text: tr("{name} : CPU {cpu} % · RAM {mem} % · disque {disk} %", { name: s.name, cpu: Math.round(s.cpu ?? 0), mem: Math.round(s.mem ?? 0), disk: Math.round(s.disk ?? 0) }),
-      href: "/monitoring",
-    })),
-    ...m.containers.unhealthy.map((c) => ({ tone: "red" as const, text: tr("Conteneur {name} : {1}", { name: c.name, "1": c.health ?? c.state }), href: "/monitoring" })),
-    ...m.endpoints.down.map((e) => ({ tone: "red" as const, text: tr("Endpoint {name} : {status}", { name: e.name, status: e.status }), href: "/monitoring" })),
-    ...m.certificates.expiring.map((c) => ({
-      tone: "yellow" as const,
-      text: tr("Certificat {name} expire le {1}", { name: c.name, "1": formatDate(c.expiresAt, tr.locale) }),
-      href: "/monitoring",
-    })),
-    ...m.patches.reboot.map((h) => ({ tone: "yellow" as const, text: tr("{friendlyName} doit redémarrer", { friendlyName: h.friendlyName }), href: "/monitoring" })),
-    ...probesDown.map((x) => ({ tone: "red" as const, text: tr("{name} en panne", { name: x.name }), href: `/monitoring/${x.id}` })),
-    ...m.errors.map((e) => ({ tone: "red" as const, text: `${e.name} : ${tr(e.error)}`, href: "/parametres#integrations" })),
-  ];
+  const { m, probes, probesDown, alerts } = await dashboardAlerts();
   return (
     <Card className="h-full">
       <CardHeader
