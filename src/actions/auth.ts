@@ -1,10 +1,12 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSession, destroySession, hasUsers, requireUser } from "@/lib/auth";
 import { get, run } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/crypto";
+import { banRemaining, clearFailures, clientIp, lockRemaining, recordFailure } from "@/lib/security";
 import { formObject, zodErrors, type FormState } from "@/lib/validation";
 
 const credentials = z.object({
@@ -12,8 +14,23 @@ const credentials = z.object({
   password: z.string().min(8, "8 caractères minimum").max(200),
 });
 
-// Ralentit les tentatives de force brute (par processus).
-const failures = new Map<string, { count: number; until: number }>();
+// Hash factice : un identifiant inconnu coûte le même temps qu'un mauvais mot de passe (pas d'énumération).
+const DUMMY_HASH = hashPassword("dummy-password-for-timing");
+
+/** Chemin interne uniquement : refuse « //evil », « /\evil », « /%5Cevil »… (open redirect). */
+function safeNext(value: FormDataEntryValue | null): string {
+  const next = String(value ?? "/");
+  try {
+    const url = new URL(next, "http://app.local");
+    return next.startsWith("/") && url.origin === "http://app.local" ? url.pathname + url.search : "/";
+  } catch {
+    return "/";
+  }
+}
+
+function lockedMessage(seconds: number) {
+  return { message: `Trop de tentatives. Réessaie dans ${seconds < 120 ? `${seconds} s` : `${Math.ceil(seconds / 60)} min`}.` };
+}
 
 export async function setupAction(_: FormState, fd: FormData): Promise<FormState> {
   if (hasUsers()) redirect("/login");
@@ -32,25 +49,26 @@ export async function setupAction(_: FormState, fd: FormData): Promise<FormState
 }
 
 export async function loginAction(_: FormState, fd: FormData): Promise<FormState> {
-  const username = String(fd.get("username") ?? "").trim();
+  const ip = clientIp(await headers());
+  const username = String(fd.get("username") ?? "").trim().slice(0, 40);
   const password = String(fd.get("password") ?? "");
-  const key = username.toLowerCase();
-  const f = failures.get(key);
-  if (f && f.until > Date.now()) {
-    return { message: `Trop de tentatives. Réessaie dans ${Math.ceil((f.until - Date.now()) / 1000)} s.` };
-  }
+  const userKey = username.toLowerCase();
+  const locked = Math.max(banRemaining(ip), lockRemaining(`ip:${ip}`), lockRemaining(`user:${userKey}`));
+  if (locked) return lockedMessage(locked);
+
   const user = get<{ id: number; password_hash: string }>("SELECT id, password_hash FROM users WHERE username = ?", [
     username,
   ]);
-  if (!user || !verifyPassword(password, user.password_hash)) {
-    const count = (f?.count ?? 0) + 1;
-    failures.set(key, { count, until: count >= 5 ? Date.now() + Math.min(300, 2 ** (count - 4) * 15) * 1000 : 0 });
-    return { message: "Identifiant ou mot de passe incorrect." };
+  const valid = verifyPassword(password.slice(0, 200), user?.password_hash ?? DUMMY_HASH) && !!user && password.length <= 200;
+  if (!valid) {
+    const seconds = Math.max(recordFailure("user", userKey), recordFailure("ip", ip));
+    console.warn(`[auth] échec de connexion ip=${ip} user=${JSON.stringify(userKey)}${seconds ? ` verrouillé ${seconds}s` : ""}`);
+    return seconds ? lockedMessage(seconds) : { message: "Identifiant ou mot de passe incorrect." };
   }
-  failures.delete(key);
+  clearFailures("user", userKey);
+  clearFailures("ip", ip);
   await createSession(user.id);
-  const next = String(fd.get("next") ?? "/");
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+  redirect(safeNext(fd.get("next")));
 }
 
 export async function logoutAction() {
@@ -70,7 +88,11 @@ export async function changePasswordAction(_: FormState, fd: FormData): Promise<
     .safeParse(formObject(fd));
   if (!parsed.success) return { errors: zodErrors(parsed.error) };
   const row = get<{ password_hash: string }>("SELECT password_hash FROM users WHERE id = ?", [user.id]);
+  const userKey = user.username.toLowerCase();
+  const locked = lockRemaining(`user:${userKey}`);
+  if (locked) return lockedMessage(locked);
   if (!row || !verifyPassword(parsed.data.current, row.password_hash)) {
+    recordFailure("user", userKey);
     return { errors: { current: "Mot de passe actuel incorrect" } };
   }
   run("UPDATE users SET password_hash = ? WHERE id = ?", [hashPassword(parsed.data.password), user.id]);

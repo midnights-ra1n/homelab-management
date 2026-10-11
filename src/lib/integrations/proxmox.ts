@@ -122,6 +122,7 @@ export async function proxmoxTasks(i: Integration, node: string, limit = 15) {
 
 export async function guestAction(i: Integration, node: string, type: GuestType, vmid: number, action: GuestAction) {
   if (!GUEST_ACTIONS.includes(action)) throw new IntegrationError("Action inconnue");
+  assertGuest(type, vmid);
   if (type === "lxc" && (action === "suspend" || action === "resume")) {
     throw new IntegrationError("Suspendre / reprendre n'est disponible que pour les VM");
   }
@@ -185,6 +186,7 @@ export async function remoteMigrate(opts: {
   deleteSource: boolean;
 }) {
   const { target } = opts;
+  assertGuest(opts.type, opts.vmid, opts.targetVmid);
   if (!target.config.token_id || !target.config.token_secret) {
     throw new IntegrationError("Le nœud cible n'a pas de jeton API configuré");
   }
@@ -209,6 +211,14 @@ export async function remoteMigrate(opts: {
     method: "POST",
     body,
   });
+}
+
+/** Les arguments arrivent du client (server actions) et finissent dans le chemin de l'API Proxmox. */
+function assertGuest(type: unknown, vmid: unknown, targetVmid: unknown = null) {
+  const okId = (v: unknown) => Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 999_999_999;
+  if ((type !== "qemu" && type !== "lxc") || !okId(vmid) || (targetVmid != null && !okId(targetVmid))) {
+    throw new IntegrationError("Invité Proxmox invalide");
+  }
 }
 
 /** Lien direct vers l'interface web Proxmox pour un invité. */

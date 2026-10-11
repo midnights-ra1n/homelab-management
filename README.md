@@ -89,6 +89,21 @@ Prérequis : Node.js ≥ 22.13 (utilise le module natif `node:sqlite`, aucune d�
 
 Les secrets sont chiffrés en base et ne sont jamais renvoyés au navigateur.
 
+## Sécurité
+
+- **WAF** (`src/lib/security.ts`, appliqué par `src/proxy.ts`) : bloque en 403 les signatures d'injection SQL, XSS,
+  traversée de chemin, Log4Shell / injection de commande, CRLF, les scanners connus (`sqlmap`, `nikto`, `nuclei`…),
+  les sondes classiques (`/.env`, `/.git`, `/wp-login.php`, `*.php`…) et les méthodes HTTP exotiques.
+  L'URL et le User-Agent sont inspectés, pas le corps des formulaires (protégé par SQL paramétré, zod et React).
+- **Anti-force brute** : 5 échecs sur un identifiant → verrou de 30 s doublé à chaque nouvel échec (max 15 min) ;
+  10 échecs depuis une IP → IP bannie de toute l'app (60 s doublés, max 1 h). 5 alertes WAF → IP bannie
+  15 min (doublés, max 24 h). Réponse `429` + `Retry-After`. Les événements sont journalisés (`[auth]`, `[waf]`),
+  exploitables par fail2ban / CrowdSec.
+- **En-têtes** : CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP.
+- L'IP client est la dernière entrée de `X-Forwarded-For`. **Placez l'app derrière un reverse proxy** qui ajoute
+  cet en-tête : exposée directement, l'IP est falsifiable et seul le verrou par identifiant protège la connexion.
+- Les compteurs sont en mémoire : un redémarrage les remet à zéro.
+
 ## Architecture
 
 ```

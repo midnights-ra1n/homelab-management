@@ -8,6 +8,7 @@ export async function GET() {
     get("SELECT 1");
     return Response.json({ status: "ok" });
   } catch (err) {
-    return Response.json({ status: "error", error: (err as Error).message }, { status: 500 });
+    console.error(err);
+    return Response.json({ status: "error" }, { status: 500 });
   }
 }
