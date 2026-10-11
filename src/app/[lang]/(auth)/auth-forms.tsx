@@ -3,18 +3,22 @@
 import { LogIn, UserPlus } from "lucide-react";
 import { loginAction, setupAction } from "@/actions/auth";
 import { ActionForm, SubmitButton, TextField } from "@/components/ui/form";
+import { PasskeyLoginButton } from "@/features/settings/passkeys";
 import { useT } from "@/i18n/client";
 
 export function LoginForm({ next }: { next?: string }) {
   const tr = useT();
   return (
-    <ActionForm action={loginAction} className="grid gap-5">
-      <input type="hidden" name="next" value={next ?? "/"} />
-      <TextField label={tr("Identifiant")} name="username" autoComplete="username" autoFocus required />
-      <TextField label={tr("Mot de passe")} name="password" type="password" autoComplete="current-password" required />
-      <SubmitButton pendingLabel={tr("Connexion…")} className="mt-2 w-full" icon={<LogIn size={16} />}>
-        {tr("Se connecter")}</SubmitButton>
-    </ActionForm>
+    <>
+      <ActionForm action={loginAction} className="grid gap-5">
+        <input type="hidden" name="next" value={next ?? "/"} />
+        <TextField label={tr("Identifiant")} name="username" autoComplete="username" autoFocus required />
+        <TextField label={tr("Mot de passe")} name="password" type="password" autoComplete="current-password" required />
+        <SubmitButton pendingLabel={tr("Connexion…")} className="mt-2 w-full" icon={<LogIn size={16} />}>
+          {tr("Se connecter")}</SubmitButton>
+      </ActionForm>
+      <PasskeyLoginButton next={next} />
+    </>
   );
 }
 

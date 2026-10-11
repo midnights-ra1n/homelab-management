@@ -14,6 +14,8 @@ import { LanguageSwitch, ThemeSwitch } from "@/components/layout/theme-switch";
 import { AppIcon } from "@/features/apps/app-icon";
 import { IntegrationDialog } from "@/features/settings/integration-dialog";
 import { BackupForms, PasswordForm } from "@/features/settings/account-forms";
+import { PasskeyManager } from "@/features/settings/passkeys";
+import { listPasskeys } from "@/lib/passkeys";
 import { SshKeyDialog, SshKeyList } from "@/features/settings/ssh-keys";
 import { listSshKeys } from "@/lib/data/ssh-keys";
 import { timeAgo } from "@/lib/utils";
@@ -156,8 +158,11 @@ async function Settings() {
         <section aria-labelledby="account">
           <SectionTitle id="account">{tr("Compte")}</SectionTitle>
           <Card>
-            <CardBody>
+            <CardBody className="grid gap-8">
               <PasswordForm />
+              <div className="border-t border-line-subtle pt-8">
+                <PasskeyManager passkeys={listPasskeys(user.id)} />
+              </div>
             </CardBody>
           </Card>
         </section>

@@ -346,4 +346,19 @@ export const migrations: string[] = [
   DROP TABLE integrations;
   ALTER TABLE integrations_new RENAME TO integrations;
   `,
+
+  /* 006 — passkeys (WebAuthn) */
+  `
+  CREATE TABLE passkeys (
+    id           TEXT PRIMARY KEY,           -- identifiant de la credential (base64url)
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    public_key   BLOB NOT NULL,              -- clé COSE
+    counter      INTEGER NOT NULL DEFAULT 0,
+    transports   TEXT NOT NULL DEFAULT '',
+    name         TEXT NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    last_used_at TEXT
+  );
+  CREATE INDEX passkeys_user ON passkeys(user_id);
+  `,
 ];
