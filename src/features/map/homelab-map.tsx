@@ -42,6 +42,17 @@ import { cn } from "@/lib/utils";
 import { ExportMenu } from "./export-menu";
 import { useT } from "@/i18n/client";
 
+/**
+ * Étiquettes de liens en styles inline : html-to-image (export de la carte) ignore le
+ * remplissage SVG venu des feuilles de style, qui sortait noir dans les PNG / JPEG / PDF.
+ */
+const EDGE_LABEL = {
+  labelStyle: { fill: "var(--mm-body)", fontFamily: "var(--font-mono)", fontSize: 10 },
+  labelBgStyle: { fill: "var(--mm-bg-elevated)" },
+  labelBgPadding: [6, 3] as [number, number],
+  labelBgBorderRadius: 4,
+};
+
 export type MapAsset = {
   id: number;
   name: string;
@@ -269,6 +280,7 @@ function Flow({
           source: String(l.source_id),
           target: String(l.target_id),
           label: l.label || meta.label,
+          ...EDGE_LABEL,
           animated: l.kind === "vpn",
           style: {
             stroke: meta.tone === "muted" ? "var(--mm-accent)" : TONE_VAR[meta.tone],
@@ -286,6 +298,7 @@ function Flow({
             source: String(t.a),
             target: t.b ? String(t.b) : `ext-${t.id}`,
             label: `${t.typeLabel} · ${t.name}`,
+            ...EDGE_LABEL,
             animated: t.status === "up",
             selectable: false,
             style: {
