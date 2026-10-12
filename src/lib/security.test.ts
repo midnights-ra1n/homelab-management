@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { banRemaining, clearFailures, clientIp, lockRemaining, recordFailure, wafInspect } from "./security";
+import { banRemaining, clearFailures, clientIp, lockRemaining, POLICIES, recordFailure, wafInspect } from "./security";
 
 const req = (path: string, init: { method?: string; ua?: string } = {}) => ({
   method: init.method ?? "GET",
@@ -51,16 +51,18 @@ test("clientIp prend la dernière entrée de X-Forwarded-For", () => {
 
 test("verrouillage exponentiel après le seuil, puis bannissement d'IP", () => {
   const now = 1_000_000;
-  for (let i = 1; i < 5; i++) assert.equal(recordFailure("user", "alice", now), 0);
-  assert.equal(recordFailure("user", "alice", now), 30);
-  assert.equal(recordFailure("user", "alice", now), 60);
-  assert.equal(lockRemaining("user:alice", now), 60);
+  const u = POLICIES.user;
+  for (let i = 1; i < u.threshold; i++) assert.equal(recordFailure("user", "alice", now), 0);
+  assert.equal(recordFailure("user", "alice", now), u.base);
+  assert.equal(recordFailure("user", "alice", now), u.base * 2);
+  assert.equal(lockRemaining("user:alice", now), u.base * 2);
   clearFailures("user", "alice");
   assert.equal(lockRemaining("user:alice", now), 0);
 
-  for (let i = 1; i < 10; i++) recordFailure("ip", "203.0.113.9", now);
+  const p = POLICIES.ip;
+  for (let i = 1; i < p.threshold; i++) recordFailure("ip", "203.0.113.9", now);
   assert.equal(banRemaining("203.0.113.9", now), 0);
-  assert.equal(recordFailure("ip", "203.0.113.9", now), 60);
-  assert.equal(banRemaining("203.0.113.9", now), 60);
-  assert.equal(banRemaining("203.0.113.9", now + 61_000), 0);
+  assert.equal(recordFailure("ip", "203.0.113.9", now), p.base);
+  assert.equal(banRemaining("203.0.113.9", now), p.base);
+  assert.equal(banRemaining("203.0.113.9", now + (p.base + 1) * 1000), 0);
 });

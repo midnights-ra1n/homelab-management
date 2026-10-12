@@ -3,7 +3,37 @@ export type ThemeChoice = "auto" | "dark" | "light";
 export type Theme = "dark" | "light";
 
 const KEY = "hm-theme";
-const COLORS: Record<Theme, string> = { dark: "#191e27", light: "#e4e8ef" };
+const STYLE_KEY = "hm-style";
+const COLORS: Record<UiStyle, Record<Theme, string>> = {
+  standard: { dark: "#111214", light: "#f6f7f9" },
+  mint: { dark: "#191e27", light: "#e4e8ef" },
+};
+
+/** Style d'interface : "standard" (défaut, pas d'attribut) ou "mint" (charte Midnights Mint, data-style="mint"). */
+export type UiStyle = "standard" | "mint";
+
+export function getStyle(): UiStyle {
+  return document.documentElement.dataset.style === "mint" ? "mint" : "standard";
+}
+
+export function setStyle(style: UiStyle) {
+  try {
+    if (style === "mint") localStorage.setItem(STYLE_KEY, style);
+    else localStorage.removeItem(STYLE_KEY);
+  } catch {}
+  const root = document.documentElement;
+  root.classList.add("theme-transition");
+  window.setTimeout(() => root.classList.remove("theme-transition"), 400);
+  if (style === "mint") root.dataset.style = "mint";
+  else delete root.dataset.style;
+  syncThemeColor();
+  window.dispatchEvent(new Event("hm-theme"));
+}
+
+function syncThemeColor() {
+  const color = COLORS[getStyle()][getEffectiveTheme()];
+  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = color));
+}
 
 export function getChoice(): ThemeChoice {
   try {
@@ -31,8 +61,7 @@ export function setTheme(choice: ThemeChoice) {
   } catch {}
   if (choice === "auto") delete root.dataset.theme;
   else root.dataset.theme = choice;
-  const color = COLORS[getEffectiveTheme()];
-  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = color));
+  syncThemeColor();
   window.dispatchEvent(new Event("hm-theme"));
 }
 

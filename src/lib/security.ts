@@ -18,9 +18,10 @@ const COUNTER_TTL = 60 * 60_000; // un compteur inactif depuis 1 h est oublié
 
 /** Politiques : seuil avant blocage, durée initiale (doublée à chaque échec suivant), plafond. */
 export const POLICIES = {
-  user: { threshold: 5, base: 30, max: 15 * 60 },
-  ip: { threshold: 10, base: 60, max: 60 * 60 },
-  waf: { threshold: 5, base: 15 * 60, max: 24 * 60 * 60 },
+  // Réglages homelab : tolérants aux fautes de frappe et faux positifs, bannissements courts.
+  user: { threshold: 10, base: 15, max: 5 * 60 },
+  ip: { threshold: 25, base: 30, max: 10 * 60 },
+  waf: { threshold: 15, base: 60, max: 30 * 60 },
 } as const;
 type Policy = keyof typeof POLICIES;
 

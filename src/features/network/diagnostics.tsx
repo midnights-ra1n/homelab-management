@@ -18,7 +18,7 @@ export async function Diagnostics({ issues }: { issues: Issue[] }) {
       <div className="flex flex-col items-center rounded-2xl border border-line-subtle bg-box px-6 py-14 text-center">
         <CheckCircle2 size={28} className="text-green" />
         <p className="mt-3 font-semibold text-h1">{tr("Aucun problème détecté")}</p>
-        <p className="mt-1 max-w-md text-sm text-meta">
+        <p className="mt-1 text-sm text-meta">
           {tr("Pas de chevauchement de sous-réseaux, de doublon d'adresse ou de MAC, d'IP fixe dans une plage DHCP ni de règle orpheline.")}</p>
       </div>
     );

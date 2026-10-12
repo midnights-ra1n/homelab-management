@@ -42,11 +42,11 @@ export function Stat({
         )}
       </div>
       <p className="mt-2 text-2xl font-bold tracking-tight text-h1 tabular-nums sm:mt-3 sm:text-3xl">{value}</p>
-      {detail && <p className="mt-1 truncate font-mono text-xs text-meta">{detail}</p>}
+      {detail && <p className="mt-1 truncate text-xs text-meta mint:font-mono">{detail}</p>}
     </>
   );
   const cls = cn(
-    "block min-w-0 rounded-2xl border border-line-subtle bg-box p-4 transition-colors duration-200 sm:p-6",
+    "block min-w-0 rounded-xl border border-line-subtle bg-box p-5 transition-colors duration-200 sm:p-7 mint:rounded-2xl mint:p-4 mint:sm:p-6",
     href && "hover:border-line-accent",
     className,
   );

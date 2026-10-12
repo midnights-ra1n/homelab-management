@@ -79,7 +79,7 @@ export function SshKeyList({ keys }: { keys: SshKey[] }) {
             value={k.public_key}
             aria-label={tr("Clé publique {name}", { name: k.name })}
             onFocus={(e) => e.currentTarget.select()}
-            className="field w-full rounded-lg px-3 py-1.5 font-mono text-xs"
+            className="field w-full rounded-full px-3 py-1.5 font-mono text-xs"
           />
           <code className="block truncate font-mono text-xs text-meta">{k.fingerprint}</code>
         </li>

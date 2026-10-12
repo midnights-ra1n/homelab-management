@@ -137,7 +137,13 @@ export function Field({
   );
 }
 
-export const inputClass = "field w-full rounded-xl px-4 py-2.5 text-base sm:text-sm";
+const fieldBase = "field w-full px-4 py-2.5 text-base sm:text-sm";
+export const inputClass = `${fieldBase} rounded-full`;
+/** Zones multilignes : arrondi modéré, jamais en pilule. */
+export const textareaClass = `${fieldBase} rounded-2xl resize-y leading-relaxed`;
+
+/** Barre Annuler / Enregistrer des formulaires pleine page : tout en bas, après le dernier champ. */
+export const FORM_ACTIONS_CLASS = "mt-2 flex justify-end gap-3";
 
 export function TextField({
   label,
@@ -164,7 +170,7 @@ export function TextAreaField({
 }: { label: ReactNode; name: string; hint?: ReactNode; className?: string } & Omit<ComponentProps<"textarea">, "name">) {
   return (
     <Field label={label} name={name} hint={hint} className={className} required={required}>
-      {(p) => <textarea rows={4} {...p} {...props} className={cn(inputClass, "resize-y leading-relaxed")} />}
+      {(p) => <textarea rows={4} {...p} {...props} className={textareaClass} />}
     </Field>
   );
 }

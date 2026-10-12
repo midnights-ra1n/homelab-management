@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Badge, StatusDot, Tag } from "@/components/ui/badge";
 import { KindAvatar } from "@/components/kind-icon";
-import { ASSET_KIND_META, ASSET_STATUS_META } from "@/lib/constants";
+import { ASSET_KIND_META, ASSET_STATUS_META, STATUS_SOURCE_LABEL } from "@/lib/constants";
 import type { Asset } from "@/lib/data/assets";
-import { formatGb } from "@/lib/utils";
+import { formatDateTime, formatGb } from "@/lib/utils";
 import { getT } from "@/i18n/server";
 import type { Translate } from "@/i18n/translate";
 
@@ -51,7 +51,17 @@ export async function AssetTable({ assets }: { assets: Asset[] }) {
                     </Link>
                   </td>
                   <td className="px-3 py-3">
-                    <span className="inline-flex items-center gap-2 text-body">
+                    <span
+                      className="inline-flex items-center gap-2 text-body"
+                      title={
+                        a.status_source && a.status_checked_at
+                          ? tr("via {source} · {when}", {
+                              source: tr(STATUS_SOURCE_LABEL[a.status_source] ?? a.status_source),
+                              when: formatDateTime(a.status_checked_at, tr.locale),
+                            })
+                          : undefined
+                      }
+                    >
                       <StatusDot tone={status.tone} ping={a.status === "online"} />
                       {tr(status.label)}
                     </span>

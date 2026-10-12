@@ -201,7 +201,7 @@ async function MaintenantSection() {
         </SourceHeader>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-8 xl:grid-cols-3">
         <Card className="overflow-hidden xl:col-span-2">
           <p className="border-b border-line-subtle px-5 py-3 font-mono text-xs uppercase tracking-[0.14em] text-meta">{tr("Conteneurs")}</p>
           <ul className="max-h-[28rem] divide-y divide-line-subtle overflow-y-auto">

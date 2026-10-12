@@ -232,7 +232,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
               <Cloud size={22} />
             </span>
             <p className="mt-4 font-semibold text-h1">{tr("Prêt à simuler")}</p>
-            <p className="mt-1 max-w-md text-sm text-meta">
+            <p className="mt-1 text-sm text-meta">
               {tr("Choisis une source et une destination : le paquet traverse les commutateurs, la passerelle, le pare-feu et les tunnels VPN tels que décrits dans l'IPAM. Idéal pour valider une règle avant la mise en prod.")}</p>
           </div>
         ) : (

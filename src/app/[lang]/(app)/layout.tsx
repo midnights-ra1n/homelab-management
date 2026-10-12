@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: LayoutProps<"/[lang]">) {
           }
         />
       </Suspense>
-      <main id="contenu" className="mx-auto w-full max-w-[84rem] flex-1 overflow-x-clip px-4 pb-32 pt-24 sm:px-5 sm:pt-32 xl:pb-24 xl:pt-40">
+      <main id="contenu" className="mx-auto w-full max-w-[84rem] flex-1 overflow-x-clip px-4 pb-32 pt-24 sm:px-8 sm:pt-28 xl:pb-24 xl:pt-32 mint:sm:px-5 mint:sm:pt-32 mint:xl:pt-40">
         <Suspense fallback={null}>
           <AlertStrip />
         </Suspense>

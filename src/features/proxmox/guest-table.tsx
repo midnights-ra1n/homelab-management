@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRightLeft, ExternalLink, Pause, Play, Power, RotateCw, Search, Square } from "lucide-react";
+import { ArrowRightLeft, ExternalLink, Pause, Play, Power, RotateCw, Search, Square, SquareTerminal } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { guestActionAction, migrationTargetsAction, remoteMigrateAction } from "@/actions/proxmox";
 import { Alert } from "@/components/ui/alert";
@@ -11,6 +12,7 @@ import { inputClass } from "@/components/ui/form";
 import { Meter } from "@/components/ui/meter";
 import { useToast } from "@/components/ui/toaster";
 import { cn, formatBytes, formatUptime } from "@/lib/utils";
+import { consoleHref } from "./console-href";
 import { useT } from "@/i18n/client";
 
 export type GuestRow = {
@@ -245,6 +247,16 @@ export function GuestTable({
                             onClick={() => setMigrating(g)}
                             icon={<ArrowRightLeft size={14} />}
                           />
+                        )}
+                        {g.status === "running" && (
+                          <Link
+                            href={consoleHref(g)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-body hover:bg-elevated hover:text-h1"
+                            title={tr("Console")}
+                            aria-label={tr("Console de {name}", { name: g.name })}
+                          >
+                            <SquareTerminal size={14} />
+                          </Link>
                         )}
                         <a
                           href={`${g.baseUrl}/#v1:0:=${g.type}%2F${g.vmid}:4:::::::`}

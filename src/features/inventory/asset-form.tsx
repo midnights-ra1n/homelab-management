@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { saveAssetAction } from "@/actions/inventory";
 import { nextFreeIpAction } from "@/actions/network";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { ActionForm, Field, Fieldset, inputClass, SelectField, SubmitButton, TextAreaField, TextField } from "@/components/ui/form";
+import { ActionForm, Field, Fieldset, FORM_ACTIONS_CLASS, inputClass, SelectField, SubmitButton, TextAreaField, TextField } from "@/components/ui/form";
 import { KindIcon } from "@/components/kind-icon";
 import { IpHint } from "@/features/network/ip-hint";
 import {
@@ -420,7 +420,7 @@ export function AssetForm({
         <TextAreaField label={tr("Notes libres")} name="notes" defaultValue={asset?.notes} rows={6} placeholder={tr("Procédures, identifiants de rangement, historique…")} />
       </Fieldset>
 
-      <div className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-10 flex justify-end xl:bottom-4 xl:mr-16 2xl:mr-0 gap-3 rounded-full border border-line bg-page/90 p-2 backdrop-blur">
+      <div className={FORM_ACTIONS_CLASS}>
         <ButtonLink href={asset ? `/inventaire/${asset.id}` : "/inventaire"} variant="secondary">
           {tr("Annuler")}</ButtonLink>
         <SubmitButton>{asset ? tr("Enregistrer") : tr("Ajouter à l'inventaire")}</SubmitButton>

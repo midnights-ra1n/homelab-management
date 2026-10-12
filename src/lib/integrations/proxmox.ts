@@ -59,7 +59,7 @@ export type GuestType = "qemu" | "lxc";
 export const GUEST_ACTIONS = ["start", "shutdown", "stop", "reboot", "suspend", "resume"] as const;
 export type GuestAction = (typeof GUEST_ACTIONS)[number];
 
-function authHeader(i: Integration) {
+export function authHeader(i: Integration) {
   const { token_id, token_secret } = i.config;
   if (!token_id || !token_secret) throw new IntegrationError("Jeton API Proxmox manquant (ID + secret)");
   return { Authorization: `PVEAPIToken=${token_id}=${token_secret}` };
@@ -219,6 +219,15 @@ function assertGuest(type: unknown, vmid: unknown, targetVmid: unknown = null) {
   if ((type !== "qemu" && type !== "lxc") || !okId(vmid) || (targetVmid != null && !okId(targetVmid))) {
     throw new IntegrationError("Invité Proxmox invalide");
   }
+}
+
+/** Ouvre une session VNC (noVNC) : le ticket sert de mot de passe VNC, à utiliser sous ~10 s. */
+export async function vncProxy(i: Integration, node: string, type: GuestType, vmid: number) {
+  assertGuest(type, vmid);
+  return pve<{ port: string | number; ticket: string }>(i, `/nodes/${encodeURIComponent(node)}/${type}/${vmid}/vncproxy`, {
+    method: "POST",
+    body: new URLSearchParams({ websocket: "1" }),
+  });
 }
 
 /** Lien direct vers l'interface web Proxmox pour un invité. */

@@ -67,7 +67,7 @@ function ThemeToggle() {
 
 export function FloatingActions() {
   return (
-    <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-40 hidden flex-col items-end gap-3 xl:flex">
+    <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-40 hidden flex-col items-end gap-3 mint:xl:flex">
       <BackToTop />
       <ThemeToggle />
     </div>

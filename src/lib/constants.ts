@@ -27,6 +27,14 @@ export const ASSET_STATUS_META: Record<AssetStatus, { label: string; tone: Tone 
   decommissioned: { label: "Retiré", tone: "muted" },
 };
 
+/** Origine de l'état détecté automatiquement (colonne assets.status_source). */
+export const STATUS_SOURCE_LABEL: Record<string, string> = {
+  proxmox: "Proxmox",
+  beszel: "Beszel",
+  maintenant: "Maintenant",
+  tcp: "sonde réseau",
+};
+
 export const DEPLOYMENT_KINDS = ["physical", "vm", "lxc", "docker", "application", "other"] as const;
 export type DeploymentKind = (typeof DEPLOYMENT_KINDS)[number];
 

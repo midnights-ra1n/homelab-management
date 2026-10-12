@@ -30,13 +30,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#191e27" },
-    { media: "(prefers-color-scheme: light)", color: "#e4e8ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#111214" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f7f9" },
   ],
 };
 
-// Applique le thème mémorisé avant le premier rendu (évite le flash).
-const themeScript = `try{var t=localStorage.getItem("hm-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}`;
+// Applique le thème et le style mémorisés avant le premier rendu (évite le flash).
+const themeScript = `try{var d=document.documentElement,t=localStorage.getItem("hm-theme");if(t==="dark"||t==="light")d.dataset.theme=t;if(localStorage.getItem("hm-style")==="mint")d.dataset.style="mint"}catch(e){}`;
 
 export default async function RootLayout({ children }: LayoutProps<"/[lang]">) {
   const locale = await getLocale();

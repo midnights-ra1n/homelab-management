@@ -126,7 +126,7 @@ async function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau"
             {tr("Voir le diagnostic")}</Link>
         </Alert>
       )}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:gap-8">
         <Stat label="VLAN" value={totals.vlans} />
         <Stat label={tr("Sous-réseaux")} value={totals.subnets} />
         <Stat label={tr("Adresses attribuées")} value={totals.used} detail={tr("sur {0} utilisables", { "0": totals.capacity.toLocaleString(tr.locale) })} />
@@ -188,7 +188,7 @@ async function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau"
           <EmptyState icon={<Network size={22} />} title={tr("Aucun sous-réseau")} action={<SubnetDialog vlans={vlans} />}>
             {tr("Ajoute un sous-réseau (ex. 192.168.10.0/24) pour visualiser son occupation et attribuer des adresses.")}</EmptyState>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
+          <div className="grid gap-8 lg:grid-cols-[22rem_1fr]">
             <nav aria-label={tr("Sous-réseaux")} className="grid content-start gap-2">
               {subnets.map((s) => {
                 const active = s.id === selected?.id;

@@ -132,9 +132,9 @@ to French, and a test fails if a French string passed to `tr()` has no English t
   Log4Shell / command injection and CRLF signatures, known scanners (`sqlmap`, `nikto`, `nuclei`…), common probes
   (`/.env`, `/.git`, `/wp-login.php`, `*.php`…) and unusual HTTP methods. The URL and User-Agent are inspected, not
   form bodies (protected by parameterized SQL, zod and React escaping).
-- **Brute-force protection**: 5 failures on a username → 30 s lock, doubled on each new failure (max 15 min);
-  10 failures from an IP → IP banned from the whole app (60 s doubled, max 1 h). 5 WAF hits → IP banned for 15 min
-  (doubled, max 24 h). Response `429` + `Retry-After`. Events are logged (`[auth]`, `[waf]`) for fail2ban / CrowdSec.
+- **Brute-force protection**: 10 failures on a username → 15 s lock, doubled on each new failure (max 5 min);
+  25 failures from an IP → IP banned from the whole app (30 s doubled, max 10 min). 15 WAF hits → IP banned for 60 s
+  (doubled, max 30 min). Response `429` + `Retry-After`. Events are logged (`[auth]`, `[waf]`) for fail2ban / CrowdSec.
 - **Passkeys** (WebAuthn, HTTPS only): add them in *Settings → Account*, then use “Sign in with a passkey”.
   User verification (biometrics / PIN) is required; failures count toward the IP ban. A passkey is bound to the
   hostname it was created on.

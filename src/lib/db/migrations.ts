@@ -361,4 +361,10 @@ export const migrations: string[] = [
   );
   CREATE INDEX passkeys_user ON passkeys(user_id);
   `,
+
+  /* 007 — état réel des actifs (détection automatique) */
+  `
+  ALTER TABLE assets ADD COLUMN status_source TEXT NOT NULL DEFAULT '';
+  ALTER TABLE assets ADD COLUMN status_checked_at TEXT;
+  `,
 ];

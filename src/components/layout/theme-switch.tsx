@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { getChoice, setTheme, subscribeTheme, type ThemeChoice } from "@/lib/theme";
+import { getChoice, getStyle, setStyle, setTheme, subscribeTheme, type ThemeChoice, type UiStyle } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n/client";
 import { LOCALE_COOKIE, type Locale } from "@/i18n/locales";
@@ -36,6 +36,40 @@ export function ThemeSwitch({ className }: { className?: string }) {
           className={cn(
             "rounded-full px-3.5 py-1.5 font-mono text-xs transition-colors duration-200",
             theme === o.value ? "bg-accent text-on-accent" : "text-body hover:text-h1",
+          )}
+        >
+          {tr(o.label)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const STYLES: { value: UiStyle; label: string }[] = [
+  { value: "standard", label: "Standard" },
+  { value: "mint", label: "Midnights Mint" },
+];
+
+/** Sélecteur de style d'interface : Standard (défaut) ou charte Midnights Mint. */
+export function StyleSwitch({ className }: { className?: string }) {
+  const tr = useT();
+  const style = useSyncExternalStore(subscribeTheme, getStyle, () => "standard" as UiStyle);
+  return (
+    <div
+      role="radiogroup"
+      aria-label={tr("Style d'interface")}
+      className={cn("inline-flex items-center gap-1 rounded-full border border-line bg-box p-1", className)}
+    >
+      {STYLES.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={style === o.value}
+          onClick={() => setStyle(o.value)}
+          className={cn(
+            "rounded-full px-3.5 py-1.5 text-xs transition-colors duration-200",
+            style === o.value ? "bg-accent text-on-accent" : "text-body hover:text-h1",
           )}
         >
           {tr(o.label)}

@@ -12,9 +12,11 @@ import {
   proxmoxTasks,
   remoteMigrate,
   targetOptions,
+  vncProxy,
   type GuestAction,
   type GuestType,
 } from "@/lib/integrations/proxmox";
+import { registerVncSession } from "@/lib/integrations/vnc-relay";
 
 type Result = { ok: boolean; message: string };
 
@@ -139,4 +141,16 @@ export async function syncProxmoxInventoryAction(integrationId?: number): Promis
   revalidatePath("/", "layout");
   const msg = `${created} élément(s) créé(s), ${updated} mis à jour.`;
   return errors.length ? { ok: false, message: `${msg} Erreurs — ${errors.join(" ; ")}` } : { ok: true, message: msg };
+}
+
+/** Prépare une console noVNC : jeton à usage unique pour le relais WebSocket + mot de passe VNC. */
+export async function vncSessionAction(integrationId: number, node: string, type: GuestType, vmid: number) {
+  await requireUser();
+  try {
+    const v = await vncProxy(integrationOrThrow(integrationId), node, type, vmid);
+    const token = registerVncSession({ integrationId, node, type, vmid, port: String(v.port), ticket: v.ticket });
+    return { ok: true as const, token, password: v.ticket };
+  } catch (err) {
+    return { ok: false as const, message: (err as Error).message };
+  }
 }

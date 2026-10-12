@@ -65,7 +65,7 @@ export function FilterBar({
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="field w-full rounded-xl py-2.5 pl-11 pr-12 text-base sm:text-sm"
+          className="field w-full rounded-full py-2.5 pl-11 pr-12 text-base sm:text-sm"
         />
         {q ? (
           <button
@@ -88,7 +88,7 @@ export function FilterBar({
           aria-label={s.label}
           value={params.get(s.name) ?? ""}
           onChange={(e) => update(s.name, e.target.value)}
-          className="field rounded-xl px-4 py-2.5 text-base sm:w-auto sm:text-sm"
+          className="field rounded-full px-4 py-2.5 text-base sm:w-auto sm:text-sm"
         >
           <option value="">{s.label}</option>
           {s.options.map((o) => (

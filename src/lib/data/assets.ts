@@ -16,6 +16,9 @@ export type Asset = {
   display_name: string;
   hostname: string;
   status: AssetStatus;
+  /** Source de la dernière détection automatique (proxmox, beszel, maintenant, tcp) ; vide = manuel. */
+  status_source: string;
+  status_checked_at: string | null;
   role: string;
   description: string;
   tags: string[];

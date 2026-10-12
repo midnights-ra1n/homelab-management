@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { saveDeploymentAction } from "@/actions/deployments";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { ActionForm, Fieldset, inputClass, SelectField, SubmitButton, TextAreaField, TextField } from "@/components/ui/form";
+import { ActionForm, Fieldset, FORM_ACTIONS_CLASS, inputClass, SelectField, SubmitButton, TextAreaField, TextField } from "@/components/ui/form";
 import {
   ASSET_KIND_META,
   DEPLOYMENT_KINDS,
@@ -37,7 +37,8 @@ export function DeploymentForm({
   const tr = useT();
   const [kind, setKind] = useState<DeploymentKind>(deployment?.kind ?? "vm");
   const [steps, setSteps] = useState<Step[]>(
-    deployment?.steps.map((s) => ({ label: s.label, done: !!s.done })) ?? STEP_TEMPLATES.vm.map((label) => ({ label: tr(label), done: false })),
+    // Checklist vide par défaut : le modèle s'ajoute à la demande (« Ajouter la checklist type »).
+    deployment?.steps.map((s) => ({ label: s.label, done: !!s.done })) ?? [],
   );
   const [draft, setDraft] = useState("");
 
@@ -64,11 +65,11 @@ export function DeploymentForm({
               role="radio"
               aria-checked={kind === k}
               onClick={() => {
-                // Si la checklist est encore celle du modèle précédent, on la remplace
+                // Si la checklist est encore celle du modèle précédent (ajoutée à la demande), on la remplace
                 const untouched =
-                  steps.every((s) => !s.done) && steps.map((s) => s.label).join() === STEP_TEMPLATES[kind].map((l) => tr(l)).join();
+                  steps.length > 0 && steps.every((s) => !s.done) && steps.map((s) => s.label).join() === STEP_TEMPLATES[kind].map((l) => tr(l)).join();
                 setKind(k);
-                if (untouched || steps.length === 0) setSteps(STEP_TEMPLATES[k].map((label) => ({ label: tr(label), done: false })));
+                if (untouched) setSteps(STEP_TEMPLATES[k].map((label) => ({ label: tr(label), done: false })));
               }}
               className={cn(
                 "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
@@ -240,7 +241,7 @@ export function DeploymentForm({
         <TextAreaField label={tr("Notes de déploiement")} name="notes" defaultValue={deployment?.notes} rows={6} placeholder={tr("Commandes, liens de documentation, problèmes rencontrés…")} />
       </Fieldset>
 
-      <div className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-10 flex justify-end xl:bottom-4 xl:mr-16 2xl:mr-0 gap-3 rounded-full border border-line bg-page/90 p-2 backdrop-blur">
+      <div className={FORM_ACTIONS_CLASS}>
         <ButtonLink href={deployment ? `/deploiements/${deployment.id}` : "/deploiements"} variant="secondary">
           {tr("Annuler")}</ButtonLink>
         <SubmitButton>{deployment ? tr("Enregistrer") : tr("Créer le déploiement")}</SubmitButton>

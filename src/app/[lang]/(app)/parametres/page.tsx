@@ -10,7 +10,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { PageHeader, SectionTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LanguageSwitch, ThemeSwitch } from "@/components/layout/theme-switch";
+import { LanguageSwitch, StyleSwitch, ThemeSwitch } from "@/components/layout/theme-switch";
 import { AppIcon } from "@/features/apps/app-icon";
 import { IntegrationDialog } from "@/features/settings/integration-dialog";
 import { BackupForms, PasswordForm } from "@/features/settings/account-forms";
@@ -113,13 +113,14 @@ async function Settings() {
         </Card>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:gap-8">
+      <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
         <section aria-labelledby="appearance">
           <SectionTitle id="appearance">{tr("Apparence")}</SectionTitle>
           <Card>
             <CardBody className="grid gap-4">
               <p className="text-sm text-body">
-                {tr("Charte ")}<span className="text-accent-text">{tr("Midnights Mint")}</span> {tr(": fonds gris-bleu inspirés de Nord, accent menthe #3fbfa6, Geist & Geist Mono. « Auto » suit le réglage du système.")}</p>
+                {tr("Style Standard sobre par défaut, ou charte Midnights Mint (accent menthe #3fbfa6, Geist Mono, lueurs). « Auto » suit le réglage clair / sombre du système.")}</p>
+              <StyleSwitch className="w-fit" />
               <div className="flex flex-wrap gap-3">
                 <ThemeSwitch className="w-fit" />
                 <LanguageSwitch className="w-fit" />

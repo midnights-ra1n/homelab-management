@@ -1,13 +1,151 @@
 @import "tailwindcss";
 @import "@xyflow/react/dist/style.css";
 
+/* Variante Tailwind « mint: » : classes propres à la charte Midnights Mint. */
+@custom-variant mint (&:where([data-style="mint"], [data-style="mint"] *));
+
 /* ---------------------------------------------------------------------------
- * Midnights Mint — charte graphique (https://noe-georget.fr/graphique)
- * Sombre par défaut, clair via prefers-color-scheme ou data-theme="light".
+ * Standard — style par défaut : thème d'app classique, gris neutres,
+ * accent vert #3fbfa6, sans lueurs ni animations d'apparition.
+ * Mêmes jetons (--mm-*) que la charte, pour que tous les composants suivent.
  * ------------------------------------------------------------------------- */
 
-
 :root {
+  color-scheme: dark;
+  --mm-bg-crust: #0a0a0c;
+  --mm-bg: #111214;
+  --mm-bg-box: #18191c;
+  --mm-bg-elevated: #202125;
+  --mm-field: #0d0e10;
+  --mm-overlay: #000000b3;
+  --mm-panel: #202125e6;
+  --mm-border-subtle: #232428;
+  --mm-border: #2e3035;
+  --mm-border-strong: #5b5f68;
+  --mm-border-accent: #3fbfa666;
+  --mm-border-mint: #1f5f52;
+  --mm-h1: #f4f4f5;
+  --mm-h2: #e4e4e7;
+  --mm-body: #a1a1aa;
+  --mm-meta: #8b8b94;
+  --mm-accent: #3fbfa6;
+  --mm-accent-text: #3fbfa6;
+  --mm-accent-hover: #52cbb3;
+  --mm-accent-active: #2fa38d;
+  --mm-accent-muted: #1f5f52;
+  --mm-accent-soft: #3fbfa622;
+  --mm-selection: #3fbfa640;
+  --mm-focus: #3fbfa6;
+  --mm-on-accent: #0b1512;
+  --mm-red: #f87171;
+  --mm-orange: #fb923c;
+  --mm-yellow: #facc15;
+  --mm-green: #4ade80;
+  --mm-cyan: #22d3ee;
+  --mm-blue: #60a5fa;
+  --mm-purple: #a78bfa;
+  --mm-pink: #f472b6;
+  --mm-glow-accent: transparent;
+  --mm-glow-accent-strong: transparent;
+  --mm-glow-opacity: 0;
+  --mm-glow-boost: 0;
+  --mm-ambient-boost: 0;
+  --mm-shadow-popover: 0 8px 24px #00000066;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --mm-bg-crust: #eceef1;
+    --mm-bg: #f6f7f9;
+    --mm-bg-box: #ffffff;
+    --mm-bg-elevated: #ffffff;
+    --mm-field: #ffffff;
+    --mm-overlay: #0f172a59;
+    --mm-panel: #ffffffeb;
+    --mm-border-subtle: #e5e7eb;
+    --mm-border: #d4d7dd;
+    --mm-border-strong: #6b7280;
+    --mm-border-accent: #3fbfa680;
+    --mm-border-mint: #9fdccf;
+    --mm-h1: #111827;
+    --mm-h2: #1f2937;
+    --mm-body: #4b5563;
+    --mm-meta: #6b7280;
+    --mm-accent-text: #00775f;
+    --mm-accent-hover: #36ad96;
+    --mm-accent-active: #2b9883;
+    --mm-accent-muted: #9fdccf;
+    --mm-accent-soft: #3fbfa61f;
+    --mm-selection: #3fbfa640;
+    --mm-focus: #12937a;
+    --mm-red: #b91c1c;
+    --mm-orange: #c2410c;
+    --mm-yellow: #a16207;
+    --mm-green: #15803d;
+    --mm-cyan: #0e7490;
+    --mm-blue: #1d4ed8;
+    --mm-purple: #6d28d9;
+    --mm-pink: #be185d;
+    --mm-shadow-popover: 0 8px 24px #1118271a;
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --mm-bg-crust: #eceef1;
+  --mm-bg: #f6f7f9;
+  --mm-bg-box: #ffffff;
+  --mm-bg-elevated: #ffffff;
+  --mm-field: #ffffff;
+  --mm-overlay: #0f172a59;
+  --mm-panel: #ffffffeb;
+  --mm-border-subtle: #e5e7eb;
+  --mm-border: #d4d7dd;
+  --mm-border-strong: #6b7280;
+  --mm-border-accent: #3fbfa680;
+  --mm-border-mint: #9fdccf;
+  --mm-h1: #111827;
+  --mm-h2: #1f2937;
+  --mm-body: #4b5563;
+  --mm-meta: #6b7280;
+  --mm-accent-text: #00775f;
+  --mm-accent-hover: #36ad96;
+  --mm-accent-active: #2b9883;
+  --mm-accent-muted: #9fdccf;
+  --mm-accent-soft: #3fbfa61f;
+  --mm-selection: #3fbfa640;
+  --mm-focus: #12937a;
+  --mm-red: #b91c1c;
+  --mm-orange: #c2410c;
+  --mm-yellow: #a16207;
+  --mm-green: #15803d;
+  --mm-cyan: #0e7490;
+  --mm-blue: #1d4ed8;
+  --mm-purple: #6d28d9;
+  --mm-pink: #be185d;
+  --mm-shadow-popover: 0 8px 24px #1118271a;
+}
+
+/* Standard : rien qui « apparaît » (fondus, flous, montées), pas de boutons flottants. */
+:root:not([data-style="mint"]) :is(.page-enter, .rise, .fade-in) {
+  animation: none !important;
+  transition: none !important;
+}
+:root:not([data-style="mint"]) .fade-in[data-shown="false"] {
+  opacity: 1 !important;
+  filter: none !important;
+  translate: none !important;
+  scale: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Midnights Mint — charte graphique (https://noe-georget.fr/graphique)
+ * Activée par data-style="mint" (Paramètres → Apparence). Sélecteurs plus
+ * spécifiques que ceux du style standard : ils l'emportent toujours.
+ * ------------------------------------------------------------------------- */
+
+:root[data-style="mint"] {
   color-scheme: dark;
 
   /* Surfaces */
@@ -63,7 +201,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
+  :root[data-style="mint"]:not([data-theme]) {
     color-scheme: light;
     --mm-bg-crust: #d8dde5;
     --mm-bg: #e4e8ef;
@@ -105,7 +243,7 @@
   }
 }
 
-:root[data-theme="light"] {
+:root[data-style="mint"][data-theme="light"] {
   color-scheme: light;
   --mm-bg-crust: #d8dde5;
   --mm-bg: #e4e8ef;
@@ -203,6 +341,31 @@ body {
   background-color: var(--mm-bg);
   min-height: 100dvh;
   color: var(--mm-h2);
+}
+
+/* Main qui pointe sur tout ce qui est cliquable (Tailwind 4 ne le fait plus pour les boutons). */
+a[href],
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="radio"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+summary,
+label[for],
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled),
+input[type="color"]:not(:disabled),
+input:is([type="submit"], [type="button"], [type="reset"]):not(:disabled),
+[role="switch"],
+[role="checkbox"],
+[role="link"],
+[role="menuitemradio"],
+label:has(> input:is([type="checkbox"], [type="radio"]):not(:disabled)),
+dialog::backdrop {
+  cursor: pointer;
 }
 
 ::selection {
@@ -475,7 +638,10 @@ dialog::backdrop {
   box-shadow: 0 0 30px var(--mm-glow-accent-strong);
 }
 
-/* Lueurs d'ambiance fixes : entrée, dérive, blob (voir ambient-glow.tsx) */
+/* Lueurs d'ambiance fixes : entrée, dérive, blob (voir ambient-glow.tsx). Charte Mint uniquement. */
+:root:not([data-style="mint"]) .ambient-glows {
+  display: none;
+}
 @media (max-width: 767px) {
   .ambient-glows {
     --ambient-scale: 0.6;

@@ -60,7 +60,7 @@ async function Detail({ params }: { params: PageProps<"/[lang]/deploiements/[id]
   return (
     <div className="grid grid-cols-1 gap-8 xl:gap-10">
       <header className="rise flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div className="max-w-3xl">
+        <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-bold tracking-tight text-h1 sm:text-4xl">{d.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone={DEPLOYMENT_KIND_META[d.kind].tone}>{tr(DEPLOYMENT_KIND_META[d.kind].label)}</Badge>
@@ -92,7 +92,7 @@ async function Detail({ params }: { params: PageProps<"/[lang]/deploiements/[id]
         <StatusSwitcher id={id} status={d.status} />
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-3 xl:gap-8">
+      <div className="grid gap-8 lg:grid-cols-3 xl:gap-10">
         <div className="grid min-w-0 content-start gap-6 lg:col-span-2">
           <Card>
             <CardHeader

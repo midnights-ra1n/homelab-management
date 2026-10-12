@@ -69,8 +69,8 @@ export default async function DashboardPage() {
 
 function DashboardSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-6 xl:gap-8">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
+    <div className="grid grid-cols-1 gap-8 xl:gap-10">
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:gap-8">
         {[0, 1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-32 rounded-2xl" />
         ))}
@@ -92,7 +92,7 @@ async function Dashboard() {
     listMonitors().length > 0 || ["beszel", "maintenant", "patchmon"].some((t) => listIntegrations(t as "beszel", true).length > 0);
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:gap-8">
+    <div className="grid grid-cols-1 gap-8 xl:gap-10">
       {hasMonitoring && (
         <Suspense fallback={null}>
           <DashboardAlertBanner />
@@ -100,7 +100,7 @@ async function Dashboard() {
       )}
 
       {/* KPI */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:gap-8">
         <Stat
           href="/inventaire"
           label={tr("Éléments inventoriés")}
@@ -138,7 +138,7 @@ async function Dashboard() {
       </div>
 
       {/* Live : Proxmox + monitoring (toujours affichés, état vide si non configuré) */}
-      <div className="grid gap-6 xl:grid-cols-2 xl:gap-8">
+      <div className="grid gap-8 xl:grid-cols-2 xl:gap-10">
         <FadeIn>
           {hasProxmox ? (
             <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
@@ -171,7 +171,7 @@ async function Dashboard() {
         </FadeIn>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:gap-8">
+      <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
         <FadeIn>
           <DeploymentsWidget />
         </FadeIn>
@@ -180,7 +180,7 @@ async function Dashboard() {
         </FadeIn>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:gap-8">
+      <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
         <FadeIn>
           <CapacityWidget />
         </FadeIn>

@@ -20,7 +20,7 @@ import {
 } from "@xyflow/react";
 import Link from "next/link";
 import { ArrowUpRight, Globe, LayoutTemplate, Maximize, Trash2, X } from "lucide-react";
-import { memo, useCallback, useMemo, useState, useTransition } from "react";
+import { memo, useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { createLinkAction, deleteLinkAction, resetPositionsAction, savePositionsAction } from "@/actions/map";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import {
   type Tone,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { ExportMenu } from "./export-menu";
 import { useT } from "@/i18n/client";
 
 export type MapAsset = {
@@ -224,6 +225,7 @@ function Flow({
   const [vlanFilter, setVlanFilter] = useState<number | null>(null);
   const [selectedNode, setSelectedNode] = useState<number | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const layout = useMemo(() => autoLayout(assets), [assets]);
   const visible = assets.filter((a) => !hiddenKinds.has(a.kind));
@@ -326,7 +328,7 @@ function Flow({
   const selectedLink = selectedEdge?.startsWith("l-") ? links.find((l) => `l-${l.id}` === selectedEdge) : undefined;
 
   return (
-    <div className="relative h-[calc(100vh-15rem)] min-h-[32rem] overflow-hidden rounded-3xl border border-line-subtle bg-crust">
+    <div ref={containerRef} className="relative h-[calc(100vh-15rem)] min-h-[32rem] overflow-hidden rounded-3xl border border-line-subtle bg-crust">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -453,6 +455,7 @@ function Flow({
             }
             icon={<LayoutTemplate size={15} />}
           />
+          <ExportMenu container={containerRef} />
         </Panel>
 
         {/* Panneau de détail */}

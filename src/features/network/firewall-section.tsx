@@ -51,7 +51,7 @@ export function FirewallSection({ rules, policy, options }: { rules: FirewallRul
       <div className="flex flex-col gap-4 rounded-2xl border border-line-subtle bg-box p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
           <p className="font-medium text-h1">{tr("Politique par défaut")}</p>
-          <p className="mt-1 max-w-xl text-sm text-body">
+          <p className="mt-1 text-sm text-body">
             {tr("Appliquée au trafic routé (entre VLAN, vers un VPN ou Internet) quand aucune règle ne correspond. Le trafic au sein d'un même sous-réseau ne passe pas par le pare-feu.")}</p>
         </div>
         <div role="radiogroup" aria-label={tr("Politique par défaut")} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-page p-1">

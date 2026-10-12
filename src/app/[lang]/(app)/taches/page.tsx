@@ -47,7 +47,7 @@ async function Board({ searchParams }: { searchParams: PageProps<"/[lang]/taches
     deployments: deploymentOptions(),
   };
   return (
-    <div className="grid grid-cols-1 gap-6 xl:gap-8">
+    <div className="grid grid-cols-1 gap-8 xl:gap-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
         <FilterBar
           className="flex-1"

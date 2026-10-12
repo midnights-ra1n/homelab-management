@@ -102,7 +102,7 @@ async function Overview() {
           </Alert>
         ))}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:gap-8">
         <Stat label={tr("Nœuds en ligne")} value={`${online.length}/${nodes.length}`} detail={tr("{length} intégration(s)", { length: sources.length })} />
         <Stat label={tr("Invités démarrés")} value={`${running}/${guests.length}`} detail={`${guests.filter((g) => g.type === "qemu").length} VM · ${guests.filter((g) => g.type === "lxc").length} CT`} />
         <Stat label={tr("CPU agrégé")} value={`${pct(cpuUsed, cpuTotal)} %`} detail={tr("{n} threads", { n: cpuTotal })} />

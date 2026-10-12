@@ -138,7 +138,7 @@ async function Detail({ params, searchParams }: Pick<PageProps<"/[lang]/monitori
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:gap-8">
         <Stat label={tr("Disponibilité 24 h")} value={formatPct(u24, 2, tr.locale)} />
         <Stat label={tr("7 jours")} value={formatPct(u7, 2, tr.locale)} />
         <Stat label={tr("30 jours")} value={formatPct(u30, 2, tr.locale)} />
@@ -180,7 +180,7 @@ async function Detail({ params, searchParams }: Pick<PageProps<"/[lang]/monitori
         </CardBody>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:gap-8">
+      <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
         <Card>
           <CardHeader overline={tr("Incidents")} title={incs.length ? tr("{n} sur 30 jours", { n: incs.length }) : tr("Aucun incident sur 30 jours")} />
           <CardBody>

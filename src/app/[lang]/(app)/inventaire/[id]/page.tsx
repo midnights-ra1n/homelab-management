@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { Copy, ExternalLink, Pencil, Plus, Star } from "lucide-react";
+import { Copy, ExternalLink, Pencil, Plus, SquareTerminal, Star } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { assetOptions, childrenOf, getAsset, type Asset } from "@/lib/data/assets";
 import { ipsForAsset, subnetOptions } from "@/lib/data/network";
@@ -11,12 +11,14 @@ import { listTasks } from "@/lib/data/tasks";
 import { getIntegration } from "@/lib/data/integrations";
 import { fetchBeszel, fetchPatchmon } from "@/lib/integrations";
 import { guestConsoleUrl } from "@/lib/integrations/proxmox";
+import { consoleHref } from "@/features/proxmox/console-href";
 import {
   ASSET_KIND_META,
   ASSET_STATUS_META,
   DEPLOYMENT_STATUS_META,
   DISK_TYPE_LABEL,
   IP_STATUS_META,
+  STATUS_SOURCE_LABEL,
   TASK_STATUS_META,
 } from "@/lib/constants";
 import { deleteAssetAction, duplicateAssetAction } from "@/actions/inventory";
@@ -95,6 +97,14 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
               <Badge tone={status.tone} icon={<StatusDot tone={status.tone} ping={asset.status === "online"} className="h-2 w-2" />}>
                 {tr(status.label)}
               </Badge>
+              {asset.status_source && asset.status_checked_at && (
+                <span className="text-xs text-meta" title={formatDateTime(asset.status_checked_at, tr.locale)}>
+                  {tr("via {source} · {when}", {
+                    source: tr(STATUS_SOURCE_LABEL[asset.status_source] ?? asset.status_source),
+                    when: timeAgo(asset.status_checked_at, tr.locale),
+                  })}
+                </span>
+              )}
               {asset.role && <Badge tone="muted">{asset.role}</Badge>}
             </div>
           </div>
@@ -131,7 +141,7 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3 xl:gap-8">
+      <div className="grid gap-8 lg:grid-cols-3 xl:gap-10">
         <div className="grid min-w-0 content-start gap-6 lg:col-span-2">
           {/* Matériel / ressources */}
           {asset.kind !== "docker" && (
@@ -140,7 +150,7 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
                 overline={isPhysical ? tr("Configuration matérielle") : tr("Ressources allouées")}
                 title={resourceSummary(asset, tr) || tr("Non renseigné")}
               />
-              <CardBody className="grid gap-6 md:grid-cols-2">
+              <CardBody className="grid gap-8 md:grid-cols-2">
                 <dl>
                   {isPhysical && (
                     <>
@@ -361,6 +371,20 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
               <CardHeader overline={tr("Proxmox")} title={`${proxmox.name} · ${asset.proxmox_node}`} />
               <CardBody className="flex items-center justify-between gap-3">
                 <span className="font-mono text-sm text-body">{tr("VMID ")}{asset.proxmox_vmid}</span>
+                <span className="flex gap-1">
+                <ButtonLink
+                  href={consoleHref({
+                    integrationId: proxmox.id,
+                    node: asset.proxmox_node,
+                    type: asset.kind === "lxc" ? "lxc" : "qemu",
+                    vmid: asset.proxmox_vmid,
+                    name: asset.display_name,
+                  })}
+                  variant="ghost"
+                  size="sm"
+                  icon={<SquareTerminal size={14} />}
+                >
+                  {tr("Console")}</ButtonLink>
                 <ButtonLink
                   href={guestConsoleUrl(proxmox.url, asset.kind === "lxc" ? "lxc" : "qemu", asset.proxmox_vmid)}
                   target="_blank"
@@ -370,6 +394,7 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
                   icon={<ExternalLink size={14} />}
                 >
                   {tr("Ouvrir")}</ButtonLink>
+                </span>
               </CardBody>
             </Card>
           )}

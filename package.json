@@ -10,9 +10,11 @@
     "test": "node --import ./scripts/test-loader.mjs --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test 'src/**/*.test.ts'"
   },
   "dependencies": {
+    "@novnc/novnc": "1.7.0",
     "@simplewebauthn/server": "^14.0.3",
     "@xyflow/react": "^12.12.0",
     "geist": "^1.7.2",
+    "html-to-image": "1.11.13",
     "lucide-react": "^1.54.0",
     "next": "16.4.0",
     "react": "19.3.0",

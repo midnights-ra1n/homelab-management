@@ -50,7 +50,11 @@ export async function getCurrentUser(): Promise<User | null> {
   if (AUTH_DISABLED) {
     return get<User>("SELECT id, username FROM users ORDER BY id LIMIT 1") ?? { id: 0, username: "admin" };
   }
-  if (!token) return null;
+  return token ? userForToken(token) : null;
+}
+
+/** Session valide pour un jeton brut (aussi utilisé hors requête Next, ex. relais WebSocket). */
+export function userForToken(token: string): User | null {
   return (
     get<User>(
       `SELECT u.id, u.username FROM sessions s JOIN users u ON u.id = s.user_id
