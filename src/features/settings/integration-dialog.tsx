@@ -19,6 +19,7 @@ const HELP: Record<IntegrationType, string> = {
   maintenant:
     "Maintenant n'a pas d'authentification native : si ton reverse proxy en exige une, renseigne l'en-tête complet (ex. « Authorization: Basic … »).",
   patchmon: "Paramètres → Intégrations → identifiants API avec la portée « host:get ». Authentification Basic (clé + secret).",
+  hlm: "Réglages → API : active l'API, puis « Créer un jeton » avec les scopes hosts:read et monitors:read. Les nœuds Proxmox déjà connectés sont reconnus par leur nom : ils ne sont pas comptés deux fois.",
   webmin:
     "URL de l'interface Webmin. Pour l'état système, choisis une clé SSH (Paramètres → Clés SSH) et ajoute sa clé publique dans ~/.ssh/authorized_keys de l'utilisateur. Un compte non-root suffit : tout est en lecture seule.",
 };
@@ -113,6 +114,19 @@ export function IntegrationDialog({
               className="font-mono"
             />
           </>
+        )}
+
+        {type === "hlm" && (
+          <TextField
+            label={tr("Jeton d'API")}
+            name="token_secret"
+            type="password"
+            placeholder={integration?.config.has_secret ? "••••••••" : "hlm_…"}
+            hint={secretHint}
+            required={!integration?.config.has_secret}
+            autoComplete="new-password"
+            className="font-mono sm:col-span-2"
+          />
         )}
 
         {type === "beszel" && (

@@ -30,6 +30,7 @@ export const ASSET_STATUS_META: Record<AssetStatus, { label: string; tone: Tone 
 /** Origine de l'état détecté automatiquement (colonne assets.status_source). */
 export const STATUS_SOURCE_LABEL: Record<string, string> = {
   proxmox: "Proxmox",
+  hlm: "Homelab Monitoring",
   beszel: "Beszel",
   maintenant: "Maintenant",
   tcp: "sonde réseau",
@@ -114,7 +115,7 @@ export const LINK_KIND_META: Record<LinkKind, { label: string; tone: Tone; dashe
   logical: { label: "Logique", tone: "muted", dashed: true },
 };
 
-export const INTEGRATION_TYPES = ["proxmox", "beszel", "maintenant", "patchmon", "webmin"] as const;
+export const INTEGRATION_TYPES = ["proxmox", "beszel", "maintenant", "patchmon", "webmin", "hlm"] as const;
 export type IntegrationType = (typeof INTEGRATION_TYPES)[number];
 
 export const INTEGRATION_META: Record<
@@ -150,6 +151,12 @@ export const INTEGRATION_META: Record<
     description: "Toutes tes instances Webmin centralisées : état, système et mises à jour via SSH par clé.",
     icon: "webmin",
     urlPlaceholder: "https://192.168.1.20:10000",
+  },
+  hlm: {
+    label: "Homelab Monitoring",
+    description: "Ton hub de supervision : hôtes équipés de l'agent (Proxmox compris), sondes et mises à jour.",
+    icon: "/icons/homelab-monitoring.svg",
+    urlPlaceholder: "https://monitoring.lan",
   },
 };
 

@@ -5,12 +5,23 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Toaster } from "@/components/ui/toaster";
 import { AlertStrip } from "@/components/alert-banner";
+import { TimeZoneSync } from "@/features/settings/time-zone";
+import { getTimeZone } from "@/lib/data/settings";
 import { getT } from "@/i18n/server";
+import { connection } from "next/server";
+
+async function TimeZone() {
+  await connection();
+  return <TimeZoneSync tz={getTimeZone()} />;
+}
 
 export default async function AppLayout({ children }: LayoutProps<"/[lang]">) {
   const tr = await getT();
   return (
     <Toaster>
+      <Suspense fallback={null}>
+        <TimeZone />
+      </Suspense>
       <a
         href="#contenu"
         className="sr-only z-[70] rounded-full bg-accent px-4 py-2 font-semibold text-on-accent focus:not-sr-only focus:fixed focus:left-4 focus:top-4"

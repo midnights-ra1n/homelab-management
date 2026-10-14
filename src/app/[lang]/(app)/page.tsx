@@ -89,7 +89,7 @@ async function Dashboard() {
   const tasks = taskCounts();
   const hasProxmox = listIntegrations("proxmox", true).length > 0;
   const hasMonitoring =
-    listMonitors().length > 0 || ["beszel", "maintenant", "patchmon"].some((t) => listIntegrations(t as "beszel", true).length > 0);
+    listMonitors().length > 0 || ["beszel", "maintenant", "patchmon", "hlm"].some((t) => listIntegrations(t as "beszel", true).length > 0);
 
   return (
     <div className="grid grid-cols-1 gap-8 xl:gap-10">

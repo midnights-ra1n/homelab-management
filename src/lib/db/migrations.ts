@@ -367,4 +367,21 @@ export const migrations: string[] = [
   ALTER TABLE assets ADD COLUMN status_source TEXT NOT NULL DEFAULT '';
   ALTER TABLE assets ADD COLUMN status_checked_at TEXT;
   `,
+
+  /* 008 — Homelab Monitoring (reconstruction de « integrations » pour étendre le CHECK) */
+  `
+  CREATE TABLE integrations_new (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    type       TEXT NOT NULL CHECK (type IN ('proxmox','beszel','maintenant','patchmon','webmin','hlm')),
+    name       TEXT NOT NULL,
+    url        TEXT NOT NULL,
+    config     TEXT NOT NULL DEFAULT '',
+    enabled    INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  INSERT INTO integrations_new SELECT id, type, name, url, config, enabled, created_at, updated_at FROM integrations;
+  DROP TABLE integrations;
+  ALTER TABLE integrations_new RENAME TO integrations;
+  `,
 ];

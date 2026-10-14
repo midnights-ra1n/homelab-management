@@ -13,12 +13,21 @@ export function parseJson<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
+export const TZ_COOKIE = "tz";
+/** Fuseau d'affichage dans le navigateur ; le serveur, lui, suit process.env.TZ (réglé dans Paramètres). */
+let clientTimeZone =
+  typeof document === "undefined" ? undefined : decodeURIComponent(new RegExp(`(?:^|; )${TZ_COOKIE}=([^;]+)`).exec(document.cookie)?.[1] ?? "") || undefined;
+export function setClientTimeZone(tz: string) {
+  clientTimeZone = tz;
+}
+
 const fmtCache = new Map<string, Intl.DateTimeFormat>();
-/** Intl.DateTimeFormat mis en cache par langue (fr-FR / en-GB : jour avant le mois). */
+/** Intl.DateTimeFormat mis en cache par langue (fr-FR / en-GB : jour avant le mois) et fuseau. */
 export function dateFormat(locale: Locale, opts: Intl.DateTimeFormatOptions) {
-  const key = locale + JSON.stringify(opts);
+  const timeZone = typeof window === "undefined" ? undefined : clientTimeZone;
+  const key = locale + (timeZone ?? "") + JSON.stringify(opts);
   let f = fmtCache.get(key);
-  if (!f) fmtCache.set(key, (f = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", opts)));
+  if (!f) fmtCache.set(key, (f = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", { timeZone, ...opts })));
   return f;
 }
 

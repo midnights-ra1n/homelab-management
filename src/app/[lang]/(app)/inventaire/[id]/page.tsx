@@ -9,7 +9,8 @@ import { ipsForAsset, subnetOptions } from "@/lib/data/network";
 import { listDeployments } from "@/lib/data/deployments";
 import { listTasks } from "@/lib/data/tasks";
 import { getIntegration } from "@/lib/data/integrations";
-import { fetchBeszel, fetchPatchmon } from "@/lib/integrations";
+import { fetchBeszel, fetchHlm, fetchPatchmon } from "@/lib/integrations";
+import { pctOf } from "@/lib/integrations/hlm";
 import { guestConsoleUrl } from "@/lib/integrations/proxmox";
 import { consoleHref } from "@/features/proxmox/console-href";
 import {
@@ -414,11 +415,11 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
   );
 }
 
-/** Rapproche l'élément des systèmes Beszel et hôtes PatchMon (hostname, nom ou IP). */
+/** Rapproche l'élément des hôtes Homelab Monitoring, systèmes Beszel et hôtes PatchMon (hostname, nom ou IP). */
 async function LiveMonitoring({ asset }: { asset: Asset }) {
   const tr = await getT();
-  const [beszel, patchmon] = await Promise.all([fetchBeszel(), fetchPatchmon()]);
-  if (beszel.length === 0 && patchmon.length === 0) return null;
+  const [beszel, patchmon, hlm] = await Promise.all([fetchBeszel(), fetchPatchmon(), fetchHlm()]);
+  if (beszel.length === 0 && patchmon.length === 0 && hlm.length === 0) return null;
   const keys = new Set(
     [asset.hostname, asset.display_name, asset.primary_ip].filter(Boolean).map((k) => k!.toLowerCase()),
   );
@@ -426,17 +427,31 @@ async function LiveMonitoring({ asset }: { asset: Asset }) {
     values.some((v) => v && (keys.has(v.toLowerCase()) || keys.has(v.toLowerCase().split(".")[0])));
   const system = beszel.flatMap((s) => s.data ?? []).find((s) => match(s.name, s.host, s.hostname));
   const host = patchmon.flatMap((s) => s.data ?? []).find((h) => match(h.hostname, h.friendlyName, h.ip));
+  const agent = hlm.flatMap((s) => s.data?.hosts ?? []).find((h) => match(h.name, h.info?.hostname));
 
   return (
     <Card>
-      <CardHeader overline={tr("Monitoring")} title={system || host ? tr("Données en direct") : tr("Aucune correspondance")} />
+      <CardHeader overline={tr("Monitoring")} title={agent || system || host ? tr("Données en direct") : tr("Aucune correspondance")} />
       <CardBody className="grid gap-4">
-        {!system && !host && (
+        {!agent && !system && !host && (
           <p className="text-sm text-meta">
-            {tr("Aucun système Beszel ni hôte PatchMon ne correspond au nom d'hôte, au nom ou à l'IP de cet élément.")}</p>
+            {tr("Aucun hôte Homelab Monitoring, système Beszel ni hôte PatchMon ne correspond au nom d'hôte, au nom ou à l'IP de cet élément.")}</p>
+        )}
+        {agent && (
+          <div className="grid gap-3">
+            <p className="flex items-center justify-between text-sm">
+              <span className="text-h2">Homelab Monitoring · {agent.name}</span>
+              <Badge tone={agent.status === "operational" ? "green" : agent.status === "major_outage" ? "red" : "yellow"} dot>
+                {agent.status}
+              </Badge>
+            </p>
+            <Meter label="CPU" value={agent.latest?.cpu} />
+            <Meter label={tr("Mémoire")} value={pctOf(agent.latest?.mem_used, agent.latest?.mem_total)} />
+            <Meter label={tr("Disque")} value={pctOf(agent.latest?.disk_used, agent.latest?.disk_total)} />
+          </div>
         )}
         {system && (
-          <div className="grid gap-3">
+          <div className="grid gap-3 border-t border-line-subtle pt-4 first:border-0 first:pt-0">
             <p className="flex items-center justify-between text-sm">
               <span className="text-h2">{tr("Beszel · ")}{system.name}</span>
               <Badge tone={system.status === "up" ? "green" : "red"} dot>

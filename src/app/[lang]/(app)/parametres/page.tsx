@@ -18,6 +18,8 @@ import { PasskeyManager } from "@/features/settings/passkeys";
 import { listPasskeys } from "@/lib/passkeys";
 import { SshKeyDialog, SshKeyList } from "@/features/settings/ssh-keys";
 import { listSshKeys } from "@/lib/data/ssh-keys";
+import { getTimeZone, timeZones } from "@/lib/data/settings";
+import { TimeZoneSelect } from "@/features/settings/time-zone";
 import { timeAgo } from "@/lib/utils";
 import { getT } from "@/i18n/server";
 
@@ -65,7 +67,7 @@ async function Settings() {
                 <CardHeader
                   title={
                     <span className="flex items-center gap-3">
-                      <AppIcon type="selfhst" value={meta.icon} name={tr(meta.label)} size={26} />
+                      <AppIcon type={meta.icon.startsWith("/") ? "url" : "selfhst"} value={meta.icon} name={tr(meta.label)} size={26} />
                       {tr(meta.label)}
                     </span>
                   }
@@ -125,6 +127,7 @@ async function Settings() {
                 <ThemeSwitch className="w-fit" />
                 <LanguageSwitch className="w-fit" />
               </div>
+              <TimeZoneSelect value={getTimeZone()} options={timeZones()} />
             </CardBody>
           </Card>
         </section>

@@ -1,11 +1,11 @@
 import "server-only";
 import net from "node:net";
 import { all, run, transaction } from "../db";
-import { fetchBeszel, fetchMaintenant, fetchProxmox } from "../integrations";
+import { fetchBeszel, fetchHlm, fetchMaintenant, fetchProxmox, machineKeys } from "../integrations";
 
 /**
  * Détection de l'état réel des actifs de l'inventaire, par ordre de fiabilité :
- * Proxmox (VM/CT liés, nœuds) → Beszel → Maintenant (Docker) → sonde TCP sur l'IP.
+ * Proxmox (VM/CT liés, nœuds) → Homelab Monitoring → Beszel → Maintenant (Docker) → sonde TCP sur l'IP.
  * Les états manuels (maintenance, planifié, retiré) ne sont jamais écrasés.
  */
 
@@ -63,6 +63,7 @@ export function detect(
     guests: Map<string, boolean>; // `${integrationId}:${vmid}` → running
     pveOk: Set<number>;
     nodes: Map<string, boolean>; // nom de nœud → online
+    hlm: Map<string, boolean>; // nom / hostname → joignable
     beszel: Map<string, boolean>; // nom / hôte → up
     containers: Map<string, boolean>; // nom → running
   },
@@ -81,6 +82,8 @@ export function detect(
     if (hit) return { online: src.containers.get(hit)!, source: "maintenant" };
     return null; // l'IP d'un conteneur est souvent celle de l'hôte : une sonde serait trompeuse
   }
+  const agent = k.find((x) => src.hlm.has(x));
+  if (agent) return { online: src.hlm.get(agent)!, source: "hlm" };
   const hit = k.find((x) => src.beszel.has(x));
   if (hit) return { online: src.beszel.get(hit)!, source: "beszel" };
   return null;
@@ -93,12 +96,13 @@ export async function refreshAssetStatuses() {
      FROM assets a WHERE a.status IN ('online','offline')`,
   );
   if (!assets.length) return;
-  const [pve, beszel, maintenant] = await Promise.all([fetchProxmox(), fetchBeszel(), fetchMaintenant()]);
+  const [pve, beszel, maintenant, hlm] = await Promise.all([fetchProxmox(), fetchBeszel(), fetchMaintenant(), fetchHlm()]);
 
   const src = {
     guests: new Map<string, boolean>(),
     pveOk: new Set<number>(),
     nodes: new Map<string, boolean>(),
+    hlm: new Map<string, boolean>(),
     beszel: new Map<string, boolean>(),
     containers: new Map<string, boolean>(),
   };
@@ -111,6 +115,10 @@ export async function refreshAssetStatuses() {
   for (const s of beszel.flatMap((b) => b.data ?? [])) {
     if (s.status !== "up" && s.status !== "down") continue; // en pause / en attente : inconnu
     for (const k of [s.name, s.host, s.hostname]) if (k) src.beszel.set(norm(k), s.status === "up");
+  }
+  for (const h of hlm.flatMap((x) => x.data?.hosts ?? [])) {
+    if (h.status === "unknown" || h.maintenance) continue;
+    for (const k of machineKeys(h.name, h.info?.hostname)) src.hlm.set(k, h.status !== "major_outage");
   }
   for (const c of maintenant.flatMap((m) => m.data?.containers ?? [])) {
     src.containers.set(norm(c.name).replace(/^\//, ""), c.state === "running");
