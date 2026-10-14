@@ -6,18 +6,16 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { NAV_DESKTOP, NAV_ITEMS, isActive, isGroup, type NavGroup, type NavItem } from "./nav-items";
-import { useScrollVisibility } from "./use-scroll-visibility";
 import { usePathname, useT } from "@/i18n/client";
 
 /**
  * Navbar flottante en pilule, reprise du portfolio : séparateurs « • »,
- * entrées regroupées en sous-menus, indicateur unique qui glisse sous l'entrée active, masquage au défilement
- * (réapparition au survol du haut de l'écran), fondus d'entrée / de sortie.
+ * entrées regroupées en sous-menus, indicateur unique qui glisse sous l'entrée active.
+ * Toujours fixe en haut, au-dessus d'un fondu vers la couleur de la page.
  */
 export function AppHeader({ userSlot }: { userSlot: ReactNode }) {
   const tr = useT();
   const pathname = usePathname();
-  const { visible, forceShow, forceHide } = useScrollVisibility();
   const current = NAV_ITEMS.find((i) => isActive(pathname, i.href)) ?? (isActive(pathname, "/parametres") ? { label: tr("Paramètres") } : null);
 
   // Indicateur d'activité : positionné impérativement (dépend de la largeur réelle des liens)
@@ -68,19 +66,8 @@ export function AppHeader({ userSlot }: { userSlot: ReactNode }) {
 
   return (
     <>
-      <div aria-hidden className="fixed left-0 right-0 top-0 z-[60] h-4" onMouseEnter={forceShow} />
-
-      <header
-        className={cn(
-          HEADER_CLASS,
-          "transition-[translate,opacity]",
-          visible
-            ? "translate-y-0 opacity-100 duration-300 ease-out"
-            : "duration-700 ease-in-out mint:pointer-events-none mint:-translate-y-40 mint:opacity-0", // masquage au défilement : charte Mint uniquement
-        )}
-        onMouseEnter={forceShow}
-        onMouseLeave={forceHide}
-      >
+      <TopFade />
+      <header className={HEADER_CLASS}>
         <nav aria-label={tr("Navigation principale")} className={cn(NAV_CLASS, "bg-page/90 backdrop-blur-md mint:bg-page/95 mint:xl:bg-page")}>
           <Link href="/" aria-label={tr("Tableau de bord")} className="flex shrink-0 items-center justify-center">
             <Logo />
@@ -129,25 +116,28 @@ export function AppHeader({ userSlot }: { userSlot: ReactNode }) {
 export function AppHeaderFallback() {
   const tr = useT();
   return (
-    <header className={HEADER_CLASS}>
-      <nav aria-label={tr("Navigation principale")} className={cn(NAV_CLASS, "bg-page")}>
-        <Link href="/" aria-label={tr("Tableau de bord")} className="shrink-0">
-          <Logo />
-        </Link>
-        <ul className="hidden items-center gap-2 text-sm font-medium xl:flex mint:gap-0 2xl:text-base">
-          {NAV_DESKTOP.map((entry, i) => (
-            <li key={entryKey(entry)} className="flex items-center">
-              {i > 0 && <span className="hidden select-none px-2.5 text-xs text-meta mint:inline 2xl:px-4">•</span>}
-              <span className="flex items-center gap-1 whitespace-nowrap px-3.5 py-2 text-body 2xl:px-4">
-                {tr(entry.label)}
-                {isGroup(entry) && <ChevronDown size={14} aria-hidden="true" className="text-meta" />}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <span className="h-10 w-10" />
-      </nav>
-    </header>
+    <>
+      <TopFade />
+      <header className={HEADER_CLASS}>
+        <nav aria-label={tr("Navigation principale")} className={cn(NAV_CLASS, "bg-page")}>
+          <Link href="/" aria-label={tr("Tableau de bord")} className="shrink-0">
+            <Logo />
+          </Link>
+          <ul className="hidden items-center gap-2 text-sm font-medium xl:flex mint:gap-0 2xl:text-base">
+            {NAV_DESKTOP.map((entry, i) => (
+              <li key={entryKey(entry)} className="flex items-center">
+                {i > 0 && <span className="hidden select-none px-2.5 text-xs text-meta mint:inline 2xl:px-4">•</span>}
+                <span className="flex items-center gap-1 whitespace-nowrap px-3.5 py-2 text-body 2xl:px-4">
+                  {tr(entry.label)}
+                  {isGroup(entry) && <ChevronDown size={14} aria-hidden="true" className="text-meta" />}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <span className="h-10 w-10" />
+        </nav>
+      </header>
+    </>
   );
 }
 
@@ -156,6 +146,16 @@ const HEADER_CLASS =
   "fixed inset-x-0 top-0 z-50 w-full pt-[env(safe-area-inset-top)] mint:inset-x-auto mint:left-1/2 mint:top-[max(0.75rem,env(safe-area-inset-top))] mint:max-w-[84rem] mint:-translate-x-1/2 mint:px-3 mint:pt-0 mint:sm:top-[max(1.25rem,env(safe-area-inset-top))] mint:sm:px-5";
 const NAV_CLASS =
   "flex h-16 items-center justify-between border-b border-line px-5 sm:px-8 mint:h-14 mint:rounded-full mint:border mint:px-5 nav-glow mint:sm:h-16 mint:sm:px-6 mint:xl:h-22 mint:xl:px-8";
+
+/** Fondu de la couleur de la page vers le transparent : le contenu disparaît en douceur sous la navbar. */
+function TopFade() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-x-0 top-0 z-40 h-24 bg-gradient-to-b from-page from-60% to-transparent mint:h-32 mint:sm:h-36 mint:xl:h-44"
+    />
+  );
+}
 
 const entryKey = (e: NavItem | NavGroup) => (isGroup(e) ? e.id : e.href);
 const entryActive = (e: NavItem | NavGroup, pathname: string) =>

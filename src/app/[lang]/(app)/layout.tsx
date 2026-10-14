@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { AmbientGlow } from "@/components/layout/ambient-glow";
 import { FloatingActions } from "@/components/layout/floating-actions";
 import { AppHeader, AppHeaderFallback } from "@/components/layout/app-header";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -17,7 +16,6 @@ export default async function AppLayout({ children }: LayoutProps<"/[lang]">) {
         className="sr-only z-[70] rounded-full bg-accent px-4 py-2 font-semibold text-on-accent focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
       >
         {tr("Aller au contenu")}</a>
-      <AmbientGlow />
       <Suspense fallback={<AppHeaderFallback />}>
         <AppHeader
           userSlot={

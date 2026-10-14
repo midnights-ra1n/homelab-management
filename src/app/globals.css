@@ -5,126 +5,125 @@
 @custom-variant mint (&:where([data-style="mint"], [data-style="mint"] *));
 
 /* ---------------------------------------------------------------------------
- * Standard — style par défaut : thème d'app classique, gris neutres,
+ * Midnights Classic — style par défaut (design system Midnights Classic v1.0) : ardoise neutre,
  * accent vert #3fbfa6, sans lueurs ni animations d'apparition.
  * Mêmes jetons (--mm-*) que la charte, pour que tous les composants suivent.
  * ------------------------------------------------------------------------- */
 
 :root {
   color-scheme: dark;
-  --mm-bg-crust: #0a0a0c;
-  --mm-bg: #111214;
-  --mm-bg-box: #18191c;
-  --mm-bg-elevated: #202125;
-  --mm-field: #0d0e10;
-  --mm-overlay: #000000b3;
-  --mm-panel: #202125e6;
-  --mm-border-subtle: #232428;
-  --mm-border: #2e3035;
-  --mm-border-strong: #5b5f68;
-  --mm-border-accent: #3fbfa666;
-  --mm-border-mint: #1f5f52;
-  --mm-h1: #f4f4f5;
-  --mm-h2: #e4e4e7;
-  --mm-body: #a1a1aa;
-  --mm-meta: #8b8b94;
+  --mm-bg-crust: #090f13;
+  --mm-bg: #0e1519;
+  --mm-bg-box: #131b1f;
+  --mm-bg-elevated: #1c2429;
+  --mm-field: #10181c;
+  --mm-overlay: #030608a8;
+  --mm-panel: #1c2429e6;
+  --mm-border-subtle: #1f282d;
+  --mm-border: #262f34;
+  --mm-border-strong: #66737a;
+  --mm-border-accent: #3fbfa673;
+  --mm-border-mint: #155347;
+  --mm-h1: #e7ecef;
+  --mm-h2: #d8dfe3;
+  --mm-body: #95a0a6;
+  --mm-meta: #8a959b;
   --mm-accent: #3fbfa6;
-  --mm-accent-text: #3fbfa6;
-  --mm-accent-hover: #52cbb3;
-  --mm-accent-active: #2fa38d;
-  --mm-accent-muted: #1f5f52;
-  --mm-accent-soft: #3fbfa622;
+  --mm-accent-text: #79ddc6;
+  --mm-accent-hover: #79ddc6;
+  --mm-accent-active: #aceedd;
+  --mm-accent-muted: #155347;
+  --mm-accent-soft: #3fbfa624;
   --mm-selection: #3fbfa640;
   --mm-focus: #3fbfa6;
-  --mm-on-accent: #0b1512;
-  --mm-red: #f87171;
+  --mm-on-accent: #09251f;
+  --mm-red: #fda19a;
   --mm-orange: #fb923c;
-  --mm-yellow: #facc15;
-  --mm-green: #4ade80;
+  --mm-yellow: #e7b369;
+  --mm-green: #89d298;
   --mm-cyan: #22d3ee;
-  --mm-blue: #60a5fa;
-  --mm-purple: #a78bfa;
+  --mm-blue: #86c3ff;
+  --mm-purple: #a58cf0;
   --mm-pink: #f472b6;
   --mm-glow-accent: transparent;
   --mm-glow-accent-strong: transparent;
   --mm-glow-opacity: 0;
   --mm-glow-boost: 0;
-  --mm-ambient-boost: 0;
-  --mm-shadow-popover: 0 8px 24px #00000066;
+  --mm-shadow-popover: 0 4px 10px -2px #0000008c, 0 0 0 1px #e7ecef0f;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --mm-bg-crust: #eceef1;
-    --mm-bg: #f6f7f9;
+    --mm-bg-crust: #e7ecef;
+    --mm-bg: #f2f6f8;
     --mm-bg-box: #ffffff;
     --mm-bg-elevated: #ffffff;
     --mm-field: #ffffff;
-    --mm-overlay: #0f172a59;
+    --mm-overlay: #090f137a;
     --mm-panel: #ffffffeb;
-    --mm-border-subtle: #e5e7eb;
-    --mm-border: #d4d7dd;
-    --mm-border-strong: #6b7280;
-    --mm-border-accent: #3fbfa680;
-    --mm-border-mint: #9fdccf;
-    --mm-h1: #111827;
-    --mm-h2: #1f2937;
-    --mm-body: #4b5563;
-    --mm-meta: #6b7280;
-    --mm-accent-text: #00775f;
-    --mm-accent-hover: #36ad96;
-    --mm-accent-active: #2b9883;
-    --mm-accent-muted: #9fdccf;
+    --mm-border-subtle: #e7ecef;
+    --mm-border: #d8dfe3;
+    --mm-border-strong: #8a959b;
+    --mm-border-accent: #79ddc6;
+    --mm-border-mint: #aceedd;
+    --mm-h1: #131b1f;
+    --mm-h2: #262f34;
+    --mm-body: #546066;
+    --mm-meta: #67727a;
+    --mm-accent-text: #16695a;
+    --mm-accent-hover: #35ad96;
+    --mm-accent-active: #1f9e88;
+    --mm-accent-muted: #aceedd;
     --mm-accent-soft: #3fbfa61f;
     --mm-selection: #3fbfa640;
-    --mm-focus: #12937a;
-    --mm-red: #b91c1c;
+    --mm-focus: #1f9e88;
+    --mm-red: #9d3533;
     --mm-orange: #c2410c;
-    --mm-yellow: #a16207;
-    --mm-green: #15803d;
+    --mm-yellow: #8a4e00;
+    --mm-green: #00722e;
     --mm-cyan: #0e7490;
-    --mm-blue: #1d4ed8;
-    --mm-purple: #6d28d9;
+    --mm-blue: #005fa8;
+    --mm-purple: #6f52c9;
     --mm-pink: #be185d;
-    --mm-shadow-popover: 0 8px 24px #1118271a;
+    --mm-shadow-popover: 0 4px 10px -2px #131b1f1a, 0 2px 4px -2px #131b1f0f;
   }
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --mm-bg-crust: #eceef1;
-  --mm-bg: #f6f7f9;
+  --mm-bg-crust: #e7ecef;
+  --mm-bg: #f2f6f8;
   --mm-bg-box: #ffffff;
   --mm-bg-elevated: #ffffff;
   --mm-field: #ffffff;
-  --mm-overlay: #0f172a59;
+  --mm-overlay: #090f137a;
   --mm-panel: #ffffffeb;
-  --mm-border-subtle: #e5e7eb;
-  --mm-border: #d4d7dd;
-  --mm-border-strong: #6b7280;
-  --mm-border-accent: #3fbfa680;
-  --mm-border-mint: #9fdccf;
-  --mm-h1: #111827;
-  --mm-h2: #1f2937;
-  --mm-body: #4b5563;
-  --mm-meta: #6b7280;
-  --mm-accent-text: #00775f;
-  --mm-accent-hover: #36ad96;
-  --mm-accent-active: #2b9883;
-  --mm-accent-muted: #9fdccf;
+  --mm-border-subtle: #e7ecef;
+  --mm-border: #d8dfe3;
+  --mm-border-strong: #8a959b;
+  --mm-border-accent: #79ddc6;
+  --mm-border-mint: #aceedd;
+  --mm-h1: #131b1f;
+  --mm-h2: #262f34;
+  --mm-body: #546066;
+  --mm-meta: #67727a;
+  --mm-accent-text: #16695a;
+  --mm-accent-hover: #35ad96;
+  --mm-accent-active: #1f9e88;
+  --mm-accent-muted: #aceedd;
   --mm-accent-soft: #3fbfa61f;
   --mm-selection: #3fbfa640;
-  --mm-focus: #12937a;
-  --mm-red: #b91c1c;
+  --mm-focus: #1f9e88;
+  --mm-red: #9d3533;
   --mm-orange: #c2410c;
-  --mm-yellow: #a16207;
-  --mm-green: #15803d;
+  --mm-yellow: #8a4e00;
+  --mm-green: #00722e;
   --mm-cyan: #0e7490;
-  --mm-blue: #1d4ed8;
-  --mm-purple: #6d28d9;
+  --mm-blue: #005fa8;
+  --mm-purple: #6f52c9;
   --mm-pink: #be185d;
-  --mm-shadow-popover: 0 8px 24px #1118271a;
+  --mm-shadow-popover: 0 4px 10px -2px #131b1f1a, 0 2px 4px -2px #131b1f0f;
 }
 
 /* Standard : rien qui « apparaît » (fondus, flous, montées), pas de boutons flottants. */
@@ -196,7 +195,6 @@
   --mm-glow-accent-strong: #3fbfa657;
   --mm-glow-opacity: 0.7;
   --mm-glow-boost: 1;
-  --mm-ambient-boost: 1.45;
   --mm-shadow-popover: 0 10px 30px #00000080;
 }
 
@@ -238,7 +236,6 @@
     --mm-glow-accent: #3fbfa61a;
     --mm-glow-accent-strong: #3fbfa629;
     --mm-glow-boost: 2.2;
-    --mm-ambient-boost: 2;
     --mm-shadow-popover: 0 10px 28px #161b241a;
   }
 }
@@ -280,7 +277,6 @@
   --mm-glow-accent: #3fbfa61a;
   --mm-glow-accent-strong: #3fbfa629;
   --mm-glow-boost: 2.2;
-  --mm-ambient-boost: 2;
   --mm-shadow-popover: 0 10px 28px #161b241a;
 }
 
@@ -636,71 +632,6 @@ dialog::backdrop {
 .hover-glow:hover {
   border-color: var(--mm-border-accent);
   box-shadow: 0 0 30px var(--mm-glow-accent-strong);
-}
-
-/* Lueurs d'ambiance fixes : entrée, dérive, blob (voir ambient-glow.tsx). Charte Mint uniquement. */
-:root:not([data-style="mint"]) .ambient-glows {
-  display: none;
-}
-@media (max-width: 767px) {
-  .ambient-glows {
-    --ambient-scale: 0.6;
-    --ambient-dim: 0.55;
-  }
-}
-@keyframes ambient-enter {
-  from { opacity: 0; transform: scale(0.55); }
-  to { opacity: 1; transform: scale(1); }
-}
-@keyframes ambient-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes ambient-drift-a {
-  0%, 100% { translate: 0 0; }
-  33% { translate: 7vw -5vh; }
-  66% { translate: -4vw 6vh; }
-}
-@keyframes ambient-drift-b {
-  0%, 100% { translate: 0 0; }
-  30% { translate: -6vw 4vh; }
-  70% { translate: 5vw -6vh; }
-}
-@keyframes ambient-drift-c {
-  0%, 100% { translate: 0 0; }
-  25% { translate: 4vw 6vh; }
-  50% { translate: 8vw -2vh; }
-  75% { translate: -3vw -5vh; }
-}
-@keyframes ambient-blob {
-  0%, 100% { scale: 1 1; rotate: 0deg; }
-  20% { scale: 1.18 0.86; rotate: 40deg; }
-  40% { scale: 0.9 1.14; rotate: 95deg; }
-  60% { scale: 1.12 0.94; rotate: 160deg; }
-  80% { scale: 0.94 1.1; rotate: 250deg; }
-}
-.ambient-enter {
-  opacity: 0;
-  animation: ambient-fade 1.2s ease-out both;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .ambient-enter {
-    animation: ambient-enter 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  .ambient-drift-a,
-  .ambient-drift-b,
-  .ambient-drift-c {
-    animation-timing-function: ease-in-out;
-    animation-iteration-count: infinite;
-  }
-  .ambient-drift-a { animation-name: ambient-drift-a; }
-  .ambient-drift-b { animation-name: ambient-drift-b; }
-  .ambient-drift-c { animation-name: ambient-drift-c; }
-  .ambient-blob {
-    animation: ambient-blob var(--blob-duration, 28s) ease-in-out infinite;
-    animation-delay: var(--blob-delay, 0s);
-    will-change: scale, rotate;
-  }
 }
 
 /* PWA installée : pas de rebond hors page, pas de sélection accidentelle sur les contrôles */

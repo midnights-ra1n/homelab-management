@@ -33,7 +33,7 @@ export const required = (label: string, max = 200) =>
     z.string().trim().min(1, `${label} est requis`).max(max, `${max} caractères maximum`),
   );
 
-const optNumber = (opts: { int?: boolean; min?: number; max?: number } = {}) =>
+export const optNumber = (opts: { int?: boolean; min?: number; max?: number } = {}) =>
   z.preprocess(
     (v) => {
       const b = blankToNull(v);
@@ -55,7 +55,7 @@ const optId = z.preprocess((v) => {
 
 const optDate = z.preprocess(blankToNull, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide").nullable());
 
-const checkbox = z.preprocess((v) => v === "on" || v === "true" || v === "1" || v === true, z.boolean());
+export const checkbox = z.preprocess((v) => v === "on" || v === "true" || v === "1" || v === true, z.boolean());
 
 const optIp = z.preprocess(
   (v) => (v == null ? "" : String(v).trim()),
@@ -383,6 +383,43 @@ export const monitorSchema = z
     }
   });
 export type MonitorInput = z.infer<typeof monitorSchema>;
+
+/* ----------------------------------------------------------------------------
+ * Proxmox : configuration d'un invité, snapshot, sauvegarde
+ * -------------------------------------------------------------------------- */
+
+const pveName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/, "Lettres, chiffres, . _ - uniquement");
+const pveGuest = {
+  integration_id: z.coerce.number().int().positive(),
+  node: pveName,
+  type: z.enum(["qemu", "lxc"]),
+  vmid: z.coerce.number().int().min(100).max(999_999_999),
+};
+
+export const guestConfigSchema = z.object({
+  ...pveGuest,
+  name: z.string().trim().regex(/^[A-Za-z0-9]([A-Za-z0-9.-]{0,61}[A-Za-z0-9])?$/, "Nom DNS valide attendu (lettres, chiffres, . et -)"),
+  cores: optNumber({ int: true, min: 1, max: 512 }),
+  sockets: optNumber({ int: true, min: 1, max: 16 }),
+  memory: optNumber({ int: true, min: 16, max: 4_194_304 }),
+  swap: optNumber({ int: true, min: 0, max: 4_194_304 }),
+  onboot: checkbox,
+  tags: text(400),
+  description: text(8000),
+});
+
+export const snapshotSchema = z.object({
+  ...pveGuest,
+  snapname: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{1,39}$/, "2 à 40 caractères, commence par une lettre (lettres, chiffres, _ -)"),
+  description: text(2000),
+  vmstate: checkbox,
+});
+
+export const backupSchema = z.object({
+  ...pveGuest,
+  storage: pveName,
+  mode: z.enum(["snapshot", "suspend", "stop"]),
+});
 
 /* ----------------------------------------------------------------------------
  * Résultat d'action de formulaire

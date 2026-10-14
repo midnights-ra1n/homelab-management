@@ -46,11 +46,11 @@ export function ThemeSwitch({ className }: { className?: string }) {
 }
 
 const STYLES: { value: UiStyle; label: string }[] = [
-  { value: "standard", label: "Standard" },
+  { value: "standard", label: "Midnights Classic" },
   { value: "mint", label: "Midnights Mint" },
 ];
 
-/** Sélecteur de style d'interface : Standard (défaut) ou charte Midnights Mint. */
+/** Sélecteur de style d'interface : Midnights Classic (défaut) ou charte Midnights Mint. */
 export function StyleSwitch({ className }: { className?: string }) {
   const tr = useT();
   const style = useSyncExternalStore(subscribeTheme, getStyle, () => "standard" as UiStyle);

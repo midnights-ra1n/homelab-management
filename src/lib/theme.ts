@@ -5,7 +5,7 @@ export type Theme = "dark" | "light";
 const KEY = "hm-theme";
 const STYLE_KEY = "hm-style";
 const COLORS: Record<UiStyle, Record<Theme, string>> = {
-  standard: { dark: "#111214", light: "#f6f7f9" },
+  standard: { dark: "#0e1519", light: "#f2f6f8" },
   mint: { dark: "#191e27", light: "#e4e8ef" },
 };
 

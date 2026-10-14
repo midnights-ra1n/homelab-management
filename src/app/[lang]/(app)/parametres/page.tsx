@@ -119,7 +119,7 @@ async function Settings() {
           <Card>
             <CardBody className="grid gap-4">
               <p className="text-sm text-body">
-                {tr("Style Standard sobre par défaut, ou charte Midnights Mint (accent menthe #3fbfa6, Geist Mono, lueurs). « Auto » suit le réglage clair / sombre du système.")}</p>
+                {tr("Style Midnights Classic sobre par défaut, ou charte Midnights Mint (accent menthe #3fbfa6, Geist Mono, lueurs). « Auto » suit le réglage clair / sombre du système.")}</p>
               <StyleSwitch className="w-fit" />
               <div className="flex flex-wrap gap-3">
                 <ThemeSwitch className="w-fit" />

@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { Dialog } from "./dialog";
+import { useToast } from "./toaster";
 import { useT } from "@/i18n/client";
 
 /** Bouton qui demande confirmation avant d'exécuter une action destructrice. */
@@ -17,6 +18,7 @@ export function ConfirmButton({
   size = "icon-sm",
   icon = <Trash2 size={15} />,
   label = "Supprimer",
+  pendingLabel = "Suppression…",
 }: {
   action: () => Promise<unknown>;
   title?: string;
@@ -27,6 +29,7 @@ export function ConfirmButton({
   size?: ButtonSize;
   icon?: ReactNode;
   label?: string;
+  pendingLabel?: string;
 }) {
   const tr = useT();
   label = tr(label);
@@ -34,6 +37,7 @@ export function ConfirmButton({
   title = tr(title);
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
+  const toast = useToast();
   return (
     <>
       <Button variant={variant} size={size} icon={icon} onClick={() => setOpen(true)} aria-label={children ? undefined : label} title={label}>
@@ -49,12 +53,14 @@ export function ConfirmButton({
             disabled={pending}
             onClick={() =>
               start(async () => {
-                await action();
+                const r = await action();
                 setOpen(false);
+                // Actions qui renvoient { ok, message } (Proxmox…) : on affiche le résultat
+                if (r && typeof r === "object" && "ok" in r && "message" in r) toast(r.ok ? "success" : "error", tr(String(r.message)));
               })
             }
           >
-            {pending ? tr("Suppression…") : confirmLabel}
+            {pending ? tr(pendingLabel) : confirmLabel}
           </Button>
         </div>
       </Dialog>

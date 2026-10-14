@@ -12,7 +12,7 @@ import { inputClass } from "@/components/ui/form";
 import { Meter } from "@/components/ui/meter";
 import { useToast } from "@/components/ui/toaster";
 import { cn, formatBytes, formatUptime } from "@/lib/utils";
-import { consoleHref } from "./console-href";
+import { consoleHref, guestHref } from "./console-href";
 import { useT } from "@/i18n/client";
 
 export type GuestRow = {
@@ -37,7 +37,7 @@ export type GuestRow = {
 
 type Action = "start" | "shutdown" | "stop" | "reboot" | "suspend" | "resume";
 
-const ACTIONS: { action: Action; label: string; icon: typeof Play; when: (s: string) => boolean; danger?: boolean }[] = [
+export const ACTIONS: { action: Action; label: string; icon: typeof Play; when: (s: string) => boolean; danger?: boolean }[] = [
   { action: "start", label: "Démarrer", icon: Play, when: (s) => s === "stopped" },
   { action: "resume", label: "Reprendre", icon: Play, when: (s) => s === "paused" || s === "suspended" },
   { action: "shutdown", label: "Arrêter proprement", icon: Power, when: (s) => s === "running" },
@@ -132,7 +132,7 @@ export function GuestTable({
                   aria-label={g.status}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-h1">{g.name}</p>
+                  <Link href={guestHref(g)} className="block truncate font-medium text-h1 hover:text-accent-text">{g.name}</Link>
                   <p className="font-mono text-xs text-meta">
                     {g.type === "qemu" ? "VM" : "CT"} {g.vmid} · {g.node}
                     {running && ` · ${Math.round(g.cpu * 100)} % CPU · ${formatBytes(g.mem, tr.locale)}`}
@@ -190,7 +190,7 @@ export function GuestTable({
                           aria-label={g.status}
                         />
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-h1">{g.name}</p>
+                          <Link href={guestHref(g)} className="block truncate font-medium text-h1 hover:text-accent-text">{g.name}</Link>
                           <p className="flex items-center gap-2 font-mono text-xs text-meta">
                             <span>{g.vmid}</span>
                             <Badge tone={g.type === "qemu" ? "blue" : "purple"} className="px-1.5 py-0 text-[0.65rem]">

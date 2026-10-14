@@ -16,6 +16,8 @@ import { Stat } from "@/components/ui/stat";
 import { GuestTable, type GuestRow } from "@/features/proxmox/guest-table";
 import { NodeTasks } from "@/features/proxmox/node-tasks";
 import { SyncProxmoxButton } from "@/features/proxmox/sync-button";
+import { nodeHref, toGuestRow } from "@/features/proxmox/console-href";
+import Link from "next/link";
 import { formatBytes, formatUptime, pct } from "@/lib/utils";
 import { getT } from "@/i18n/server";
 
@@ -64,25 +66,7 @@ async function Overview() {
   const ok = sources.filter((s) => s.ok && s.data);
   const nodes = ok.flatMap((s) => s.data!.nodes.map((n) => ({ ...n, source: s })));
   const guests: GuestRow[] = ok.flatMap((s) =>
-    s.data!.guests.map((g) => ({
-      key: `${s.id}-${g.node}-${g.vmid}`,
-      integrationId: s.id,
-      integrationName: s.name,
-      baseUrl: s.url,
-      node: g.node,
-      type: g.type as "qemu" | "lxc",
-      vmid: g.vmid!,
-      name: g.name ?? String(g.vmid),
-      status: g.status,
-      cpu: g.cpu ?? 0,
-      maxcpu: g.maxcpu ?? 0,
-      mem: g.mem ?? 0,
-      maxmem: g.maxmem ?? 0,
-      disk: g.disk ?? 0,
-      maxdisk: g.maxdisk ?? 0,
-      uptime: g.uptime ?? 0,
-      tags: (g.tags ?? "").split(/[;,\s]+/).filter(Boolean),
-    })),
+    s.data!.guests.map((g) => toGuestRow(s, g)),
   );
   const storages = ok.flatMap((s) => s.data!.storages.map((st) => ({ ...st, sourceName: s.name })));
   const online = nodes.filter((n) => n.status === "online");
@@ -125,7 +109,7 @@ async function Overview() {
                         {isOnline && <span className="ping absolute inset-0 rounded-full bg-green" />}
                         <span className={`relative h-2.5 w-2.5 rounded-full ${isOnline ? "bg-green" : "bg-red"}`} />
                       </span>
-                      <span className="truncate text-lg font-semibold text-h1">{n.node}</span>
+                      <Link href={nodeHref(n.source.id, n.node)} className="truncate text-lg font-semibold text-h1 hover:text-accent-text">{n.node}</Link>
                     </p>
                     <p className="mt-1 font-mono text-xs text-meta">
                       {n.source.name} {tr("· PVE ")}{n.source.data!.version}
@@ -169,6 +153,8 @@ async function Overview() {
                     {guests.filter((g) => g.integrationId === n.source.id && g.node === n.node).length} {tr("invité(s)")}</span>
                   <div className="flex gap-1">
                     {isOnline && <NodeTasks integrationId={n.source.id} node={n.node} />}
+                    <ButtonLink href={nodeHref(n.source.id, n.node)} variant="ghost" size="sm" icon={<Server size={14} />}>
+                      {tr("Gérer")}</ButtonLink>
                     <ButtonLink href={n.source.url} target="_blank" rel="noreferrer" variant="ghost" size="sm" icon={<ExternalLink size={14} />}>
                       {tr("Web UI")}</ButtonLink>
                   </div>
