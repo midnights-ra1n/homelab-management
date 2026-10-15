@@ -89,10 +89,11 @@ export function clearFailures(policy: Policy, key: string) {
  * la validation zod et l'échappement React.
  * -------------------------------------------------------------------------- */
 
+// xss : un gestionnaire on…= n'est dangereux que dans une balise (après espace, guillemet ou /), pas en nom de paramètre (?onglet=).
 const RULES: [string, RegExp][] = [
   ["traversal", /(?:\.\.[/\\]|[/\\]\.\.(?:$|[/\\])|\/etc\/(?:passwd|shadow)|\/proc\/self|\0|win\.ini|boot\.ini)/i],
   ["sqli", /(?:\bunion\b[\s\S]{0,40}\bselect\b|\bselect\b[\s\S]{0,60}\bfrom\b[\s\S]{0,60}\b(?:information_schema|sqlite_master|pg_catalog|mysql\.)|\b(?:sleep|benchmark|pg_sleep|load_file|randomblob)\s*\(|\bwaitfor\s+delay\b|['"]\s*(?:or|and)\s+['"]?\d+['"]?\s*=\s*['"]?\d+|['"`]\s*;\s*(?:drop|delete|insert|update|alter|attach)\b|\bxp_cmdshell\b)/i],
-  ["xss", /(?:<\s*\/?\s*(?:script|iframe|object|embed|svg|math|base|meta|link|style)\b|\bjavascript\s*:|\bvbscript\s*:|\bdata\s*:\s*text\/html|\bon[a-z]{3,20}\s*=|\bsrcdoc\s*=|expression\s*\()/i],
+  ["xss", /(?:<\s*\/?\s*(?:script|iframe|object|embed|svg|math|base|meta|link|style)\b|\bjavascript\s*:|\bvbscript\s*:|\bdata\s*:\s*text\/html|[\s"'/]on[a-z]{3,20}\s*=|\bsrcdoc\s*=|expression\s*\()/i],
   ["injection", /(?:\$\{jndi:|\$\{[^}]*(?:env|sys|java):|<%|%>|\{\{.*\}\}|<\?php|;\s*(?:cat|wget|curl|bash|sh|nc)\s|\|\s*(?:cat|wget|curl|bash|sh|nc)\s|`[^`]*`|\$\((?:[^)]*)\))/i],
   ["crlf", /[\r\n]/],
   ["scanner", /(?:^|\/)(?:\.env|\.git|\.svn|\.hg|\.ds_store|\.htaccess|\.htpasswd|wp-admin|wp-login|wp-content|wp-includes|xmlrpc|phpmyadmin|pma|adminer|cgi-bin|actuator|server-status|vendor\/phpunit|boaform|hnap1|owa|autodiscover)\b|\.(?:php\d?|asp|aspx|jsp|cgi|pl|bak|sql|old|swp|ini|conf|cfg|log)$/i],
