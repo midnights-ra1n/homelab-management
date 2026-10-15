@@ -24,6 +24,7 @@ const TABLES = [
   "map_links",
   "vpn_tunnels",
   "firewall_rules",
+  "domains",
   "activity",
 ] as const;
 

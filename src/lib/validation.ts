@@ -15,6 +15,7 @@ import {
   VPN_TYPES,
   FW_TARGETS,
   FW_PROTOCOLS,
+  DOMAIN_EXPOSURES,
 } from "./constants";
 import { isIpv4, isValidPortSpec, normalizeCidr } from "./ip";
 
@@ -361,6 +362,19 @@ export const ruleSchema = z.object({
   notes: text(500),
 });
 export type RuleInput = z.infer<typeof ruleSchema>;
+
+export const domainSchema = z.object({
+  fqdn: z.preprocess(
+    (v) => String(v ?? "").trim().toLowerCase().replace(/\.$/, ""),
+    z.string().max(253).regex(/^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$/, "Nom de domaine invalide (ex. jellyfin.example.fr)"),
+  ),
+  exposure: z.enum(DOMAIN_EXPOSURES),
+  proxy_asset_id: optId,
+  target_asset_id: optId,
+  upstream: url,
+  notes: text(1000),
+});
+export type DomainInput = z.infer<typeof domainSchema>;
 
 
 /* ----------------------------------------------------------------------------

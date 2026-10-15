@@ -384,4 +384,19 @@ export const migrations: string[] = [
   DROP TABLE integrations;
   ALTER TABLE integrations_new RENAME TO integrations;
   `,
+
+  /* 009 — noms de domaine pointant vers le reverse proxy */
+  `
+  CREATE TABLE domains (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    fqdn            TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    exposure        TEXT NOT NULL CHECK (exposure IN ('public','lan')),
+    proxy_asset_id  INTEGER REFERENCES assets(id) ON DELETE SET NULL,
+    target_asset_id INTEGER REFERENCES assets(id) ON DELETE SET NULL,
+    upstream        TEXT NOT NULL DEFAULT '',  -- URL interne du service (http://10.0.10.5:8096)
+    notes           TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  `,
 ];

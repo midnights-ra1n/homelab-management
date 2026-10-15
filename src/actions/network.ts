@@ -24,7 +24,8 @@ import { loadSnapshot } from "@/lib/net/snapshot";
 import { createTunnel, deleteTunnel, updateTunnel } from "@/lib/data/vpn";
 import { createRule, deleteRule, moveRule, toggleRule, updateRule } from "@/lib/data/firewall";
 import { setSetting } from "@/lib/data/settings";
-import { ruleSchema, vpnSchema } from "@/lib/validation";
+import { domainSchema, ruleSchema, vpnSchema } from "@/lib/validation";
+import { createDomain, deleteDomain, updateDomain } from "@/lib/data/domains";
 
 function refresh() {
   revalidatePath("/", "layout");
@@ -227,5 +228,27 @@ export async function moveRuleAction(id: number, direction: -1 | 1) {
 export async function setDefaultPolicyAction(policy: "allow" | "deny") {
   await requireUser();
   setSetting("fw_default_policy", policy === "deny" ? "deny" : "allow");
+  refresh();
+}
+
+/* Domaines ------------------------------------------------------------------- */
+
+export async function saveDomainAction(id: number | null, _: FormState, fd: FormData): Promise<FormState> {
+  await requireUser();
+  const parsed = parseForm(domainSchema, fd);
+  if (!parsed.ok) return parsed.state;
+  try {
+    if (id) updateDomain(id, parsed.data);
+    else createDomain(parsed.data);
+  } catch (err) {
+    return dbError(err, "fqdn", "Ce domaine existe déjà");
+  }
+  refresh();
+  return success(id ? "Domaine mis à jour." : "Domaine ajouté.");
+}
+
+export async function deleteDomainAction(id: number) {
+  await requireUser();
+  deleteDomain(id);
   refresh();
 }

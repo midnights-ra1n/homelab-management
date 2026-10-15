@@ -5,6 +5,8 @@ import { Network } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { listTunnels } from "@/lib/data/vpn";
 import { listRules } from "@/lib/data/firewall";
+import { listDomains } from "@/lib/data/domains";
+import { DomainSection } from "@/features/network/domain-section";
 import { defaultFirewallPolicy } from "@/lib/data/settings";
 import { listAssets } from "@/lib/data/assets";
 import { diagnose } from "@/lib/net/engine";
@@ -45,7 +47,7 @@ export default async function NetworkPage({ searchParams }: PageProps<"/[lang]/r
     <>
       <PageHeader
         title={tr("Réseau")}
-        description={tr("Adressage, tunnels VPN, règles de pare-feu et simulation de flux avant la mise en prod.")}
+        description={tr("Adressage, tunnels VPN, pare-feu, noms de domaine et simulation de flux avant la mise en prod.")}
       />
       <Suspense fallback={<Skeleton className="h-[32rem] rounded-2xl" />}>
         <Ipam searchParams={searchParams} />
@@ -74,6 +76,7 @@ async function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau"
         { value: "adressage", label: tr("Adressage"), href: "/reseau" },
         { value: "vpn", label: "VPN", href: "/reseau?onglet=vpn" },
         { value: "pare-feu", label: "Pare-feu", href: "/reseau?onglet=pare-feu" },
+        { value: "domaines", label: tr("Domaines"), href: "/reseau?onglet=domaines" },
         { value: "simulation", label: tr("Simulation"), href: "/reseau?onglet=simulation" },
         { value: "diagnostic", label: tr("Diagnostic"), href: "/reseau?onglet=diagnostic", count: issues.filter((i) => i.level !== "info").length },
       ]}
@@ -95,6 +98,7 @@ async function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau"
       <div>
         {tabs}
         {tab === "vpn" && <VpnSection tunnels={tunnels} assets={assets.map((a) => ({ id: a.id, display_name: a.display_name }))} />}
+        {tab === "domaines" && <DomainSection domains={listDomains()} assets={assets.map((a) => ({ id: a.id, display_name: a.display_name }))} />}
         {tab === "pare-feu" && <FirewallSection rules={listRules()} policy={defaultFirewallPolicy()} options={fwOptions} />}
         {tab === "simulation" && (
           <Simulator

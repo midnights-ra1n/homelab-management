@@ -202,6 +202,13 @@ export const VPN_STATUS_META: Record<VpnStatus, { label: string; tone: Tone }> =
   planned: { label: "Prévu", tone: "blue" },
 };
 
+export const DOMAIN_EXPOSURES = ["public", "lan"] as const;
+export type DomainExposure = (typeof DOMAIN_EXPOSURES)[number];
+export const DOMAIN_EXPOSURE_META: Record<DomainExposure, { label: string; tone: Tone }> = {
+  public: { label: "Internet", tone: "orange" },
+  lan: { label: "LAN uniquement", tone: "green" },
+};
+
 export const FW_TARGETS = ["any", "vlan", "subnet", "asset", "cidr", "vpn", "internet"] as const;
 export type FwTarget = (typeof FW_TARGETS)[number];
 export const FW_TARGET_LABEL: Record<FwTarget, string> = {
