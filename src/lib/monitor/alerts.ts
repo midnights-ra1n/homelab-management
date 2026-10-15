@@ -1,16 +1,13 @@
 import "server-only";
 import type { Translate } from "@/i18n/translate";
-import { confirmedDown, listMonitors } from "../data/monitors";
 import { monitoringSummary } from "../integrations";
 import { formatDate } from "../utils";
 
 export type MonitorAlert = { tone: "red" | "yellow"; text: string; href: string };
 
-/** Alertes en cours (sondes + Beszel / Maintenant / PatchMon / Homelab Monitoring), pannes en premier. */
+/** Alertes en cours (Homelab Monitoring / Beszel / Maintenant / PatchMon), pannes en premier. */
 export async function collectAlerts(tr: Translate) {
   const m = await monitoringSummary();
-  const probes = listMonitors().filter((x) => x.enabled);
-  const probesDown = probes.filter((x) => confirmedDown(x.id));
   const alerts: MonitorAlert[] = [
     ...m.systems.down.map((s) => ({ tone: "red" as const, text: tr("{name} hors ligne ({source})", { name: s.name, source: s.source }), href: "/monitoring" })),
     ...m.systems.hot.map((s) => ({
@@ -27,9 +24,8 @@ export async function collectAlerts(tr: Translate) {
     })),
     ...m.probes.down.map((x) => ({ tone: "red" as const, text: tr("Sonde {name} : {message}", { name: x.name, message: x.message }), href: "/monitoring" })),
     ...m.patches.reboot.map((name) => ({ tone: "yellow" as const, text: tr("{friendlyName} doit redémarrer", { friendlyName: name }), href: "/monitoring" })),
-    ...probesDown.map((x) => ({ tone: "red" as const, text: tr("{name} en panne", { name: x.name }), href: `/monitoring/${x.id}` })),
     ...m.errors.map((e) => ({ tone: "red" as const, text: `${e.name} : ${tr(e.error)}`, href: "/parametres#integrations" })),
   ];
   alerts.sort((x, y) => (x.tone === y.tone ? 0 : x.tone === "red" ? -1 : 1));
-  return { m, probes, probesDown, alerts };
+  return { m, alerts };
 }

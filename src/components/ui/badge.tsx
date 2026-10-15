@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { TONE_TEXT_VAR, TONE_VAR, type Tone } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-/** Badge teinté : la couleur n'est jamais seule, toujours accompagnée d'un libellé. */
+/** Badge de statut (.mm-badge, pilule) : la couleur n'est jamais seule, toujours accompagnée d'un libellé. */
 export function Badge({
   tone = "muted",
   children,
@@ -19,32 +19,32 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium",
+        "mm-badge",
         className,
       )}
-      style={{
-        color: TONE_TEXT_VAR[tone],
-        background: `color-mix(in srgb, ${TONE_VAR[tone]} 12%, transparent)`,
-        borderColor: `color-mix(in srgb, ${TONE_VAR[tone]} 35%, transparent)`,
-      }}
+      style={
+        tone === "muted"
+          ? undefined
+          : { color: TONE_TEXT_VAR[tone], background: `color-mix(in srgb, ${TONE_VAR[tone]} 16%, transparent)` }
+      }
     >
-      {dot && <span className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[tone] }} />}
+      {dot && <span className="mm-badge__dot" style={{ background: TONE_VAR[tone] }} />}
       {icon}
       {children}
     </span>
   );
 }
 
-/** Étiquette libre (tags) : mono, arrondi sm. */
+/** Étiquette libre (tags) : mono, pilule neutre. */
 export function Tag({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md border border-line bg-elevated px-1.5 py-0.5 font-mono text-[0.7rem] text-body",
+        "inline-flex h-5 items-center rounded-full bg-muted px-2 font-mono text-[0.7rem] text-body",
         className,
       )}
     >
-      #{children}
+      {children}
     </span>
   );
 }

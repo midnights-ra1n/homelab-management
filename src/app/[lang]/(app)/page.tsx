@@ -24,7 +24,6 @@ import { openTasks, taskCounts } from "@/lib/data/tasks";
 import { ipamTotals, listSubnets } from "@/lib/data/network";
 import { listIntegrations } from "@/lib/data/integrations";
 import { fetchProxmox } from "@/lib/integrations";
-import { listMonitors } from "@/lib/data/monitors";
 import { collectAlerts } from "@/lib/monitor/alerts";
 import { AlertBanner } from "@/components/alert-banner";
 import {
@@ -42,7 +41,6 @@ import { Meter } from "@/components/ui/meter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/ui/stat";
 import { KindIcon } from "@/components/kind-icon";
-import { FadeIn } from "@/components/ui/fade-in";
 import { cn, formatBytes, formatDate, formatGb, isOverdue, pct } from "@/lib/utils";
 import { getT } from "@/i18n/server";
 
@@ -55,7 +53,7 @@ export default async function DashboardPage() {
   const tr = await getT();
   return (
     <>
-      <header className="rise mb-8 sm:mb-12">
+      <header className="mb-8 sm:mb-12">
         <h1 className="text-4xl font-bold tracking-tight text-h1 sm:text-5xl">
           {tr("Tableau de ")}<span className="text-accent-text">{tr("bord")}</span>
         </h1>
@@ -89,7 +87,7 @@ async function Dashboard() {
   const tasks = taskCounts();
   const hasProxmox = listIntegrations("proxmox", true).length > 0;
   const hasMonitoring =
-    listMonitors().length > 0 || ["beszel", "maintenant", "patchmon", "hlm"].some((t) => listIntegrations(t as "beszel", true).length > 0);
+    ["beszel", "maintenant", "patchmon", "hlm"].some((t) => listIntegrations(t as "beszel", true).length > 0);
 
   return (
     <div className="grid grid-cols-1 gap-8 xl:gap-10">
@@ -139,7 +137,7 @@ async function Dashboard() {
 
       {/* Live : Proxmox + monitoring (toujours affichés, état vide si non configuré) */}
       <div className="grid gap-8 xl:grid-cols-2 xl:gap-10">
-        <FadeIn>
+        <div>
           {hasProxmox ? (
             <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
               <ProxmoxWidget />
@@ -152,8 +150,8 @@ async function Dashboard() {
               icon={<Server size={20} />}
             />
           )}
-        </FadeIn>
-        <FadeIn delay={80}>
+        </div>
+        <div>
           {hasMonitoring ? (
             <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
               <MonitoringWidget />
@@ -162,31 +160,31 @@ async function Dashboard() {
             <NotConfigured
               overline={tr("Monitoring")}
               title={tr("Aucune instance de monitoring")}
-              text={tr("Ajoute des sondes de disponibilité (HTTP/TCP) dans Monitoring, ou connecte Beszel, Maintenant ou PatchMon : pannes, certificats et mises à jour remonteront ici.")}
+              text={tr("Connecte Homelab Monitoring, Beszel, Maintenant ou PatchMon : sondes, pannes, certificats et mises à jour remonteront ici.")}
               icon={<Activity size={20} />}
-              href="/monitoring"
-              cta={tr("Ajouter une sonde")}
+              href="/parametres#integrations"
+              cta={tr("Connecter une intégration")}
             />
           )}
-        </FadeIn>
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
-        <FadeIn>
+        <div>
           <DeploymentsWidget />
-        </FadeIn>
-        <FadeIn delay={80}>
+        </div>
+        <div>
           <TasksWidget />
-        </FadeIn>
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
-        <FadeIn>
+        <div>
           <CapacityWidget />
-        </FadeIn>
-        <FadeIn delay={80}>
+        </div>
+        <div>
           <SubnetsWidget />
-        </FadeIn>
+        </div>
       </div>
 
     </div>
@@ -252,7 +250,7 @@ async function DashboardAlertBanner() {
 
 async function MonitoringWidget() {
   const tr = await getT();
-  const { m, probes, probesDown, alerts } = await dashboardAlerts();
+  const { m, alerts } = await dashboardAlerts();
   return (
     <Card className="h-full">
       <CardHeader
@@ -266,7 +264,7 @@ async function MonitoringWidget() {
       <CardBody className="grid gap-5">
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: tr("Sondes"), value: probes.length ? `${probes.length - probesDown.length}/${probes.length}` : "—", icon: Activity },
+            { label: tr("Sondes"), value: m.probes.total ? `${m.probes.total - m.probes.down.length}/${m.probes.total}` : "—", icon: Activity },
             { label: tr("Systèmes"), value: m.systems.total ? `${m.systems.up}/${m.systems.total}` : "—", icon: Server },
             { label: tr("Endpoints"), value: m.endpoints.total ? `${m.endpoints.up}/${m.endpoints.total}` : "—", icon: Network },
             { label: tr("MàJ sécurité"), value: m.patches.hosts ? m.patches.security : "—", icon: ShieldAlert },

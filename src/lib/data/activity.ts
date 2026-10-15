@@ -24,3 +24,12 @@ export function logActivity(entity_type: string, entity_id: number | null, actio
 export function recentActivity(limit = 15): Activity[] {
   return all<Activity>("SELECT * FROM activity ORDER BY id DESC LIMIT ?", [limit]);
 }
+
+/** Historique d'un élément (le plus récent d'abord). */
+export function activityFor(entity_type: string, entity_id: number, limit = 30): Activity[] {
+  return all<Activity>("SELECT * FROM activity WHERE entity_type = ? AND entity_id = ? ORDER BY id DESC LIMIT ?", [
+    entity_type,
+    entity_id,
+    limit,
+  ]);
+}

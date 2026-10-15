@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { listIntegrations, type Integration } from "../data/integrations";
 import type { IntegrationType } from "../constants";
 import { hlmData, pctOf, testHlm, type HlmData } from "./hlm";
@@ -17,6 +18,7 @@ export type Source<T> = {
   data?: T;
 };
 
+// Les fetchers sont mémorisés par requête (cache React) : une page qui affiche plusieurs résumés n'interroge chaque API qu'une fois.
 async function collect<T>(type: IntegrationType, fetcher: (i: Integration) => Promise<T>): Promise<Source<T>[]> {
   const integrations = listIntegrations(type, true);
   const results = await Promise.allSettled(integrations.map(fetcher));
@@ -28,12 +30,12 @@ async function collect<T>(type: IntegrationType, fetcher: (i: Integration) => Pr
   });
 }
 
-export const fetchBeszel = () => collect<BeszelSystem[]>("beszel", beszelSystems);
-export const fetchMaintenant = () => collect<MaintenantData>("maintenant", maintenantData);
-export const fetchPatchmon = () => collect<PatchmonHost[]>("patchmon", patchmonHosts);
-export const fetchProxmox = () => collect<ProxmoxOverview>("proxmox", proxmoxOverview);
-export const fetchWebmin = () => collect<WebminInstance>("webmin", webminInstance);
-export const fetchHlm = () => collect<HlmData>("hlm", hlmData);
+export const fetchBeszel = cache(() => collect<BeszelSystem[]>("beszel", beszelSystems));
+export const fetchMaintenant = cache(() => collect<MaintenantData>("maintenant", maintenantData));
+export const fetchPatchmon = cache(() => collect<PatchmonHost[]>("patchmon", patchmonHosts));
+export const fetchProxmox = cache(() => collect<ProxmoxOverview>("proxmox", proxmoxOverview));
+export const fetchWebmin = cache(() => collect<WebminInstance>("webmin", webminInstance));
+export const fetchHlm = cache(() => collect<HlmData>("hlm", hlmData));
 
 /** Clés de rapprochement d'une machine entre sources (nom, FQDN, nom court), en minuscules. */
 export function machineKeys(...values: (string | null | undefined)[]) {
@@ -110,7 +112,12 @@ export async function monitoringSummary() {
       down: probes.filter((m) => m.status === "major_outage" || m.status === "minor_outage"),
     },
     certificates: {
-      expiring: certificates.filter((c) => c.expiresAt && new Date(c.expiresAt).getTime() < soon),
+      expiring: [
+        ...certificates.filter((c) => c.expiresAt && new Date(c.expiresAt).getTime() < soon),
+        ...probes
+          .filter((m) => m.cert_expires_at && m.cert_expires_at * 1000 < soon)
+          .map((m) => ({ name: m.name, expiresAt: new Date(m.cert_expires_at! * 1000).toISOString() })),
+      ],
     },
     patches: {
       hosts: hosts.length + hlmHosts.filter((h) => h.updates).length,

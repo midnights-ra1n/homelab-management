@@ -86,7 +86,7 @@ function hydrate(row: AssetRow): Asset {
   };
 }
 
-export type AssetFilters = { kind?: string; status?: string; q?: string; tag?: string; vlan?: string };
+export type AssetFilters = { kind?: string; status?: string; q?: string; tag?: string; vlan?: string; host?: string };
 
 export function listAssets(filters: AssetFilters = {}): Asset[] {
   const where: string[] = [];
@@ -107,12 +107,17 @@ export function listAssets(filters: AssetFilters = {}): Asset[] {
     where.push("v.vlan_id = ?");
     params.push(Number(filters.vlan));
   }
+  if (filters.host) {
+    where.push("a.parent_id = ?");
+    params.push(Number(filters.host));
+  }
   if (filters.q) {
-    where.push(
-      "(a.display_name LIKE ? OR a.hostname LIKE ? OR a.role LIKE ? OR a.os LIKE ? OR ip.address LIKE ? OR a.tags LIKE ? OR a.model LIKE ?)",
-    );
-    const like = `%${filters.q}%`;
-    params.push(like, like, like, like, like, like, like);
+    // MAC : on accepte « - » comme séparateur, comme à la saisie.
+    const fields = ["a.display_name", "a.hostname", "a.role", "a.os", "ip.address", "ip.mac", "a.tags", "a.model", "a.serial_number", "a.nics"];
+    where.push(`(${fields.map((f) => `${f} LIKE ?`).join(" OR ")})`);
+    const q = /^([0-9a-f]{2}-)+/i.test(filters.q) ? filters.q.replace(/-/g, ":") : filters.q;
+    const like = `%${q}%`;
+    params.push(...fields.map(() => like));
   }
   const sql = `${SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY
     CASE a.kind WHEN 'network' THEN 0 WHEN 'physical' THEN 1 WHEN 'vm' THEN 2 WHEN 'lxc' THEN 3 WHEN 'docker' THEN 4 ELSE 5 END,
@@ -131,14 +136,49 @@ export function childrenOf(id: number): Asset[] {
   );
 }
 
-export type AssetOption = { id: number; display_name: string; kind: AssetKind; hostname: string };
+export type AssetOption = { id: number; display_name: string; kind: AssetKind; hostname: string; subnet_id: number | null };
 
 export function assetOptions(kinds?: AssetKind[]): AssetOption[] {
-  const filter = kinds?.length ? `WHERE kind IN (${kinds.map(() => "?").join(",")})` : "";
+  const filter = kinds?.length ? `WHERE a.kind IN (${kinds.map(() => "?").join(",")})` : "";
   return all<AssetOption>(
-    `SELECT id, display_name, kind, hostname FROM assets ${filter} ORDER BY display_name COLLATE NOCASE`,
+    `SELECT a.id, a.display_name, a.kind, a.hostname,
+       (SELECT subnet_id FROM ip_addresses WHERE asset_id = a.id ORDER BY is_primary DESC, id LIMIT 1) AS subnet_id
+     FROM assets a ${filter} ORDER BY a.display_name COLLATE NOCASE`,
     kinds ?? [],
   );
+}
+
+/** Hôtes qui hébergent au moins un élément (filtre « Hôte »). */
+export function hostOptions(): { id: number; display_name: string; count: number }[] {
+  return all(
+    `SELECT p.id, p.display_name, COUNT(*) AS count FROM assets c JOIN assets p ON p.id = c.parent_id
+     GROUP BY p.id ORDER BY p.display_name COLLATE NOCASE`,
+  );
+}
+
+/** Chaîne des hôtes, du plus haut jusqu'au parent direct (fil d'Ariane). */
+export function ancestorsOf(id: number): { id: number; display_name: string }[] {
+  return all(
+    `WITH RECURSIVE up(id, display_name, parent_id, depth) AS (
+       SELECT p.id, p.display_name, p.parent_id, 1 FROM assets a JOIN assets p ON p.id = a.parent_id WHERE a.id = ?
+       UNION ALL
+       SELECT p.id, p.display_name, p.parent_id, up.depth + 1 FROM up JOIN assets p ON p.id = up.parent_id WHERE up.depth < 16
+     ) SELECT id, display_name FROM up ORDER BY depth DESC`,
+    [id],
+  );
+}
+
+/** Identifiants des descendants (pour refuser un déplacement qui créerait une boucle). */
+function descendantsOf(ids: number[]): Set<number> {
+  if (!ids.length) return new Set();
+  const rows = all<{ id: number }>(
+    `WITH RECURSIVE down(id) AS (
+       SELECT id FROM assets WHERE parent_id IN (${ids.map(() => "?").join(",")})
+       UNION SELECT a.id FROM assets a JOIN down ON a.parent_id = down.id
+     ) SELECT id FROM down`,
+    ids,
+  );
+  return new Set(rows.map((r) => r.id));
 }
 
 export function allTags(): { tag: string; count: number }[] {
@@ -221,11 +261,10 @@ function columns(input: AssetInput) {
 }
 
 export class AssetError extends Error {
-  constructor(
-    public field: string,
-    message: string,
-  ) {
+  field: string;
+  constructor(field: string, message: string) {
     super(message);
+    this.field = field;
   }
 }
 
@@ -284,9 +323,40 @@ export function createAsset(input: AssetInput): number {
   });
 }
 
+/** Libellés des champs suivis dans l'historique (les autres comptent comme « autres champs »). */
+const FIELD_LABELS: Record<string, string> = {
+  kind: "type",
+  display_name: "nom",
+  hostname: "nom d'hôte",
+  status: "état",
+  role: "rôle",
+  tags: "tags",
+  parent_id: "hôte",
+  os: "système",
+  os_version: "version",
+  location: "emplacement",
+  cpu_cores: "CPU",
+  ram_gb: "mémoire",
+  disks: "disques",
+  nics: "interfaces",
+  management_url: "URL d'administration",
+  notes: "notes",
+};
+
+/** Résumé « Modification de X : état, tags, IP » à partir des colonnes qui changent. */
+export function changeSummary(before: Record<string, unknown>, after: Record<string, unknown>, name: string) {
+  const changed = Object.keys(after).filter((k) => String(before[k] ?? "") !== String(after[k] ?? ""));
+  const labels = [...new Set(changed.map((k) => FIELD_LABELS[k] ?? "autres champs"))];
+  return labels.length ? `Modification de « ${name} » : ${labels.join(", ")}` : `Modification de « ${name} »`;
+}
+
 export function updateAsset(id: number, input: AssetInput) {
   if (input.parent_id === id) throw new AssetError("parent_id", "Un élément ne peut pas être son propre hôte");
+  if (input.parent_id && descendantsOf([id]).has(input.parent_id))
+    throw new AssetError("parent_id", "Cet hôte est hébergé par l'élément lui-même");
   transaction(() => {
+    const before = get<Record<string, unknown>>("SELECT * FROM assets WHERE id = ?", [id]) ?? {};
+    const ipBefore = get<{ address: string; mac: string }>("SELECT address, mac FROM ip_addresses WHERE asset_id = ? AND is_primary = 1", [id]);
     const cols = columns(input);
     run(
       `UPDATE assets SET ${Object.keys(cols)
@@ -295,12 +365,60 @@ export function updateAsset(id: number, input: AssetInput) {
       { ...cols, id },
     );
     syncPrimaryIp(id, input);
-    logActivity("asset", id, "update", `Modification de « ${input.display_name} »`);
+    let summary = changeSummary(before, cols, input.display_name);
+    const ipChanged = (ipBefore?.address ?? "") !== (input.primary_ip ?? "") || (ipBefore?.mac ?? "") !== (input.primary_mac ?? "");
+    if (ipChanged) summary += summary.includes(" : ") ? ", IP" : " : IP";
+    logActivity("asset", id, "update", summary);
   });
 }
 
 export function setAssetStatus(id: number, status: AssetStatus) {
   run("UPDATE assets SET status = ?, updated_at = datetime('now') WHERE id = ?", [status, id]);
+}
+
+/* ----------------------------- Actions groupées ---------------------------- */
+
+export type BulkOp =
+  | { op: "status"; status: AssetStatus }
+  | { op: "tag"; tag: string }
+  | { op: "parent"; parentId: number | null }
+  | { op: "delete" };
+
+/** Applique une action à plusieurs éléments ; renvoie le nombre d'éléments modifiés. */
+export function bulkUpdateAssets(ids: number[], action: BulkOp): number {
+  if (action.op === "parent" && action.parentId !== null) {
+    if (ids.includes(action.parentId) || descendantsOf(ids).has(action.parentId))
+      throw new AssetError("parent_id", "Un élément ne peut pas être déplacé sous lui-même ou sous un de ses invités");
+  }
+  return transaction(() => {
+    let n = 0;
+    for (const id of ids) {
+      const a = get<{ display_name: string; tags: string; status: string; parent_id: number | null }>(
+        "SELECT display_name, tags, status, parent_id FROM assets WHERE id = ?",
+        [id],
+      );
+      if (!a) continue;
+      if (action.op === "delete") {
+        run("DELETE FROM assets WHERE id = ?", [id]);
+        logActivity("asset", id, "delete", `Suppression de « ${a.display_name} »`);
+      } else if (action.op === "status") {
+        if (a.status === action.status) continue;
+        run("UPDATE assets SET status = ?, status_source = '', updated_at = datetime('now') WHERE id = ?", [action.status, id]);
+        logActivity("asset", id, "update", `Modification de « ${a.display_name} » : état`);
+      } else if (action.op === "tag") {
+        const tags = parseJson<string[]>(a.tags, []);
+        if (tags.includes(action.tag)) continue;
+        run("UPDATE assets SET tags = ?, updated_at = datetime('now') WHERE id = ?", [JSON.stringify([...tags, action.tag]), id]);
+        logActivity("asset", id, "update", `Modification de « ${a.display_name} » : tags`);
+      } else {
+        if (a.parent_id === action.parentId) continue;
+        run("UPDATE assets SET parent_id = ?, updated_at = datetime('now') WHERE id = ?", [action.parentId, id]);
+        logActivity("asset", id, "update", `Modification de « ${a.display_name} » : hôte`);
+      }
+      n++;
+    }
+    return n;
+  });
 }
 
 export function deleteAsset(id: number) {
@@ -330,56 +448,4 @@ export function duplicateAsset(id: number): number | null {
     logActivity("asset", lastId, "create", `Duplication de « ${a.display_name} »`);
     return lastId;
   });
-}
-
-/** Importe / met à jour un invité Proxmox dans l'inventaire. Retourne true si créé. */
-export function upsertProxmoxGuest(g: {
-  integrationId: number;
-  node: string;
-  vmid: number;
-  kind: "vm" | "lxc";
-  name: string;
-  running: boolean;
-  cores: number | null;
-  ramGb: number | null;
-  diskGb: number | null;
-  tags: string[];
-  parentId: number | null;
-}): boolean {
-  const existing = get<{ id: number }>(
-    "SELECT id FROM assets WHERE proxmox_integration_id = ? AND proxmox_vmid = ?",
-    [g.integrationId, g.vmid],
-  );
-  const status = g.running ? "online" : "offline";
-  if (existing) {
-    run(
-      `UPDATE assets SET proxmox_node = ?, status = CASE WHEN status IN ('maintenance','decommissioned') THEN status ELSE ? END,
-         cpu_cores = COALESCE(?, cpu_cores), ram_gb = COALESCE(?, ram_gb),
-         parent_id = COALESCE(parent_id, ?), updated_at = datetime('now') WHERE id = ?`,
-      [g.node, status, g.cores, g.ramGb, g.parentId, existing.id],
-    );
-    return false;
-  }
-  const disks = g.diskGb ? [{ name: "rootfs", type: "virtual", capacity_gb: g.diskGb, usage: "" }] : [];
-  const { lastId } = run(
-    `INSERT INTO assets (kind, display_name, hostname, status, tags, parent_id, cpu_cores, ram_gb, disks,
-       proxmox_integration_id, proxmox_node, proxmox_vmid)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      g.kind,
-      g.name,
-      g.name.toLowerCase().replace(/[^a-z0-9.-]/g, "-"),
-      status,
-      JSON.stringify(g.tags),
-      g.parentId,
-      g.cores,
-      g.ramGb,
-      JSON.stringify(disks),
-      g.integrationId,
-      g.node,
-      g.vmid,
-    ],
-  );
-  logActivity("asset", lastId, "create", `Import Proxmox de « ${g.name} » (${g.vmid})`);
-  return true;
 }

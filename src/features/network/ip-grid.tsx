@@ -20,8 +20,8 @@ const CELL_STYLE: Record<GridCell["status"], { bg: string; text?: string; label:
   gateway: { bg: TONE_VAR.purple, text: "var(--mm-on-accent)", label: "Passerelle" },
   network: { bg: "var(--mm-border)", label: "Réseau" },
   broadcast: { bg: "var(--mm-border)", label: "Broadcast" },
-  "dhcp-range": { bg: "color-mix(in srgb, var(--mm-blue) 22%, var(--mm-bg-elevated))", label: "Plage DHCP" },
-  free: { bg: "var(--mm-bg-elevated)", label: "Libre" },
+  "dhcp-range": { bg: "color-mix(in srgb, var(--mm-blue) 22%, var(--mm-overlay))", label: "Plage DHCP" },
+  free: { bg: "var(--mm-overlay)", label: "Libre" },
 };
 
 /** Grille d'occupation d'un sous-réseau ; cliquer une case libre l'attribue. */

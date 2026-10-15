@@ -30,13 +30,14 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0e1519" },
-    { media: "(prefers-color-scheme: light)", color: "#f2f6f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f131a" },
+    { media: "(prefers-color-scheme: light)", color: "#d8dde5" },
   ],
 };
 
-// Applique le thème et le style mémorisés avant le premier rendu (évite le flash).
-const themeScript = `try{var d=document.documentElement,t=localStorage.getItem("hm-theme");if(t==="dark"||t==="light")d.dataset.theme=t;if(localStorage.getItem("hm-style")==="mint")d.dataset.style="mint"}catch(e){}`;
+// Applique le thème et la barre latérale mémorisés avant le premier rendu (évite le flash).
+// Sidebar : préférence mémorisée, sinon rail sur tablette (640–1023 px) comme la charte.
+const themeScript = `try{var d=document.documentElement,t=localStorage.getItem("hm-theme");if(t==="dark"||t==="light")d.dataset.theme=t;var s=localStorage.getItem("hm-sidebar");if(s?s==="rail"||s==="collapsed":innerWidth>=640&&innerWidth<1024)d.dataset.sidebar="rail"}catch(e){}`;
 
 export default async function RootLayout({ children }: LayoutProps<"/[lang]">) {
   const locale = await getLocale();
@@ -49,7 +50,7 @@ export default async function RootLayout({ children }: LayoutProps<"/[lang]">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="flex min-h-dvh flex-col">
+      <body className="mm-root flex min-h-dvh flex-col">
         <I18nProvider locale={locale}>{children}</I18nProvider>
         <PwaRegister />
       </body>

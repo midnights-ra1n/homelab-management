@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { ExternalLink, Settings } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { listIntegrations } from "@/lib/data/integrations";
-import { fetchBeszel, fetchHlm, fetchMaintenant, fetchPatchmon, fetchProxmox, machineKeys, type Source } from "@/lib/integrations";
-import { pctOf, type HlmStatus } from "@/lib/integrations/hlm";
+import { fetchBeszel, fetchMaintenant, type Source } from "@/lib/integrations";
 import { INTEGRATION_META, type IntegrationType } from "@/lib/constants";
 import { Alert } from "@/components/ui/alert";
 import { Badge, Tag } from "@/components/ui/badge";
@@ -15,7 +13,7 @@ import { Meter } from "@/components/ui/meter";
 import { PageHeader, SectionTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, daysUntil, formatDateTime, formatUptime } from "@/lib/utils";
-import { UptimeSection } from "@/features/monitoring/uptime-section";
+import { HlmOverview, StatusHero, UpdatesSummary } from "@/features/monitoring/overview";
 import { getT } from "@/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,7 +27,7 @@ export default async function MonitoringPage() {
     <>
       <PageHeader
         title={tr("Supervision centralisée")}
-        description={tr("Disponibilité et temps de réponse de tes services, puis Homelab Monitoring, Beszel, Maintenant et PatchMon réunis sur une seule page.")}
+        description={tr("Résumé de Homelab Monitoring, Beszel, Maintenant et PatchMon sur une seule page ; le détail des sondes reste dans le hub.")}
         actions={
           <ButtonLink href="/parametres#integrations" variant="secondary" icon={<Settings size={16} />}>
             {tr("Intégrations")}</ButtonLink>
@@ -49,19 +47,26 @@ async function Sections() {
   const any = configured("hlm") || configured("beszel") || configured("maintenant") || configured("patchmon");
   return (
     <div className="grid grid-cols-1 gap-12 xl:gap-16">
-      <UptimeSection />
+      <Suspense fallback={<Skeleton className="h-28 rounded-xl" />}>
+        <StatusHero />
+      </Suspense>
       {!any && (
         <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-dashed border-line px-5 py-5 sm:flex-row sm:items-center sm:px-6">
           <p className="text-sm text-body">
-            {tr("Connecte ")}<span className="text-h1">{tr("Beszel")}</span>, <span className="text-h1">{tr("Maintenant")}</span> {tr("ou")}{" "}
-            <span className="text-h1">{tr("PatchMon")}</span> {tr("pour ajouter ressources système, conteneurs, certificats et mises à jour.")}</p>
+            {tr("Connecte ")}<span className="text-h1">Homelab Monitoring</span>, <span className="text-h1">{tr("Beszel")}</span>, <span className="text-h1">{tr("Maintenant")}</span> {tr("ou")}{" "}
+            <span className="text-h1">{tr("PatchMon")}</span> {tr("pour suivre sondes, ressources système, conteneurs, certificats et mises à jour.")}</p>
           <ButtonLink href="/parametres#integrations" variant="secondary" size="sm" icon={<Settings size={14} />}>
             {tr("Intégrations")}</ButtonLink>
         </div>
       )}
       {configured("hlm") && (
         <Suspense fallback={<SectionSkeleton title="Homelab Monitoring" />}>
-          <HlmSection />
+          <HlmOverview />
+        </Suspense>
+      )}
+      {(configured("hlm") || configured("patchmon")) && (
+        <Suspense fallback={<SectionSkeleton title={tr("Mises à jour")} />}>
+          <UpdatesSummary />
         </Suspense>
       )}
       {configured("beszel") && (
@@ -72,11 +77,6 @@ async function Sections() {
       {configured("maintenant") && (
         <Suspense fallback={<SectionSkeleton title={tr("Maintenant")} />}>
           <MaintenantSection />
-        </Suspense>
-      )}
-      {configured("patchmon") && (
-        <Suspense fallback={<SectionSkeleton title="PatchMon" />}>
-          <PatchmonSection />
         </Suspense>
       )}
     </div>
@@ -121,127 +121,6 @@ async function SourceHeader<T>({ type, sources, children }: { type: IntegrationT
           </Alert>
         ))}
     </>
-  );
-}
-
-/* Homelab Monitoring ------------------------------------------------------ */
-
-const HLM_STATUS: Record<HlmStatus, { label: string; tone: "green" | "blue" | "yellow" | "orange" | "red" | "muted" }> = {
-  operational: { label: "Opérationnel", tone: "green" },
-  maintenance: { label: "Maintenance", tone: "blue" },
-  degraded: { label: "Dégradé", tone: "yellow" },
-  minor_outage: { label: "Panne partielle", tone: "orange" },
-  major_outage: { label: "Panne majeure", tone: "red" },
-  unknown: { label: "Inconnu", tone: "muted" },
-};
-
-const unix = (s: number | null | undefined) => (s ? new Date(s * 1000).toISOString() : null);
-
-async function HlmSection() {
-  const tr = await getT();
-  const [sources, pve] = await Promise.all([fetchHlm(), fetchProxmox()]);
-  // Un hôte Proxmox remonte à la fois par l'agent et par l'API Proxmox : on le relie au nœud au lieu de le doubler.
-  const nodes = new Map<string, string>();
-  for (const p of pve) for (const n of p.data?.nodes ?? []) if (n.node) nodes.set(n.node.toLowerCase(), `/proxmox/${p.id}/${encodeURIComponent(n.node)}`);
-  const hosts = sources
-    .flatMap((s) => (s.data?.hosts ?? []).map((h) => ({ ...h, key: `${s.id}:${h.id}` })))
-    .sort((a, b) => Number(a.status === "operational") - Number(b.status === "operational") || a.name.localeCompare(b.name));
-  const monitors = sources.flatMap((s) => (s.data?.monitors ?? []).map((m) => ({ ...m, key: `${s.id}:${m.id}` })));
-  const up = hosts.filter((h) => h.status === "operational").length;
-  return (
-    <section aria-label="Homelab Monitoring" className="grid grid-cols-1 gap-6">
-      <div>
-        <SourceHeader type="hlm" sources={sources}>
-          · {up}/{hosts.length} {tr("opérationnel(s)")}</SourceHeader>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {hosts.map((h) => {
-            const st = HLM_STATUS[h.status] ?? HLM_STATUS.unknown;
-            const node = machineKeys(h.name, h.info?.hostname).map((k) => nodes.get(k)).find(Boolean);
-            const fresh = h.last_seen > 0 && h.status !== "major_outage";
-            return (
-              <Card key={h.key} className={cn("p-5", st.tone === "red" && "border-[color-mix(in_srgb,var(--mm-red)_40%,transparent)]")}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-h1">{h.name}</p>
-                    <p className="truncate font-mono text-xs text-meta">{h.info?.os || h.info?.hostname || "—"}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                    {node && (
-                      <Link href={node} title={tr("Même machine que le nœud Proxmox")}>
-                        <Badge tone="orange">Proxmox</Badge>
-                      </Link>
-                    )}
-                    <Badge tone={st.tone} dot>
-                      {tr(st.label)}
-                    </Badge>
-                  </div>
-                </div>
-                {fresh && h.latest ? (
-                  <div className="mt-5 grid gap-3">
-                    <Meter label="CPU" value={h.latest.cpu} />
-                    <Meter label={tr("Mémoire")} value={pctOf(h.latest.mem_used, h.latest.mem_total)} />
-                    <Meter label={tr("Disque")} value={pctOf(h.latest.disk_used, h.latest.disk_total)} />
-                  </div>
-                ) : (
-                  <p className="mt-5 text-sm text-meta">{tr("Aucune donnée récente de l'agent.")}</p>
-                )}
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-meta">
-                  {h.info?.boot_time && h.last_seen ? <span>⏱ {formatUptime(h.last_seen - h.info.boot_time, tr.locale)}</span> : null}
-                  {h.latest?.temp != null && <span className={cn(h.latest.temp > 80 && "text-red")}>{Math.round(h.latest.temp)} °C</span>}
-                  {h.updates && (
-                    <span className={cn(h.updates.security > 0 && "text-red")}>
-                      {tr("{pending} MàJ · {security} sécu.", { pending: h.updates.pending, security: h.updates.security })}
-                    </span>
-                  )}
-                  {h.updates?.reboot_required && <span className="text-yellow">{tr("Redémarrage")}</span>}
-                  <span title={formatDateTime(unix(h.last_seen), tr.locale)}>{h.connected ? tr("connecté") : tr("vu {date}", { date: formatDateTime(unix(h.last_seen), tr.locale) })}</span>
-                </div>
-              </Card>
-            );
-          })}
-          {hosts.length === 0 && sources.every((s) => s.ok) && <p className="text-sm text-meta">{tr("Aucun hôte équipé de l'agent.")}</p>}
-        </div>
-      </div>
-      {monitors.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-line-subtle bg-box">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[40rem] text-left text-sm">
-              <thead>
-                <tr className="border-b border-line-subtle font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
-                  <th className="px-5 py-3 font-medium">{tr("Sonde")}</th>
-                  <th className="px-3 py-3 font-medium">{tr("État")}</th>
-                  <th className="px-3 py-3 text-right font-medium">{tr("Latence")}</th>
-                  <th className="px-5 py-3 font-medium">{tr("Dernière vérification")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monitors.map((m) => {
-                  const st = HLM_STATUS[m.status] ?? HLM_STATUS.unknown;
-                  return (
-                    <tr key={m.key} className="border-b border-line-subtle last:border-0">
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-h1">{m.name}</p>
-                        <p className="truncate font-mono text-xs text-meta">
-                          {m.type} · {m.target}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Badge tone={m.enabled ? st.tone : "muted"} dot>
-                          {m.enabled ? tr(st.label) : tr("Désactivée")}
-                        </Badge>
-                        {m.message && <p className="mt-1 text-xs text-meta">{m.message}</p>}
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono text-h2">{m.latency_ms != null ? `${Math.round(m.latency_ms)} ms` : "—"}</td>
-                      <td className="px-5 py-3 font-mono text-xs text-meta">{formatDateTime(m.last_check ? new Date(m.last_check).toISOString() : null, tr.locale)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -412,74 +291,6 @@ async function MaintenantSection() {
               </ul>
             </Card>
           )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* PatchMon ---------------------------------------------------------------- */
-
-async function PatchmonSection() {
-  const tr = await getT();
-  const sources = await fetchPatchmon();
-  const hosts = sources
-    .flatMap((s) => s.data ?? [])
-    .sort((a, b) => b.securityUpdates - a.securityUpdates || b.updates - a.updates);
-  const total = hosts.reduce((n, h) => n + h.updates, 0);
-  const security = hosts.reduce((n, h) => n + h.securityUpdates, 0);
-  return (
-    <section aria-label="PatchMon">
-      <SourceHeader type="patchmon" sources={sources}>
-        · {total} {tr("mise(s) à jour · ")}{security} {tr("sécurité")}</SourceHeader>
-      <div className="overflow-hidden rounded-2xl border border-line-subtle bg-box">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[48rem] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line-subtle font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
-                <th className="px-5 py-3 font-medium">{tr("Hôte")}</th>
-                <th className="px-3 py-3 font-medium">{tr("Système")}</th>
-                <th className="px-3 py-3 text-right font-medium">{tr("Mises à jour")}</th>
-                <th className="px-3 py-3 text-right font-medium">{tr("Sécurité")}</th>
-                <th className="px-3 py-3 font-medium">{tr("État")}</th>
-                <th className="px-5 py-3 font-medium">{tr("Dernier rapport")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hosts.map((h) => (
-                <tr key={h.id} className="border-b border-line-subtle last:border-0">
-                  <td className="px-5 py-3">
-                    <p className="font-medium text-h1">{h.friendlyName}</p>
-                    <p className="font-mono text-xs text-meta">
-                      {h.hostname} · {h.ip}
-                    </p>
-                  </td>
-                  <td className="px-3 py-3 text-body">
-                    {h.osType} {h.osVersion}
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono text-h2">{h.updates}</td>
-                  <td className={cn("px-3 py-3 text-right font-mono", h.securityUpdates ? "font-semibold text-red" : "text-h2")}>
-                    {h.securityUpdates}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge tone={h.status === "active" || h.status === "up" ? "green" : h.status === "pending" ? "yellow" : "muted"}>
-                        {h.status}
-                      </Badge>
-                      {h.needsReboot && <Badge tone="yellow">{tr("Redémarrage")}</Badge>}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 font-mono text-xs text-meta">{formatDateTime(h.lastUpdate, tr.locale)}</td>
-                </tr>
-              ))}
-              {hosts.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-sm text-meta">
-                    {tr("Aucun hôte.")}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     </section>

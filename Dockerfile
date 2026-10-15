@@ -28,8 +28,9 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     DATA_DIR=/data \
     TZ=Europe/Paris
-# tini : PID 1 qui relaie les signaux (arrêt propre du CT Proxmox) ; su-exec : abandon des droits root.
-RUN apk add --no-cache tzdata tini su-exec \
+# tini : PID 1 qui relaie les signaux (arrêt propre du CT Proxmox) ; su-exec : abandon des droits root ;
+# iputils-ping : état de l'inventaire par ping (sockets ICMP sans privilège pour l'utilisateur 1001).
+RUN apk add --no-cache tzdata tini su-exec iputils-ping \
  && addgroup -S app -g 1001 && adduser -S app -u 1001 -G app \
  && mkdir -p /data && chown app:app /data
 COPY --from=build --chown=app:app /app/.next/standalone ./

@@ -1,5 +1,5 @@
 import { Box, Container, Cpu, HardDrive, Monitor, Router, Server, type LucideProps } from "lucide-react";
-import { ASSET_KIND_META, TONE_VAR, type AssetKind } from "@/lib/constants";
+import { ASSET_KIND_META, TONE_TEXT_VAR, TONE_VAR, type AssetKind } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<AssetKind, React.ComponentType<LucideProps>> = {
@@ -24,7 +24,7 @@ export function KindAvatar({ kind, size = "md" }: { kind: AssetKind; size?: "sm"
     <span
       className={cn("flex shrink-0 items-center justify-center border", dim)}
       style={{
-        color: tone,
+        color: TONE_TEXT_VAR[ASSET_KIND_META[kind]?.tone ?? "muted"],
         background: `color-mix(in srgb, ${tone} 12%, transparent)`,
         borderColor: `color-mix(in srgb, ${tone} 30%, transparent)`,
       }}

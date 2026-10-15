@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Copy, ExternalLink, Pencil, Plus, SquareTerminal, Star } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { assetOptions, childrenOf, getAsset, type Asset } from "@/lib/data/assets";
+import { ancestorsOf, assetOptions, childrenOf, getAsset, type Asset } from "@/lib/data/assets";
+import { activityFor } from "@/lib/data/activity";
 import { ipsForAsset, subnetOptions } from "@/lib/data/network";
 import { listDeployments } from "@/lib/data/deployments";
 import { listTasks } from "@/lib/data/tasks";
@@ -32,7 +33,7 @@ import { Meter } from "@/components/ui/meter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KindAvatar } from "@/components/kind-icon";
 import { IpDialog } from "@/features/network/dialogs";
-import { resourceSummary } from "@/features/inventory/asset-table";
+import { resourceSummary } from "@/features/inventory/summary";
 import { cn, formatDate, formatDateTime, formatGb, formatUptime, timeAgo } from "@/lib/utils";
 import { getT } from "@/i18n/server";
 
@@ -78,13 +79,28 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
   const isPhysical = asset.kind === "physical" || asset.kind === "network" || asset.kind === "other";
 
   return (
-    <div className="grid grid-cols-1 gap-8 xl:gap-10">
+    <div className="grid grid-cols-1 gap-6">
+      {/* Fil d'Ariane : Inventaire / hôtes successifs / élément */}
+      <nav aria-label={tr("Fil d'Ariane")}>
+        <ol className="mm-crumbs">
+          <li>
+            <Link href="/inventaire">{tr("Inventaire")}</Link>
+          </li>
+          {ancestorsOf(id).map((a) => (
+            <li key={a.id}>
+              <Link href={`/inventaire/${a.id}`}>{a.display_name}</Link>
+            </li>
+          ))}
+          <li aria-current="page">{asset.display_name}</li>
+        </ol>
+      </nav>
+
       {/* En-tête */}
-      <header className="rise flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+      <header className="-mt-2 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div className="flex items-start gap-5">
           <KindAvatar kind={asset.kind} size="lg" />
           <div className="min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight text-h1 sm:text-4xl">{asset.display_name}</h1>
+            <h1 className="mm-h1">{asset.display_name}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {asset.hostname && <span className="font-mono text-sm text-body">{asset.hostname}</span>}
               <Link href={`/inventaire?kind=${asset.kind}`}>
@@ -118,17 +134,23 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
           <ButtonLink href={`/inventaire/${id}/modifier`} icon={<Pencil size={15} />}>
             {tr("Modifier")}</ButtonLink>
           <form action={duplicateAssetAction.bind(null, id)}>
-            <Button type="submit" variant="subtle" size="icon" aria-label={tr("Dupliquer")} title={tr("Dupliquer")} icon={<Copy size={16} />} />
+            <Button type="submit" variant="secondary" icon={<Copy size={15} />}>
+              {tr("Dupliquer")}
+            </Button>
           </form>
           <ConfirmButton
             action={deleteAssetAction.bind(null, id)}
-            size="icon"
+            variant="danger-ghost"
+            size="md"
+            icon={null}
             message={
               <>
                 {tr("Supprimer ")}<strong className="text-h1">{asset.display_name}</strong> {tr("? Ses adresses IP seront libérées")}{children.length > 0 && tr(" et {length} élément(s) hébergé(s) seront détachés", { length: children.length })}.
               </>
             }
-          />
+          >
+            {tr("Supprimer")}
+          </ConfirmButton>
         </div>
       </header>
 
@@ -409,6 +431,8 @@ async function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[
               </dl>
             </CardBody>
           </Card>
+
+          <History id={id} />
         </div>
       </div>
     </div>
@@ -485,3 +509,45 @@ async function LiveMonitoring({ asset }: { asset: Asset }) {
     </Card>
   );
 }
+
+/** Historique de l'élément : quoi (champs modifiés), quand. */
+async function History({ id }: { id: number }) {
+  const tr = await getT();
+  const events = activityFor("asset", id);
+  if (!events.length) return null;
+  return (
+    <Card>
+      <CardHeader overline={tr("Historique")} title={tr("{n} changement(s)", { n: events.length })} />
+      <CardBody>
+        <ol className="grid gap-3 border-l border-line pl-4">
+          {events.map((e) => (
+            <li key={e.id} className="relative">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute -left-[21px] top-1.5 size-2 rounded-full",
+                  e.action === "create" ? "bg-[var(--mm-success-solid)]" : e.action === "delete" ? "bg-[var(--mm-danger-solid)]" : "bg-line-strong",
+                )}
+              />
+              <p className="text-sm text-h2">{tr(historyText(e.summary), { detail: historyDetail(e.summary, tr) })}</p>
+              <p className="text-xs text-meta" title={formatDateTime(e.created_at, tr.locale)}>
+                {timeAgo(e.created_at, tr.locale)}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </CardBody>
+    </Card>
+  );
+}
+
+/** « Modification de « X » : état, tags » → texte court sans le nom (déjà en titre de page). */
+function historyText(summary: string) {
+  if (summary.startsWith("Modification")) return summary.includes(" : ") ? "Modifié : {detail}" : "Modifié";
+  if (summary.startsWith("Import Proxmox")) return "Importé depuis Proxmox";
+  if (summary.startsWith("Duplication")) return "Créé par duplication";
+  if (summary.startsWith("Ajout")) return "Ajouté à l'inventaire";
+  return summary;
+}
+const historyDetail = (summary: string, tr: (s: string) => string) =>
+  summary.split(" : ").slice(1).join(" : ").split(", ").map(tr).join(", ");

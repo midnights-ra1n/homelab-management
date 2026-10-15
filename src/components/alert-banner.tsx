@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { TONE_VAR } from "@/lib/constants";
 import type { MonitorAlert } from "@/lib/monitor/alerts";
 import { usePathname, useT } from "@/i18n/client";
+import { StatusIcon } from "./status-icon";
 import { ButtonLink } from "@/components/ui/button";
 
 const POLL_MS = 30_000;
@@ -66,14 +67,14 @@ export function AlertBanner({ initial }: { initial: MonitorAlert[] }) {
   return (
     <section
       role={critical ? "alert" : "status"}
-      className="rise rounded-2xl border p-5 sm:p-6"
+      className="rounded-2xl border p-5 sm:p-6"
       style={{
-        background: `color-mix(in srgb, ${color} 12%, var(--mm-bg-box))`,
+        background: `color-mix(in srgb, ${color} 12%, var(--mm-surface))`,
         borderColor: `color-mix(in srgb, ${color} 50%, var(--mm-border))`,
       }}
     >
       <div className="flex flex-wrap items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: color, color: "var(--mm-bg-box)" }}>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: color, color: "var(--mm-surface)" }}>
           <AlertTriangle size={20} aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
@@ -92,7 +93,7 @@ export function AlertBanner({ initial }: { initial: MonitorAlert[] }) {
         {alerts.slice(0, 6).map((a, i) => (
           <li key={i}>
             <Link href={a.href} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-page">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[a.tone] }} aria-hidden="true" />
+              <StatusIcon kind={a.tone === "red" ? "down" : "warn"} size={15} />
               <span className="truncate text-h1">{a.text}</span>
             </Link>
           </li>
@@ -107,15 +108,16 @@ export function AlertStrip() {
   const tr = useT();
   const pathname = usePathname();
   const alerts = useAlerts(null);
-  if (!alerts.length || pathname === "/") return null;
+  // Accueil et Monitoring ont leur propre bandeau d'alertes.
+  if (!alerts.length || pathname === "/" || pathname === "/monitoring") return null;
   const { critical, color, title } = summary(alerts, tr);
   return (
     <Link
       href="/monitoring"
       role={critical ? "alert" : "status"}
-      className="rise mb-6 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition-colors hover:brightness-110"
+      className="mb-6 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition-colors hover:brightness-110"
       style={{
-        background: `color-mix(in srgb, ${color} 8%, var(--mm-bg-box))`,
+        background: `color-mix(in srgb, ${color} 8%, var(--mm-surface))`,
         borderColor: `color-mix(in srgb, ${color} 35%, var(--mm-border))`,
       }}
     >

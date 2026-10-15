@@ -28,15 +28,23 @@ export type HlmHost = {
 export type HlmMonitor = {
   id: number;
   name: string;
-  type: string;
+  type: "http" | "tcp" | "dns" | "ssl" | string;
   target: string;
+  interval_s: number;
+  config?: { method?: string; expected_status?: string; keyword?: string; record_type?: string; dns_server?: string; expected?: string; check_ssl?: boolean } | null;
   enabled: boolean;
+  maintenance: boolean;
   status: HlmStatus;
   message: string;
   latency_ms: number | null;
   last_check: number; // millisecondes
   cert_expires_at: number | null; // secondes
+  days?: { day: number; uptime: number | null; worst: HlmStatus }[]; // 90 jours, minuit UTC, uptime 0–1
 };
+
+/** Libellé court du type de sonde (HTTPS distingué de HTTP par la cible). */
+export const probeKind = (m: Pick<HlmMonitor, "type" | "target">) =>
+  m.type === "http" && /^https:/i.test(m.target) ? "HTTPS" : m.type.toUpperCase();
 
 export type HlmData = { hosts: HlmHost[]; monitors: HlmMonitor[] };
 

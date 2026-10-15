@@ -1,13 +1,14 @@
 "use client";
 
-import { Plus, Sparkles, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { saveAssetAction } from "@/actions/inventory";
-import { nextFreeIpAction } from "@/actions/network";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { ActionForm, Field, Fieldset, FORM_ACTIONS_CLASS, inputClass, SelectField, SubmitButton, TextAreaField, TextField } from "@/components/ui/form";
+import { ActionForm, Fieldset, FORM_ACTIONS_CLASS, inputClass, SelectField, SubmitButton, TextAreaField, TextField } from "@/components/ui/form";
 import { KindIcon } from "@/components/kind-icon";
-import { IpHint } from "@/features/network/ip-hint";
+import { macError, NetworkFields, useNetworkState, type SubnetOption } from "./network-fields";
+import { SectionNav } from "./section-nav";
+import { TagInput } from "./tag-input";
 import {
   ASSET_KINDS,
   ASSET_KIND_META,
@@ -22,8 +23,6 @@ import type { Asset, AssetOption, Disk, Nic } from "@/lib/data/assets";
 import { cn, formatGb } from "@/lib/utils";
 import { useT } from "@/i18n/client";
 
-type SubnetOption = { id: number; name: string; cidr: string; vlan_number: number | null };
-
 export function AssetForm({
   asset,
   defaultKind = "physical",
@@ -31,6 +30,7 @@ export function AssetForm({
   parents,
   subnets,
   proxmox,
+  tags,
 }: {
   asset?: Asset;
   defaultKind?: AssetKind;
@@ -38,14 +38,20 @@ export function AssetForm({
   parents: AssetOption[];
   subnets: SubnetOption[];
   proxmox: { id: number; name: string }[];
+  tags: string[];
 }) {
   const tr = useT();
   const [kind, setKind] = useState<AssetKind>(asset?.kind ?? defaultKind);
   const [disks, setDisks] = useState<Disk[]>(asset?.disks ?? []);
   const [nics, setNics] = useState<Nic[]>(asset?.nics ?? []);
-  const [subnetId, setSubnetId] = useState<string>(asset?.subnet_id ? String(asset.subnet_id) : "");
-  const [ip, setIp] = useState(asset?.primary_ip ?? "");
-  const [suggesting, startSuggest] = useTransition();
+  const [mac, setMac] = useState(asset?.primary_mac ?? "");
+  // Nouvel élément créé depuis un hôte (« Ajouter » sur sa fiche) : on reprend son sous-réseau.
+  const initialHost = !asset && defaultParent ? parents.find((p) => p.id === defaultParent) : undefined;
+  const net = useNetworkState({ subnetId: asset?.subnet_id ?? initialHost?.subnet_id, ip: asset?.primary_ip });
+  useEffect(() => {
+    if (initialHost?.subnet_id) net.suggest(initialHost.subnet_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une seule proposition, au montage
+  }, []);
 
   const isPhysical = kind === "physical" || kind === "network" || kind === "other";
   const isGuest = kind === "vm" || kind === "lxc";
@@ -54,10 +60,24 @@ export function AssetForm({
 
   const action = saveAssetAction.bind(null, asset?.id ?? null);
 
+  const sections = [
+    { id: "type", label: tr("Type") },
+    { id: "identite", label: tr("Identité") },
+    { id: "reseau", label: tr("Réseau") },
+    { id: "systeme", label: tr("Système") },
+    isPhysical && { id: "materiel", label: tr("Matériel") },
+    !isDocker && { id: "ressources", label: tr("Ressources") },
+    isGuest && { id: "proxmox", label: "Proxmox" },
+    isDocker && { id: "docker", label: "Docker" },
+    { id: "notes", label: tr("Notes") },
+  ].filter(Boolean) as { id: string; label: string }[];
+
   return (
-    <ActionForm action={action} className="grid grid-cols-1 gap-6">
+    <div className="grid gap-6 lg:grid-cols-[11rem_minmax(0,1fr)]">
+    <SectionNav sections={sections} />
+    <ActionForm action={action} className="grid min-w-0 grid-cols-1 gap-6">
       {/* Type d'élément */}
-      <Fieldset legend={tr("Type")} description={tr("Le type détermine les sections affichées ci-dessous.")}>
+      <Fieldset id="type" legend={tr("Type")} description={tr("Le type détermine les sections affichées ci-dessous.")}>
         <input type="hidden" name="kind" value={kind} />
         <div role="radiogroup" aria-label={tr("Type d'élément")} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {ASSET_KINDS.map((k) => (
@@ -82,7 +102,7 @@ export function AssetForm({
       </Fieldset>
 
       {/* Identité */}
-      <Fieldset legend={tr("Identité")} description={tr("Nom affiché dans Homelab Management et nom d'hôte réel de la machine.")}>
+      <Fieldset id="identite" legend={tr("Identité")} description={tr("Nom affiché dans Homelab Management et nom d'hôte réel de la machine.")}>
         <div className="grid gap-5 md:grid-cols-2">
           <TextField
             label={tr("Nom d'affichage")}
@@ -106,6 +126,7 @@ export function AssetForm({
             label={tr("État")}
             name="status"
             defaultValue={asset?.status ?? "online"}
+            hint={tr("Avec une IP, En ligne / Hors ligne suit le ping (chaque minute). Maintenance, Planifié et Retiré restent manuels.")}
             options={ASSET_STATUSES.map((s) => ({ value: s, label: tr(ASSET_STATUS_META[s].label) }))}
           />
           <TextField label={tr("Rôle")} name="role" defaultValue={asset?.role} placeholder={tr("Hyperviseur, NAS, reverse proxy…")} />
@@ -113,20 +134,14 @@ export function AssetForm({
             label={isDocker ? tr("Hôte Docker") : isGuest ? tr("Nœud hôte") : tr("Hébergé par / rattaché à")}
             name="parent_id"
             defaultValue={asset?.parent_id ?? defaultParent ?? ""}
+            onChange={(e) => net.fromHost(parents.find((p) => String(p.id) === e.target.value))}
             placeholder={tr("— Aucun —")}
             options={parents
               .filter((p) => p.id !== asset?.id)
               .map((p) => ({ value: p.id, label: `${p.display_name} · ${tr(ASSET_KIND_META[p.kind].label)}` }))}
           />
           <TextField label={tr("Emplacement")} name="location" defaultValue={asset?.location} placeholder={tr("Baie 1 · U3, bureau…")} />
-          <TextField
-            label={tr("Tags")}
-            name="tags"
-            defaultValue={asset?.tags.join(", ")}
-            placeholder="prod, dns, critique"
-            hint={tr("Séparés par des virgules")}
-            className="md:col-span-2"
-          />
+          <TagInput label={tr("Tags")} name="tags" defaultValue={asset?.tags} suggestions={tags} className="md:col-span-2" />
           <TextAreaField
             label={tr("Description")}
             name="description"
@@ -138,58 +153,16 @@ export function AssetForm({
       </Fieldset>
 
       {/* Réseau */}
-      <Fieldset legend={tr("Réseau")} description={tr("Adresse principale, enregistrée automatiquement dans l'IPAM.")}>
+      <Fieldset id="reseau" legend={tr("Réseau")} description={tr("Adresse principale, enregistrée automatiquement dans l'IPAM.")}>
         <div className="grid gap-5 md:grid-cols-3">
-          <Field label={tr("Sous-réseau")} name="primary_subnet_id">
-            {(p) => (
-              <select {...p} className={inputClass} value={subnetId} onChange={(e) => setSubnetId(e.target.value)}>
-                <option value="">{tr("— Détection automatique —")}</option>
-                {subnets.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} · {s.cidr}
-                    {s.vlan_number ? ` · VLAN ${s.vlan_number}` : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field label={tr("Adresse IP")} name="primary_ip">
-            {(p) => (
-              <>
-              <div className="flex gap-2">
-                <input
-                  {...p}
-                  className={cn(inputClass, "font-mono")}
-                  value={ip}
-                  onChange={(e) => setIp(e.target.value)}
-                  placeholder="192.168.10.20"
-                  inputMode="decimal"
-                />
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="shrink-0"
-                  disabled={!subnetId || suggesting}
-                  title={tr("Proposer la prochaine IP libre")}
-                  aria-label={tr("Proposer la prochaine IP libre")}
-                  onClick={() =>
-                    startSuggest(async () => {
-                      const next = await nextFreeIpAction(Number(subnetId));
-                      if (next) setIp(next);
-                    })
-                  }
-                  icon={<Sparkles size={16} />}
-                />
-              </div>
-              <IpHint address={ip} subnetId={subnetId ? Number(subnetId) : null} assetId={asset?.id ?? null} />
-              </>
-            )}
-          </Field>
+          <NetworkFields net={net} subnets={subnets} assetId={asset?.id} />
 
           <TextField
             label={tr("Adresse MAC")}
             name="primary_mac"
-            defaultValue={asset?.primary_mac ?? ""}
+            value={mac}
+            onChange={(e) => setMac(e.target.value)}
+            liveError={tr(macError(mac))}
             placeholder="aa:bb:cc:dd:ee:ff"
             className="font-mono"
             spellCheck={false}
@@ -206,7 +179,7 @@ export function AssetForm({
       </Fieldset>
 
       {/* Système */}
-      <Fieldset legend={tr("Système")}>
+      <Fieldset id="systeme" legend={tr("Système")}>
         <div className="grid gap-5 md:grid-cols-2">
           <TextField label={tr("Système d'exploitation")} name="os" defaultValue={asset?.os} placeholder={tr("Proxmox VE, Debian, TrueNAS…")} />
           <TextField label={tr("Version")} name="os_version" defaultValue={asset?.os_version} placeholder="9.0, 12 (bookworm)…" />
@@ -215,7 +188,7 @@ export function AssetForm({
 
       {/* Matériel physique */}
       <div hidden={!isPhysical}>
-        <Fieldset legend={tr("Configuration matérielle")} description={tr("Châssis, processeur, mémoire et consommation.")}>
+        <Fieldset id="materiel" legend={tr("Configuration matérielle")} description={tr("Châssis, processeur, mémoire et consommation.")}>
           <div className="grid gap-5 md:grid-cols-3">
             <TextField label={tr("Fabricant")} name="manufacturer" defaultValue={asset?.manufacturer} placeholder={tr("Dell, Lenovo, Minisforum…")} />
             <TextField label={tr("Modèle")} name="model" defaultValue={asset?.model} placeholder="OptiPlex 7060 Micro" />
@@ -245,6 +218,7 @@ export function AssetForm({
       {/* Ressources (tous sauf Docker) */}
       <div hidden={isDocker}>
         <Fieldset
+          id="ressources"
           legend={isGuest ? tr("Ressources allouées") : tr("Ressources")}
           description={isGuest ? tr("vCPU, mémoire et disques virtuels.") : tr("Cœurs, mémoire et stockage.")}
         >
@@ -358,6 +332,8 @@ export function AssetForm({
                     />
                     <input
                       aria-label={tr("Adresse MAC")}
+                      aria-invalid={macError(n.mac) ? true : undefined}
+                      title={tr(macError(n.mac)) || undefined}
                       className={cn(inputClass, "font-mono")}
                       placeholder="aa:bb:cc:dd:ee:ff"
                       value={n.mac}
@@ -390,7 +366,7 @@ export function AssetForm({
 
       {/* Proxmox */}
       <div hidden={!isGuest}>
-        <Fieldset legend={tr("Proxmox")} description={tr("Lien avec l'invité Proxmox (rempli automatiquement par la synchronisation).")}>
+        <Fieldset id="proxmox" legend={tr("Proxmox")} description={tr("Lien facultatif vers l'invité Proxmox, pour ouvrir sa console depuis l'inventaire.")}>
           <div className="grid gap-5 md:grid-cols-3">
             <SelectField
               label={tr("Intégration")}
@@ -407,7 +383,7 @@ export function AssetForm({
 
       {/* Docker */}
       <div hidden={!isDocker}>
-        <Fieldset legend={tr("Docker")}>
+        <Fieldset id="docker" legend={tr("Docker")}>
           <div className="grid gap-5 md:grid-cols-2">
             <TextField label={tr("Image")} name="docker_image" defaultValue={asset?.docker_image} placeholder="ghcr.io/home-assistant/home-assistant:stable" className="font-mono md:col-span-2" />
             <TextField label={tr("Ports exposés")} name="docker_ports" defaultValue={asset?.docker_ports} placeholder="8123:8123, 443:443" className="font-mono" />
@@ -416,7 +392,7 @@ export function AssetForm({
         </Fieldset>
       </div>
 
-      <Fieldset legend={tr("Notes")}>
+      <Fieldset id="notes" legend={tr("Notes")}>
         <TextAreaField label={tr("Notes libres")} name="notes" defaultValue={asset?.notes} rows={6} placeholder={tr("Procédures, identifiants de rangement, historique…")} />
       </Fieldset>
 
@@ -426,5 +402,6 @@ export function AssetForm({
         <SubmitButton>{asset ? tr("Enregistrer") : tr("Ajouter à l'inventaire")}</SubmitButton>
       </div>
     </ActionForm>
+    </div>
   );
 }

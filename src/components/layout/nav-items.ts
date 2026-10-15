@@ -29,17 +29,14 @@ export const NAV_ITEMS: NavItem[] = [
 
 const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
 
-/** Barre desktop : entrées directes et groupes ouverts en sous-menu. */
-export type NavGroup = { id: string; label: string; items: NavItem[] };
-export const NAV_DESKTOP: (NavItem | NavGroup)[] = [
-  byHref("/"),
-  byHref("/applications"),
-  { id: "infra", label: "Infrastructure", items: ["/inventaire", "/reseau", "/carte"].map(byHref) },
-  { id: "suivi", label: "Suivi", items: ["/deploiements", "/taches"].map(byHref) },
-  { id: "serveurs", label: "Serveurs", items: ["/proxmox", "/webmin"].map(byHref) },
-  byHref("/monitoring"),
+/** Sections de la barre latérale (label en capitales ; la première n'en a pas). */
+export type NavSection = { label?: string; items: NavItem[] };
+export const NAV_SECTIONS: NavSection[] = [
+  { items: ["/", "/applications", "/monitoring"].map(byHref) },
+  { label: "Infrastructure", items: ["/inventaire", "/reseau", "/carte"].map(byHref) },
+  { label: "Suivi", items: ["/deploiements", "/taches"].map(byHref) },
+  { label: "Serveurs", items: ["/proxmox", "/webmin"].map(byHref) },
 ];
-export const isGroup = (e: NavItem | NavGroup): e is NavGroup => "items" in e;
 
 /** Onglets principaux de la barre mobile (le reste est dans « Plus »). */
 export const MOBILE_TABS = ["/", "/applications", "/inventaire", "/deploiements"];

@@ -1,9 +1,9 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Carte : teinte surface, séparateur subtil, arrondi 2xl. */
+/** Carte de la charte (.mm-card) : surface, bordure 1 px, rayon 10, sans ombre. */
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-xl border border-line-subtle bg-box mint:rounded-2xl", className)} {...props} />;
+  return <div className={cn("mm-card", className)} {...props} />;
 }
 
 export function CardHeader({
@@ -18,10 +18,10 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-wrap items-start justify-between gap-4 px-6 pt-6 sm:px-8 sm:pt-8 mint:sm:px-7 mint:sm:pt-7", className)}>
+    <div className={cn("mm-card__head flex-wrap", className)}>
       <div className="min-w-0">
-        {overline && <p className="text-xs font-medium text-meta mint:font-mono mint:text-[0.7rem] mint:font-normal mint:uppercase mint:tracking-[0.18em]">{overline}</p>}
-        <h3 className={cn("truncate text-base font-semibold text-h1", !!overline && "mt-1")}>{title}</h3>
+        {overline && <p className="mm-label-caps">{overline}</p>}
+        <h3 className="mm-card__title truncate">{title}</h3>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
     </div>
@@ -29,10 +29,10 @@ export function CardHeader({
 }
 
 export function CardBody({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("p-6 sm:p-8 mint:p-5 mint:sm:p-7", className)} {...props} />;
+  return <div className={cn("mm-card__body", className)} {...props} />;
 }
 
-/** Surtitre mono majuscule (Palette · v1.0). */
+/** Label de section en capitales (.mm-label-caps). */
 export function Overline({ className, ...props }: ComponentProps<"p">) {
-  return <p className={cn("text-sm font-medium text-meta mint:font-mono mint:text-xs mint:font-normal mint:uppercase mint:tracking-[0.18em]", className)} {...props} />;
+  return <p className={cn("mm-label-caps", className)} {...props} />;
 }

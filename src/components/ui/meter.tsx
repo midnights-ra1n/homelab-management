@@ -28,13 +28,13 @@ export function Meter({
   return (
     <div className={cn("min-w-0", className)}>
       {(label || detail) && (
-        <div className="mb-1.5 flex items-baseline justify-between gap-2 text-xs">
+        <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[13px]">
           <span className="truncate text-body">{label}</span>
-          <span className="shrink-0 font-mono text-meta">{detail ?? (value == null ? "—" : `${Math.round(v)} %`)}</span>
+          <span className="shrink-0 text-meta tabular-nums">{detail ?? (value == null ? "—" : `${Math.round(v)} %`)}</span>
         </div>
       )}
       <div
-        className={cn("overflow-hidden rounded-full bg-elevated", size === "sm" ? "h-1.5" : "h-2")}
+        className={cn("overflow-hidden rounded-full bg-muted", size === "md" ? "h-2" : "h-1.5")}
         role="meter"
         aria-valuenow={Math.round(v)}
         aria-valuemin={0}
@@ -42,7 +42,7 @@ export function Meter({
         aria-label={label}
       >
         <div
-          className="h-full rounded-full transition-[width] duration-700 ease-[var(--ease-expo)]"
+          className="h-full rounded-full transition-[width] duration-[260ms] ease-[var(--ease-expo)]"
           style={{ width: `${v}%`, background: TONE_VAR[t] }}
         />
       </div>

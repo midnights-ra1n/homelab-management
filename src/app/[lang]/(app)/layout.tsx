@@ -1,8 +1,8 @@
 import { Suspense } from "react";
-import { FloatingActions } from "@/components/layout/floating-actions";
-import { AppHeader, AppHeaderFallback } from "@/components/layout/app-header";
+import { AppSidebar, AppSidebarFallback } from "@/components/layout/app-sidebar";
 import { UserMenu } from "@/components/layout/user-menu";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { CommandPalette } from "@/components/layout/command-palette";
 import { Toaster } from "@/components/ui/toaster";
 import { AlertStrip } from "@/components/alert-banner";
 import { TimeZoneSync } from "@/features/settings/time-zone";
@@ -15,6 +15,7 @@ async function TimeZone() {
   return <TimeZoneSync tz={getTimeZone()} />;
 }
 
+/** Coque Midnights Classic : [sidebar | contenu] (.mm-app), barre basse sous 640 px. */
 export default async function AppLayout({ children }: LayoutProps<"/[lang]">) {
   const tr = await getT();
   return (
@@ -24,34 +25,39 @@ export default async function AppLayout({ children }: LayoutProps<"/[lang]">) {
       </Suspense>
       <a
         href="#contenu"
-        className="sr-only z-[70] rounded-full bg-accent px-4 py-2 font-semibold text-on-accent focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        className="mm-btn mm-btn--primary sr-only z-[70] focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
       >
-        {tr("Aller au contenu")}</a>
-      <Suspense fallback={<AppHeaderFallback />}>
-        <AppHeader
-          userSlot={
-            <Suspense fallback={<span className="block h-10 w-10" />}>
-              <UserMenu />
-            </Suspense>
-          }
-        />
-      </Suspense>
-      <main id="contenu" className="mx-auto w-full max-w-[84rem] flex-1 overflow-x-clip px-4 pb-32 pt-24 sm:px-8 sm:pt-28 xl:pb-24 xl:pt-32 mint:sm:px-5 mint:sm:pt-32 mint:xl:pt-40">
-        <Suspense fallback={null}>
-          <AlertStrip />
+        {tr("Aller au contenu")}
+      </a>
+      <div className="mm-app" data-mobile-nav="bottom">
+        <Suspense fallback={<AppSidebarFallback />}>
+          <AppSidebar
+            userSlot={
+              <Suspense fallback={<span className="block h-12" />}>
+                <UserMenu />
+              </Suspense>
+            }
+          />
         </Suspense>
-        {children}
-      </main>
-      <FloatingActions />
-      <Suspense fallback={null}>
-        <MobileNav
-          accountSlot={
+        <div className="mm-app__main">
+          <main id="contenu" className="mm-page flex-1 overflow-x-clip">
             <Suspense fallback={null}>
-              <UserMenu variant="mobile" />
+              <AlertStrip />
             </Suspense>
-          }
-        />
-      </Suspense>
+            {children}
+          </main>
+        </div>
+        <Suspense fallback={null}>
+          <MobileNav
+            accountSlot={
+              <Suspense fallback={null}>
+                <UserMenu variant="mobile" />
+              </Suspense>
+            }
+          />
+        </Suspense>
+      </div>
+      <CommandPalette />
     </Toaster>
   );
 }

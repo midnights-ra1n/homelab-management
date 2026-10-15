@@ -2,7 +2,6 @@
 
 import { X } from "lucide-react";
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
-import { TONE_VAR } from "@/lib/constants";
 import { useT } from "@/i18n/client";
 
 type Toast = { id: number; kind: "success" | "error" | "info"; message: string };
@@ -12,13 +11,9 @@ export function useToast() {
   return useContext(ToastContext);
 }
 
-const STYLE = {
-  success: { tone: TONE_VAR.green, glyph: "✓" },
-  error: { tone: TONE_VAR.red, glyph: "✕" },
-  info: { tone: TONE_VAR.blue, glyph: "i" },
-};
+const GLYPH = { success: ["✓", "--mm-success-solid"], error: ["✕", "--mm-danger-solid"], info: ["i", "--mm-info-solid"] } as const;
 
-/** Notifications éphémères (en bas à droite), annoncées aux lecteurs d'écran. */
+/** Notifications éphémères, annoncées aux lecteurs d'écran. Charte : en bas à droite, 360 px (au-dessus de la barre basse sur mobile). */
 export function Toaster({ children }: { children: ReactNode }) {
   const tr = useT();
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -32,28 +27,16 @@ export function Toaster({ children }: { children: ReactNode }) {
   return (
     <ToastContext value={push}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[80] flex flex-col gap-2 sm:inset-x-auto sm:left-5 sm:w-[24rem] xl:bottom-5">
+      <div aria-live="polite" className="mm-toast-region pointer-events-none">
         {toasts.map((t) => {
-          const s = STYLE[t.kind];
+          const [glyph, color] = GLYPH[t.kind];
           return (
-            <div
-              key={t.id}
-              role={t.kind === "error" ? "alert" : "status"}
-              className="rise pointer-events-auto flex items-start gap-3 rounded-2xl border p-4 shadow-[var(--mm-shadow-popover)]"
-              style={{
-                background: `color-mix(in srgb, ${s.tone} 10%, var(--mm-bg-elevated))`,
-                borderColor: `color-mix(in srgb, ${s.tone} 40%, var(--mm-border))`,
-              }}
-            >
-              <span
-                aria-hidden="true"
-                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold"
-                style={{ background: s.tone, color: "var(--mm-bg-box)" }}
-              >
-                {s.glyph}
+            <div key={t.id} role={t.kind === "error" ? "alert" : "status"} className="mm-toast pointer-events-auto">
+              <span className="mm-alert__glyph" style={{ background: `var(${color})` }} aria-hidden="true">
+                {glyph}
               </span>
-              <p className="min-w-0 flex-1 break-words text-sm text-h2">{tr(t.message)}</p>
-              <button type="button" onClick={() => dismiss(t.id)} className="text-meta hover:text-h1" aria-label={tr("Fermer")}>
+              <p className="mm-toast__body break-words">{tr(t.message)}</p>
+              <button type="button" onClick={() => dismiss(t.id)} className="mm-btn mm-btn--ghost mm-btn--icon mm-btn--sm -my-1.5" aria-label={tr("Fermer")}>
                 <X size={14} />
               </button>
             </div>

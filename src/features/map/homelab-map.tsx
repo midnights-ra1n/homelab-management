@@ -47,8 +47,8 @@ import { useT } from "@/i18n/client";
  * remplissage SVG venu des feuilles de style, qui sortait noir dans les PNG / JPEG / PDF.
  */
 const EDGE_LABEL = {
-  labelStyle: { fill: "var(--mm-body)", fontFamily: "var(--font-mono)", fontSize: 10 },
-  labelBgStyle: { fill: "var(--mm-bg-elevated)" },
+  labelStyle: { fill: "var(--mm-subtle)", fontFamily: "var(--font-mono)", fontSize: 10 },
+  labelBgStyle: { fill: "var(--mm-overlay)" },
   labelBgPadding: [6, 3] as [number, number],
   labelBgBorderRadius: 4,
 };
@@ -148,7 +148,7 @@ const AssetNodeView = memo(function AssetNodeView({ data, selected }: NodeProps<
     <div
       className={cn(
         "flex items-center gap-3 rounded-2xl border bg-box px-3 py-2.5 transition-[opacity,box-shadow] duration-200",
-        selected ? "border-accent shadow-[0_0_24px_4px_var(--mm-glow-accent-strong)]" : "border-line",
+        selected ? "border-accent shadow-[0_0_24px_4px_var(--mm-accent-soft)]" : "border-line",
         data.dimmed && "opacity-25",
       )}
       style={{ width: NODE_W, minHeight: NODE_H, borderLeft: `4px solid ${vlanTone}` }}
@@ -474,7 +474,7 @@ function Flow({
         {/* Panneau de détail */}
         {(selectedAsset || selectedLink) && (
           <Panel position="bottom-center" className="!mb-4 w-[min(26rem,calc(100%-2rem))]">
-            <div className="rise rounded-2xl border border-line bg-elevated p-4 shadow-[var(--mm-shadow-popover)]">
+            <div className="rounded-2xl border border-line bg-elevated p-4 shadow-[var(--mm-shadow-md)]">
               {selectedAsset && (
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">

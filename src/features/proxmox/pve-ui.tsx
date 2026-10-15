@@ -25,7 +25,7 @@ export function ApiError({ error }: { error: string }) {
 /** Tableau de la charte : en-tête discret, lignes séparées, défilement horizontal sur mobile. */
 export function PveTable({ head, rows, empty, align = [] }: { head: string[]; rows: ReactNode[][]; empty: string; align?: ("right" | undefined)[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-line-subtle bg-box mint:rounded-2xl">
+    <div className="overflow-hidden rounded-xl border border-line-subtle bg-box">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>

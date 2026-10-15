@@ -362,27 +362,6 @@ export const ruleSchema = z.object({
 });
 export type RuleInput = z.infer<typeof ruleSchema>;
 
-export const monitorSchema = z
-  .object({
-    name: required("Le nom", 80),
-    type: z.enum(["http", "tcp"]),
-    target: required("La cible", 500),
-    interval_sec: optNumber({ int: true, min: 15, max: 3600 }).transform((v) => v ?? 60),
-    timeout_ms: optNumber({ int: true, min: 500, max: 30000 }).transform((v) => v ?? 5000),
-    accept: z.enum(["2xx3xx", "lt500"]),
-    verify_tls: checkbox,
-    enabled: checkbox,
-    asset_id: optId,
-  })
-  .superRefine((m, ctx) => {
-    if (m.type === "http" && !/^https?:\/\/\S+$/i.test(m.target)) {
-      ctx.addIssue({ code: "custom", path: ["target"], message: "URL http(s) attendue" });
-    }
-    if (m.type === "tcp" && !/^[a-z0-9.-]+:\d{1,5}$/i.test(m.target)) {
-      ctx.addIssue({ code: "custom", path: ["target"], message: "Format hôte:port attendu (ex. 192.168.10.2:22)" });
-    }
-  });
-export type MonitorInput = z.infer<typeof monitorSchema>;
 
 /* ----------------------------------------------------------------------------
  * Proxmox : configuration d'un invité, snapshot, sauvegarde

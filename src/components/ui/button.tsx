@@ -2,29 +2,28 @@ import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "subtle";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-ghost" | "subtle";
 export type ButtonSize = "sm" | "md" | "icon" | "icon-sm";
 
-const base =
-  "inline-flex items-center justify-center gap-2 [-webkit-tap-highlight-color:transparent] touch-manipulation whitespace-nowrap font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60 select-none";
-
+/** Boutons pleins en pilule de la charte (.mm-btn) ; « subtle » = ghost. */
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-on-accent font-semibold hover:bg-accent-hover active:bg-accent-active",
-  secondary: "border border-line-strong text-h2 hover:bg-box",
-  ghost: "text-accent-text hover:bg-accent-soft",
-  danger: "bg-red text-on-accent font-semibold hover:brightness-110 active:brightness-95 transition-[filter]",
-  subtle: "text-body hover:text-h1 hover:bg-elevated",
+  primary: "mm-btn--primary",
+  secondary: "mm-btn--secondary",
+  ghost: "mm-btn--ghost",
+  danger: "mm-btn--danger",
+  "danger-ghost": "mm-btn--danger-ghost",
+  subtle: "mm-btn--ghost",
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "rounded-full px-3.5 py-1.5 text-xs",
-  md: "rounded-full px-5 py-2.5 text-sm",
-  icon: "rounded-full h-10 w-10 text-sm",
-  "icon-sm": "rounded-full h-8 w-8 text-xs",
+  sm: "mm-btn--sm",
+  md: "",
+  icon: "mm-btn--icon",
+  "icon-sm": "mm-btn--icon mm-btn--sm",
 };
 
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", className?: string) {
-  return cn(base, variants[variant], sizes[size], className);
+  return cn("mm-btn touch-manipulation", variants[variant], sizes[size], className);
 }
 
 type Common = { variant?: ButtonVariant; size?: ButtonSize; icon?: ReactNode };

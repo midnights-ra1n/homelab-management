@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Tuile KPI : valeur bright en grand, libellé muted, détail mono. */
+/** Tuile KPI de la charte (.mm-stat) : libellé, valeur 28/600 tabulaire, détail. */
 export function Stat({
   label,
   value,
@@ -23,11 +23,11 @@ export function Stat({
   const content = (
     <>
       <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-[0.8rem] text-body sm:text-sm">{label}</p>
+        <p className="mm-stat__label min-w-0 truncate">{label}</p>
         {icon && (
           <span
             className={cn(
-              "hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:flex",
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
               tone === "red"
                 ? "bg-red/12 text-red"
                 : tone === "yellow"
@@ -41,13 +41,13 @@ export function Stat({
           </span>
         )}
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight text-h1 tabular-nums sm:mt-3 sm:text-3xl">{value}</p>
-      {detail && <p className="mt-1 truncate text-xs text-meta mint:font-mono">{detail}</p>}
+      <p className="mm-stat__value">{value}</p>
+      {detail && <p className="mm-stat__meta truncate">{detail}</p>}
     </>
   );
   const cls = cn(
-    "block min-w-0 rounded-xl border border-line-subtle bg-box p-5 transition-colors duration-200 sm:p-7 mint:rounded-2xl mint:p-4 mint:sm:p-6",
-    href && "hover:border-line-accent",
+    "mm-card mm-stat transition-colors duration-[120ms]",
+    href && "hover:border-line-strong",
     className,
   );
   return href ? (

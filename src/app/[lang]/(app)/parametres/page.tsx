@@ -10,7 +10,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { PageHeader, SectionTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LanguageSwitch, StyleSwitch, ThemeSwitch } from "@/components/layout/theme-switch";
+import { LanguageSwitch, ThemeSwitch } from "@/components/layout/theme-switch";
 import { AppIcon } from "@/features/apps/app-icon";
 import { IntegrationDialog } from "@/features/settings/integration-dialog";
 import { BackupForms, PasswordForm } from "@/features/settings/account-forms";
@@ -120,9 +120,7 @@ async function Settings() {
           <SectionTitle id="appearance">{tr("Apparence")}</SectionTitle>
           <Card>
             <CardBody className="grid gap-4">
-              <p className="text-sm text-body">
-                {tr("Style Midnights Classic sobre par défaut, ou charte Midnights Mint (accent menthe #3fbfa6, Geist Mono, lueurs). « Auto » suit le réglage clair / sombre du système.")}</p>
-              <StyleSwitch className="w-fit" />
+              <p className="text-sm text-body">{tr("Interface Midnights Classic. « Auto » suit le réglage clair / sombre du système.")}</p>
               <div className="flex flex-wrap gap-3">
                 <ThemeSwitch className="w-fit" />
                 <LanguageSwitch className="w-fit" />

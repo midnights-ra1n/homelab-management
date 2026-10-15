@@ -59,7 +59,7 @@ export function RrdChart({
       >
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-32 w-full overflow-visible" role="img" aria-label={`${title} : ${fmt(last)}`}>
           {[0, 0.5, 1].map((f) => (
-            <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} stroke="var(--mm-border-subtle)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} stroke="var(--mm-border)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           ))}
           <path d={d} fill="none" stroke="var(--mm-accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
           {hover != null && <line x1={x(hover)} x2={x(hover)} y1={0} y2={H} stroke="var(--mm-border-strong)" strokeWidth={1} vectorEffect="non-scaling-stroke" />}

@@ -29,6 +29,8 @@ export const ASSET_STATUS_META: Record<AssetStatus, { label: string; tone: Tone 
 
 /** Origine de l'état détecté automatiquement (colonne assets.status_source). */
 export const STATUS_SOURCE_LABEL: Record<string, string> = {
+  ping: "ping",
+  // Anciennes détections (avant le passage au ping seul), encore présentes jusqu'au prochain passage.
   proxmox: "Proxmox",
   hlm: "Homelab Monitoring",
   beszel: "Beszel",
@@ -170,10 +172,13 @@ export const TONE_VAR: Record<Tone, string> = {
   cyan: "var(--mm-cyan)",
   orange: "var(--mm-orange)",
   pink: "var(--mm-pink)",
-  muted: "var(--mm-meta)",
+  muted: "var(--mm-muted)",
 };
 
-export const TONE_TEXT_VAR: Record<Tone, string> = { ...TONE_VAR, accent: "var(--mm-accent-text)" };
+/** Variante texte (≥ 4.5:1) : remplissage vif pour les pastilles, -text pour les mots. */
+export const TONE_TEXT_VAR = Object.fromEntries(
+  Object.entries(TONE_VAR).map(([k, v]) => [k, k === "muted" ? v : v.replace(")", "-text)")]),
+) as Record<Tone, string>;
 
 export const VPN_TYPES = ["wireguard", "tailscale", "headscale", "netbird", "zerotier", "openvpn", "ipsec", "other"] as const;
 export type VpnType = (typeof VPN_TYPES)[number];

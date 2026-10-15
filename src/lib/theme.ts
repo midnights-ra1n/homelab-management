@@ -3,35 +3,11 @@ export type ThemeChoice = "auto" | "dark" | "light";
 export type Theme = "dark" | "light";
 
 const KEY = "hm-theme";
-const STYLE_KEY = "hm-style";
-const COLORS: Record<UiStyle, Record<Theme, string>> = {
-  standard: { dark: "#0e1519", light: "#f2f6f8" },
-  mint: { dark: "#191e27", light: "#e4e8ef" },
-};
-
-/** Style d'interface : "standard" (défaut, pas d'attribut) ou "mint" (charte Midnights Mint, data-style="mint"). */
-export type UiStyle = "standard" | "mint";
-
-export function getStyle(): UiStyle {
-  return document.documentElement.dataset.style === "mint" ? "mint" : "standard";
-}
-
-export function setStyle(style: UiStyle) {
-  try {
-    if (style === "mint") localStorage.setItem(STYLE_KEY, style);
-    else localStorage.removeItem(STYLE_KEY);
-  } catch {}
-  const root = document.documentElement;
-  root.classList.add("theme-transition");
-  window.setTimeout(() => root.classList.remove("theme-transition"), 400);
-  if (style === "mint") root.dataset.style = "mint";
-  else delete root.dataset.style;
-  syncThemeColor();
-  window.dispatchEvent(new Event("hm-theme"));
-}
+/** theme-color de la charte : couleur de la sidebar (crust) selon le thème. */
+const COLORS: Record<Theme, string> = { dark: "#0f131a", light: "#d8dde5" };
 
 function syncThemeColor() {
-  const color = COLORS[getStyle()][getEffectiveTheme()];
+  const color = COLORS[getEffectiveTheme()];
   document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = color));
 }
 
@@ -54,7 +30,7 @@ export function getEffectiveTheme(): Theme {
 export function setTheme(choice: ThemeChoice) {
   const root = document.documentElement;
   root.classList.add("theme-transition");
-  window.setTimeout(() => root.classList.remove("theme-transition"), 400);
+  window.setTimeout(() => root.classList.remove("theme-transition"), 200);
   try {
     if (choice === "auto") localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, choice);
@@ -64,6 +40,22 @@ export function setTheme(choice: ThemeChoice) {
   syncThemeColor();
   window.dispatchEvent(new Event("hm-theme"));
 }
+
+/** Barre latérale : "full" (248 px) ou "rail" (64 px, icônes seules). Par défaut : rail sur tablette (640–1023 px). */
+const SIDEBAR_KEY = "hm-sidebar";
+
+export function toggleRail() {
+  const root = document.documentElement;
+  const rail = root.dataset.sidebar !== "rail";
+  if (rail) root.dataset.sidebar = "rail";
+  else delete root.dataset.sidebar;
+  try {
+    localStorage.setItem(SIDEBAR_KEY, rail ? "rail" : "full");
+  } catch {}
+  window.dispatchEvent(new Event("hm-theme"));
+}
+
+export const isRail = () => document.documentElement.dataset.sidebar === "rail";
 
 /** Abonnement : changement manuel ou changement du thème système. */
 export function subscribeTheme(callback: () => void) {

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { ExternalLink, RefreshCw, Server, Settings } from "lucide-react";
+import { ExternalLink, Server, Settings } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { fetchProxmox } from "@/lib/integrations";
 import { listIntegrations } from "@/lib/data/integrations";
@@ -15,7 +15,6 @@ import { SkeletonGrid } from "@/components/ui/skeleton";
 import { Stat } from "@/components/ui/stat";
 import { GuestTable, type GuestRow } from "@/features/proxmox/guest-table";
 import { NodeTasks } from "@/features/proxmox/node-tasks";
-import { SyncProxmoxButton } from "@/features/proxmox/sync-button";
 import { nodeHref, toGuestRow } from "@/features/proxmox/console-href";
 import Link from "next/link";
 import { formatBytes, formatUptime, pct } from "@/lib/utils";
@@ -94,7 +93,7 @@ async function Overview() {
       </div>
 
       <section aria-labelledby="nodes">
-        <SectionTitle id="nodes" actions={<SyncProxmoxButton icon={<RefreshCw size={15} />} />}>
+        <SectionTitle id="nodes">
           {tr("Nœuds")}</SectionTitle>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {nodes.map((n) => {

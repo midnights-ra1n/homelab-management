@@ -39,24 +39,24 @@ export function Dialog({
         if (e.target === ref.current) onClose();
       }}
       className={cn(
-        // Mobile : feuille glissante ancrée en bas ; ≥ sm : modale centrée
-        "mx-0 mb-0 mt-auto w-full max-w-none rounded-t-4xl border border-b-0 border-line bg-elevated p-0 text-h2 shadow-[var(--mm-shadow-popover)]",
-        "sm:m-auto sm:w-[calc(100%-2rem)] sm:rounded-3xl sm:border-b",
-        { sm: "sm:max-w-md", md: "sm:max-w-xl", lg: "sm:max-w-3xl", xl: "sm:max-w-5xl" }[size],
+        // Charte : feuille en bas sous 640 px ; ≥ sm modale centrée 400 / 560 / 800 px, rayon 14
+        "mx-0 mb-0 mt-auto w-full max-w-none rounded-t-[14px] border border-b-0 border-line bg-elevated p-0 text-h2 shadow-[var(--mm-shadow-lg)]",
+        "sm:m-auto sm:w-[calc(100%-2rem)] sm:rounded-[14px] sm:border-b",
+        { sm: "sm:max-w-[400px]", md: "sm:max-w-[560px]", lg: "sm:max-w-[800px]", xl: "sm:max-w-5xl" }[size],
       )}
     >
       {open && (
-        <div className="max-h-[90dvh] overflow-y-auto overscroll-contain px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 sm:max-h-[85vh] sm:p-8">
-          <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" aria-hidden />
-          <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="max-h-[90dvh] overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 sm:max-h-[85vh] sm:px-6 sm:pb-6 sm:pt-5">
+          <div className="mm-sheet__grip mx-auto sm:hidden" aria-hidden />
+          <div className="mb-3 flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-h1">{title}</h2>
-              {description && <p className="mt-1 text-sm text-meta">{description}</p>}
+              <h2 className="mm-dialog__title">{title}</h2>
+              {description && <p className="mm-help mt-0.5">{description}</p>}
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="-mr-2 -mt-1 rounded-full p-2 text-meta transition-colors hover:bg-box hover:text-h1"
+              className="mm-btn mm-btn--ghost mm-btn--icon mm-btn--sm -mr-2 -mt-1"
               aria-label={tr("Fermer")}
             >
               <X size={18} />

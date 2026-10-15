@@ -55,8 +55,8 @@ export function FilterBar({
   }, []);
 
   return (
-    <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-center", className)} aria-busy={pending}>
-      <div className="relative flex-1">
+    <div className={cn("flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center", className)} aria-busy={pending}>
+      <div className="relative flex-1 sm:min-w-64">
         <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-meta" aria-hidden="true" />
         <input
           ref={inputRef}
@@ -65,7 +65,7 @@ export function FilterBar({
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="field w-full rounded-full py-2.5 pl-11 pr-12 text-base sm:text-sm"
+          className="field h-9 w-full rounded-full pl-11 pr-12 text-base pointer-coarse:h-11 sm:text-sm"
         />
         {q ? (
           <button
@@ -88,7 +88,7 @@ export function FilterBar({
           aria-label={s.label}
           value={params.get(s.name) ?? ""}
           onChange={(e) => update(s.name, e.target.value)}
-          className="field rounded-full px-4 py-2.5 text-base sm:w-auto sm:text-sm"
+          className="field h-9 rounded-full px-4 text-base pointer-coarse:h-11 sm:w-auto sm:max-w-56 sm:text-sm"
         >
           <option value="">{s.label}</option>
           {s.options.map((o) => (

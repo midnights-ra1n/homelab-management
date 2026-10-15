@@ -1,11 +1,11 @@
 import { AUTH_DISABLED, requireUser } from "@/lib/auth";
-import { UserDropdown, UserRow } from "./user-dropdown";
+import { AccountButton, AccountSheet } from "./account-menu";
 
-export async function UserMenu({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
+export async function UserMenu({ variant = "sidebar" }: { variant?: "sidebar" | "mobile" }) {
   const user = await requireUser();
-  return variant === "desktop" ? (
-    <UserDropdown username={user.username} canLogout={!AUTH_DISABLED} />
+  return variant === "sidebar" ? (
+    <AccountButton username={user.username} canLogout={!AUTH_DISABLED} />
   ) : (
-    <UserRow username={user.username} canLogout={!AUTH_DISABLED} />
+    <AccountSheet username={user.username} canLogout={!AUTH_DISABLED} />
   );
 }

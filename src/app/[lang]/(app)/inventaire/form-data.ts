@@ -1,5 +1,5 @@
 import "server-only";
-import { assetOptions } from "@/lib/data/assets";
+import { allTags, assetOptions } from "@/lib/data/assets";
 import { subnetOptions } from "@/lib/data/network";
 import { listIntegrations } from "@/lib/data/integrations";
 
@@ -9,5 +9,6 @@ export function assetFormOptions() {
     parents: assetOptions(["physical", "vm", "lxc", "network", "other"]),
     subnets: subnetOptions(),
     proxmox: listIntegrations("proxmox").map((i) => ({ id: i.id, name: i.name })),
+    tags: allTags().map((t) => t.tag),
   };
 }

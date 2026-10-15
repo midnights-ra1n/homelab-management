@@ -101,35 +101,38 @@ export function Field({
   className,
   children,
   required,
+  liveError,
 }: {
   label: ReactNode;
   name: string;
   hint?: ReactNode;
   className?: string;
   required?: boolean;
+  /** Contrôle pendant la saisie ; l'erreur renvoyée par le serveur reste prioritaire. */
+  liveError?: string;
   children: (props: { id: string; name: string; "aria-invalid"?: boolean; "aria-describedby"?: string }) => ReactNode;
 }) {
   const tr = useT();
   const id = useId();
-  const error = useFieldError(name);
+  const error = useFieldError(name) ?? (liveError || undefined);
   const describedBy = error || hint ? `${id}-help` : undefined;
   return (
-    <div className={className}>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-h1">
+    <div className={cn("mm-field", className)}>
+      <label htmlFor={id} className="mm-field__label">
         {label}
         {required && (
-          <span className="ml-1 text-accent-text" aria-hidden="true">
+          <span className="mm-field__req" aria-hidden="true">
             *
           </span>
         )}
       </label>
       {children({ id, name, "aria-invalid": error ? true : undefined, "aria-describedby": describedBy })}
       {error ? (
-        <p id={describedBy} className="mt-2 flex items-center gap-1.5 text-xs text-red">
+        <p id={describedBy} className="mm-field__error">
           <span aria-hidden="true">✕</span> {tr(error)}
         </p>
       ) : hint ? (
-        <p id={describedBy} className="mt-2 text-xs text-meta">
+        <p id={describedBy} className="mm-help">
           {hint}
         </p>
       ) : null}
@@ -137,10 +140,11 @@ export function Field({
   );
 }
 
-const fieldBase = "field w-full px-4 py-2.5 text-base sm:text-sm";
-export const inputClass = `${fieldBase} rounded-full`;
+// Charte : champs en pilule de 36 px (44 px au tactile), textarea rayon 18. 16 px sur mobile (pas de zoom iOS).
+const fieldBase = "field w-full px-4 text-base sm:text-sm";
+export const inputClass = `${fieldBase} h-9 pointer-coarse:h-11 rounded-full`;
 /** Zones multilignes : arrondi modéré, jamais en pilule. */
-export const textareaClass = `${fieldBase} rounded-2xl resize-y leading-relaxed`;
+export const textareaClass = `${fieldBase} min-h-22 py-2.5 rounded-[18px] resize-y leading-relaxed`;
 
 /** Barre Annuler / Enregistrer des formulaires pleine page : tout en bas, après le dernier champ. */
 export const FORM_ACTIONS_CLASS = "mt-2 flex justify-end gap-3";
@@ -151,10 +155,11 @@ export function TextField({
   hint,
   className,
   required,
+  liveError,
   ...input
-}: { label: ReactNode; name: string; hint?: ReactNode; className?: string } & Omit<ComponentProps<"input">, "name">) {
+}: { label: ReactNode; name: string; hint?: ReactNode; className?: string; liveError?: string } & Omit<ComponentProps<"input">, "name">) {
   return (
-    <Field label={label} name={name} hint={hint} className={className} required={required}>
+    <Field label={label} name={name} hint={hint} className={className} required={required} liveError={liveError}>
       {(p) => <input {...p} {...input} className={inputClass} />}
     </Field>
   );
@@ -225,9 +230,9 @@ export function Switch({
       <input type="checkbox" role="switch" name={name} defaultChecked={defaultChecked} className="peer sr-only" />
       <span
         aria-hidden="true"
-        className="mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full bg-elevated p-0.5 shadow-[inset_0_0_0_1px_var(--mm-border-strong)] transition-colors duration-200 peer-checked:bg-accent peer-checked:shadow-none peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-hover peer-checked:[&>span]:translate-x-5 peer-checked:[&>span]:bg-field"
+        className="mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full border border-line-strong bg-field px-0.5 transition-colors duration-[120ms] peer-checked:border-accent peer-checked:bg-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--mm-focus)] peer-checked:[&>span]:translate-x-4 peer-checked:[&>span]:bg-on-accent"
       >
-        <span className="h-5 w-5 rounded-full bg-body transition-transform duration-200" />
+        <span className="h-3.5 w-3.5 rounded-full bg-body transition-transform duration-[180ms]" />
       </span>
       <span>
         {label}
@@ -266,18 +271,20 @@ export function Fieldset({
   description,
   children,
   className,
+  id,
 }: {
   legend: string;
   description?: string;
   children: ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
-    <fieldset className={cn("rounded-2xl border border-line-subtle bg-box p-5 sm:p-6", className)}>
+    <fieldset id={id} className={cn("mm-card scroll-mt-6 p-5", className)}>
       <legend className="sr-only">{legend}</legend>
       <div className="mb-5">
-        <p className="font-mono text-xs uppercase tracking-[0.18em] text-accent-text">{legend}</p>
-        {description && <p className="mt-1 text-sm text-meta">{description}</p>}
+        <p className="mm-h3">{legend}</p>
+        {description && <p className="mm-help mt-0.5">{description}</p>}
       </div>
       {children}
     </fieldset>

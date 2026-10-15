@@ -38,7 +38,7 @@ export async function Diagnostics({ issues }: { issues: Issue[] }) {
               <span
                 aria-hidden
                 className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold"
-                style={{ background: m.tone, color: "var(--mm-bg-box)" }}
+                style={{ background: m.tone, color: "var(--mm-surface)" }}
               >
                 {m.glyph}
               </span>

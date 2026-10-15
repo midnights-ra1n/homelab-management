@@ -19,7 +19,7 @@ import { Diagnostics } from "@/features/network/diagnostics";
 import { assetOptions } from "@/lib/data/assets";
 import { getSubnet, ipamTotals, listIps, listSubnets, listVlans, subnetOptions, type Subnet } from "@/lib/data/network";
 import { deleteIpAction, deleteSubnetAction, deleteVlanAction } from "@/actions/network";
-import { IP_STATUS_META, TONE_VAR } from "@/lib/constants";
+import { IP_STATUS_META, TONE_TEXT_VAR, TONE_VAR } from "@/lib/constants";
 import { intToIp, ipToInt, parseCidr } from "@/lib/ip";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -146,7 +146,7 @@ async function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau"
                 <span
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-mono text-sm font-semibold"
                   style={{
-                    color: TONE_VAR[v.color],
+                    color: TONE_TEXT_VAR[v.color],
                     background: `color-mix(in srgb, ${TONE_VAR[v.color]} 14%, transparent)`,
                     border: `1px solid color-mix(in srgb, ${TONE_VAR[v.color]} 35%, transparent)`,
                   }}
@@ -206,7 +206,7 @@ async function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau"
                     <div className="flex items-center justify-between gap-3">
                       <span className="truncate font-medium text-h1">{s.name}</span>
                       {s.vlan_number && (
-                        <span className="shrink-0 font-mono text-xs" style={{ color: TONE_VAR[s.vlan_color ?? "accent"] }}>
+                        <span className="shrink-0 font-mono text-xs" style={{ color: TONE_TEXT_VAR[s.vlan_color ?? "accent"] }}>
                           {tr("VLAN ")}{s.vlan_number}
                         </span>
                       )}

@@ -215,7 +215,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
                       aria-disabled={editing}
                       className={cn(
                         "flex h-full items-center gap-4 rounded-2xl border border-line-subtle bg-box p-4 transition-all duration-200",
-                        !editing && "hover:-translate-y-0.5 hover:border-line-accent hover:shadow-[0_0_24px_2px_var(--mm-glow-accent)]",
+                        !editing && "hover:-translate-y-0.5 hover:border-line-accent hover:shadow-[0_0_24px_2px_var(--mm-accent-soft)]",
                       )}
                     >
                       <AppIcon type={s.icon_type} value={s.icon_value} name={s.name} size={40} />

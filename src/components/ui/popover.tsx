@@ -94,9 +94,9 @@ export function Popover({
       aria-label={label}
       inert={!open}
       className={cn(
-        "fixed z-[90] rounded-2xl border border-line bg-elevated p-1.5 shadow-[var(--mm-shadow-popover)]",
-        "transition-[opacity,scale] duration-200 ease-out",
-        open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0",
+        "fixed z-[90] rounded-[10px] border border-line bg-elevated p-1.5 shadow-[var(--mm-shadow-lg)]",
+        "transition-[opacity,translate] duration-[180ms] ease-[cubic-bezier(0,0,0.2,1)]",
+        open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-1 opacity-0",
         className,
       )}
     >

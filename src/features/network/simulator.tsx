@@ -283,13 +283,13 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                       <li key={i} className="sim-hop flex min-w-0 flex-col items-center px-1 text-center" style={{ animationDelay: `${i * 380}ms` }}>
                         <span
                           className={cn("relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 bg-page", !reached && "opacity-40")}
-                          style={{ borderColor: reached ? tone : "var(--mm-border)", color: reached ? tone : "var(--mm-meta)" }}
+                          style={{ borderColor: reached ? tone : "var(--mm-border)", color: reached ? tone : "var(--mm-muted)" }}
                         >
                           <Icon size={22} aria-hidden />
                           {reached && (
                             <span
                               className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[0.65rem] font-bold"
-                              style={{ background: tone, color: "var(--mm-bg-box)" }}
+                              style={{ background: tone, color: "var(--mm-surface)" }}
                               aria-hidden
                             >
                               {h.status === "ok" ? "✓" : h.status === "warn" ? "!" : "✕"}
@@ -313,7 +313,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                     <li key={i} className="sim-hop flex items-center gap-3" style={{ animationDelay: `${i * 380}ms` }}>
                       <span
                         className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-2 bg-page", !reached && "opacity-40")}
-                        style={{ borderColor: reached ? tone : "var(--mm-border)", color: reached ? tone : "var(--mm-meta)" }}
+                        style={{ borderColor: reached ? tone : "var(--mm-border)", color: reached ? tone : "var(--mm-muted)" }}
                       >
                         <Icon size={18} aria-hidden />
                       </span>

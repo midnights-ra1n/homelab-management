@@ -2,9 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
-import { get } from "@/lib/db";
 import { getIntegration } from "@/lib/data/integrations";
-import { upsertProxmoxGuest } from "@/lib/data/assets";
 import { parseForm, success } from "@/lib/action-utils";
 import { backupSchema, guestConfigSchema, snapshotSchema, type FormState } from "@/lib/validation";
 import {
@@ -109,48 +107,6 @@ export async function remoteMigrateAction(opts: {
   } catch (err) {
     return { ok: false, message: (err as Error).message };
   }
-}
-
-/** Importe les VM / CT de tous les nœuds Proxmox dans l'inventaire. */
-export async function syncProxmoxInventoryAction(integrationId?: number): Promise<Result> {
-  await requireUser();
-  const { listIntegrations } = await import("@/lib/data/integrations");
-  const targets = integrationId ? [integrationOrThrow(integrationId)] : listIntegrations("proxmox", true);
-  let created = 0;
-  let updated = 0;
-  const errors: string[] = [];
-  for (const i of targets) {
-    try {
-      const o = await proxmoxOverview(i);
-      for (const g of o.guests) {
-        // Hôte parent : serveur physique dont le hostname / nom correspond au nœud
-        const parent = get<{ id: number }>(
-          "SELECT id FROM assets WHERE kind = 'physical' AND (lower(hostname) = lower(?) OR lower(display_name) = lower(?)) LIMIT 1",
-          [g.node, g.node],
-        );
-        const isNew = upsertProxmoxGuest({
-          integrationId: i.id,
-          node: g.node,
-          vmid: g.vmid!,
-          kind: g.type === "qemu" ? "vm" : "lxc",
-          name: g.name ?? `${g.type}-${g.vmid}`,
-          running: g.status === "running",
-          cores: g.maxcpu ?? null,
-          ramGb: g.maxmem ? +(g.maxmem / 1024 ** 3).toFixed(1) : null,
-          diskGb: g.maxdisk ? +(g.maxdisk / 1024 ** 3).toFixed(1) : null,
-          tags: (g.tags ?? "").split(/[;,\s]+/).filter(Boolean),
-          parentId: parent?.id ?? null,
-        });
-        if (isNew) created++;
-        else updated++;
-      }
-    } catch (err) {
-      errors.push(`${i.name} : ${(err as Error).message}`);
-    }
-  }
-  revalidatePath("/", "layout");
-  const msg = `${created} élément(s) créé(s), ${updated} mis à jour.`;
-  return errors.length ? { ok: false, message: `${msg} Erreurs — ${errors.join(" ; ")}` } : { ok: true, message: msg };
 }
 
 /** Prépare une console noVNC : jeton à usage unique pour le relais WebSocket + mot de passe VNC. */

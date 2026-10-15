@@ -1,323 +1,78 @@
 @import "tailwindcss";
 @import "@xyflow/react/dist/style.css";
+@import "../styles/midnights.css";
 
-/* Variante Tailwind « mint: » : classes propres à la charte Midnights Mint. */
-@custom-variant mint (&:where([data-style="mint"], [data-style="mint"] *));
+/* Midnights Classic (dossier « Midnights Classic/ ») : jetons --mm-* et composants .mm-* dans
+   src/styles/midnights.css. Les noms Tailwind historiques (box, h1, meta…) pointent sur ces jetons. */
 
-/* ---------------------------------------------------------------------------
- * Midnights Classic — style par défaut (design system Midnights Classic v1.0) : ardoise neutre,
- * accent vert #3fbfa6, sans lueurs ni animations d'apparition.
- * Mêmes jetons (--mm-*) que la charte, pour que tous les composants suivent.
- * ------------------------------------------------------------------------- */
-
-:root {
-  color-scheme: dark;
-  --mm-bg-crust: #090f13;
-  --mm-bg: #0e1519;
-  --mm-bg-box: #131b1f;
-  --mm-bg-elevated: #1c2429;
-  --mm-field: #10181c;
-  --mm-overlay: #030608a8;
-  --mm-panel: #1c2429e6;
-  --mm-border-subtle: #1f282d;
-  --mm-border: #262f34;
-  --mm-border-strong: #66737a;
-  --mm-border-accent: #3fbfa673;
-  --mm-border-mint: #155347;
-  --mm-h1: #e7ecef;
-  --mm-h2: #d8dfe3;
-  --mm-body: #95a0a6;
-  --mm-meta: #8a959b;
-  --mm-accent: #3fbfa6;
-  --mm-accent-text: #79ddc6;
-  --mm-accent-hover: #79ddc6;
-  --mm-accent-active: #aceedd;
-  --mm-accent-muted: #155347;
-  --mm-accent-soft: #3fbfa624;
-  --mm-selection: #3fbfa640;
-  --mm-focus: #3fbfa6;
-  --mm-on-accent: #09251f;
-  --mm-red: #fda19a;
-  --mm-orange: #fb923c;
-  --mm-yellow: #e7b369;
-  --mm-green: #89d298;
-  --mm-cyan: #22d3ee;
-  --mm-blue: #86c3ff;
-  --mm-purple: #a58cf0;
-  --mm-pink: #f472b6;
-  --mm-glow-accent: transparent;
-  --mm-glow-accent-strong: transparent;
-  --mm-glow-opacity: 0;
-  --mm-glow-boost: 0;
-  --mm-shadow-popover: 0 4px 10px -2px #0000008c, 0 0 0 1px #e7ecef0f;
+:root,
+[data-theme="dark"] {
+  --mm-neutral-soft: #ffffff12;
+  --mm-accent-border: #3fbfa666;
 }
-
+[data-theme="light"] {
+  --mm-neutral-soft: #161b2412;
+  --mm-accent-border: #00756159;
+}
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    color-scheme: light;
-    --mm-bg-crust: #e7ecef;
-    --mm-bg: #f2f6f8;
-    --mm-bg-box: #ffffff;
-    --mm-bg-elevated: #ffffff;
-    --mm-field: #ffffff;
-    --mm-overlay: #090f137a;
-    --mm-panel: #ffffffeb;
-    --mm-border-subtle: #e7ecef;
-    --mm-border: #d8dfe3;
-    --mm-border-strong: #8a959b;
-    --mm-border-accent: #79ddc6;
-    --mm-border-mint: #aceedd;
-    --mm-h1: #131b1f;
-    --mm-h2: #262f34;
-    --mm-body: #546066;
-    --mm-meta: #67727a;
-    --mm-accent-text: #16695a;
-    --mm-accent-hover: #35ad96;
-    --mm-accent-active: #1f9e88;
-    --mm-accent-muted: #aceedd;
-    --mm-accent-soft: #3fbfa61f;
-    --mm-selection: #3fbfa640;
-    --mm-focus: #1f9e88;
-    --mm-red: #9d3533;
-    --mm-orange: #c2410c;
-    --mm-yellow: #8a4e00;
-    --mm-green: #00722e;
-    --mm-cyan: #0e7490;
-    --mm-blue: #005fa8;
-    --mm-purple: #6f52c9;
-    --mm-pink: #be185d;
-    --mm-shadow-popover: 0 4px 10px -2px #131b1f1a, 0 2px 4px -2px #131b1f0f;
+    --mm-neutral-soft: #161b2412;
+    --mm-accent-border: #00756159;
   }
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-  --mm-bg-crust: #e7ecef;
-  --mm-bg: #f2f6f8;
-  --mm-bg-box: #ffffff;
-  --mm-bg-elevated: #ffffff;
-  --mm-field: #ffffff;
-  --mm-overlay: #090f137a;
-  --mm-panel: #ffffffeb;
-  --mm-border-subtle: #e7ecef;
-  --mm-border: #d8dfe3;
-  --mm-border-strong: #8a959b;
-  --mm-border-accent: #79ddc6;
-  --mm-border-mint: #aceedd;
-  --mm-h1: #131b1f;
-  --mm-h2: #262f34;
-  --mm-body: #546066;
-  --mm-meta: #67727a;
-  --mm-accent-text: #16695a;
-  --mm-accent-hover: #35ad96;
-  --mm-accent-active: #1f9e88;
-  --mm-accent-muted: #aceedd;
-  --mm-accent-soft: #3fbfa61f;
-  --mm-selection: #3fbfa640;
-  --mm-focus: #1f9e88;
-  --mm-red: #9d3533;
-  --mm-orange: #c2410c;
-  --mm-yellow: #8a4e00;
-  --mm-green: #00722e;
-  --mm-cyan: #0e7490;
-  --mm-blue: #005fa8;
-  --mm-purple: #6f52c9;
-  --mm-pink: #be185d;
-  --mm-shadow-popover: 0 4px 10px -2px #131b1f1a, 0 2px 4px -2px #131b1f0f;
-}
-
-/* Standard : rien qui « apparaît » (fondus, flous, montées), pas de boutons flottants. */
-:root:not([data-style="mint"]) :is(.page-enter, .rise, .fade-in) {
-  animation: none !important;
-  transition: none !important;
-}
-:root:not([data-style="mint"]) .fade-in[data-shown="false"] {
-  opacity: 1 !important;
-  filter: none !important;
-  translate: none !important;
-  scale: none !important;
-}
-
-/* ---------------------------------------------------------------------------
- * Midnights Mint — charte graphique (https://noe-georget.fr/graphique)
- * Activée par data-style="mint" (Paramètres → Apparence). Sélecteurs plus
- * spécifiques que ceux du style standard : ils l'emportent toujours.
- * ------------------------------------------------------------------------- */
-
-:root[data-style="mint"] {
-  color-scheme: dark;
-
-  /* Surfaces */
-  --mm-bg-crust: #0f131a;
-  --mm-bg: #191e27;
-  --mm-bg-box: #212730;
-  --mm-bg-elevated: #2a313c;
-  --mm-field: #13171f;
-  --mm-overlay: #0f131ac2;
-  --mm-panel: #2a313cbf;
-
-  /* Contours */
-  --mm-border-subtle: #2a313c;
-  --mm-border: #39404d;
-  --mm-border-strong: #6d7583;
-  --mm-border-accent: #3fbfa666;
-  --mm-border-mint: #0a4b3e;
-
-  /* Texte */
-  --mm-h1: #f0f4f9;
-  --mm-h2: #dde1ea;
-  --mm-body: #b4bbc6;
-  --mm-meta: #8b93a0;
-
-  /* Accent menthe */
-  --mm-accent: #3fbfa6;
-  --mm-accent-text: #3fbfa6;
-  --mm-accent-hover: #1ccaa8;
-  --mm-accent-active: #0fb796;
-  --mm-accent-muted: #136656;
-  --mm-accent-soft: #1ccaa826;
-  --mm-selection: #1ccaa83d;
-  --mm-focus: #1ccaa8;
-  --mm-on-accent: #12161d;
-
-  /* ANSI */
-  --mm-red: #f39c99;
-  --mm-orange: #eca575;
-  --mm-yellow: #cfb565;
-  --mm-green: #8cc98e;
-  --mm-cyan: #57cbd7;
-  --mm-blue: #89bafa;
-  --mm-purple: #c2a8f1;
-  --mm-pink: #eb9bc1;
-
-  /* Lueurs */
-  --mm-glow-accent: #3fbfa633;
-  --mm-glow-accent-strong: #3fbfa657;
-  --mm-glow-opacity: 0.7;
-  --mm-glow-boost: 1;
-  --mm-shadow-popover: 0 10px 30px #00000080;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-style="mint"]:not([data-theme]) {
-    color-scheme: light;
-    --mm-bg-crust: #d8dde5;
-    --mm-bg: #e4e8ef;
-    --mm-bg-box: #edf0f6;
-    --mm-bg-elevated: #f4f7fb;
-    --mm-field: #fcfdff;
-    --mm-overlay: #e4e8efc7;
-    --mm-panel: #f4f7fbd9;
-    --mm-border-subtle: #d5dae2;
-    --mm-border: #c9ced7;
-    --mm-border-strong: #737b88;
-    --mm-border-accent: #00756159;
-    --mm-border-mint: #8be1cb;
-    --mm-h1: #161b24;
-    --mm-h2: #252c37;
-    --mm-body: #414854;
-    --mm-meta: #5c6470;
-    --mm-accent-text: #007561;
-    --mm-accent-hover: #0fb796;
-    --mm-accent-active: #00a385;
-    --mm-accent-muted: #57cfb5;
-    --mm-accent-soft: #0fb79624;
-    --mm-selection: #0fb79640;
-    --mm-focus: #0fb796;
-    --mm-on-accent: #161b24;
-    --mm-red: #9c4343;
-    --mm-orange: #964d09;
-    --mm-yellow: #7c5f00;
-    --mm-green: #2f7434;
-    --mm-cyan: #006e7b;
-    --mm-blue: #2e64a6;
-    --mm-purple: #6e519d;
-    --mm-pink: #94436d;
-    --mm-glow-accent: #3fbfa61a;
-    --mm-glow-accent-strong: #3fbfa629;
-    --mm-glow-boost: 2.2;
-    --mm-shadow-popover: 0 10px 28px #161b241a;
-  }
-}
-
-:root[data-style="mint"][data-theme="light"] {
-  color-scheme: light;
-  --mm-bg-crust: #d8dde5;
-  --mm-bg: #e4e8ef;
-  --mm-bg-box: #edf0f6;
-  --mm-bg-elevated: #f4f7fb;
-  --mm-field: #fcfdff;
-  --mm-overlay: #e4e8efc7;
-  --mm-panel: #f4f7fbd9;
-  --mm-border-subtle: #d5dae2;
-  --mm-border: #c9ced7;
-  --mm-border-strong: #737b88;
-  --mm-border-accent: #00756159;
-  --mm-border-mint: #8be1cb;
-  --mm-h1: #161b24;
-  --mm-h2: #252c37;
-  --mm-body: #414854;
-  --mm-meta: #5c6470;
-  --mm-accent-text: #007561;
-  --mm-accent-hover: #0fb796;
-  --mm-accent-active: #00a385;
-  --mm-accent-muted: #57cfb5;
-  --mm-accent-soft: #0fb79624;
-  --mm-selection: #0fb79640;
-  --mm-focus: #0fb796;
-  --mm-on-accent: #161b24;
-  --mm-red: #9c4343;
-  --mm-orange: #964d09;
-  --mm-yellow: #7c5f00;
-  --mm-green: #2f7434;
-  --mm-cyan: #006e7b;
-  --mm-blue: #2e64a6;
-  --mm-purple: #6e519d;
-  --mm-pink: #94436d;
-  --mm-glow-accent: #3fbfa61a;
-  --mm-glow-accent-strong: #3fbfa629;
-  --mm-glow-boost: 2.2;
-  --mm-shadow-popover: 0 10px 28px #161b241a;
 }
 
 @theme inline {
   --color-*: initial;
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--mm-font-sans);
+  --font-mono: var(--mm-font-mono);
 
-  --color-crust: var(--mm-bg-crust);
+  --color-crust: var(--mm-crust);
   --color-page: var(--mm-bg);
-  --color-box: var(--mm-bg-box);
-  --color-elevated: var(--mm-bg-elevated);
+  --color-box: var(--mm-surface);
+  --color-elevated: var(--mm-overlay);
   --color-field: var(--mm-field);
-  --color-line-subtle: var(--mm-border-subtle);
+  --color-sidebar: var(--mm-crust);
+  --color-hover: var(--mm-hover);
+  --color-nav-active: var(--mm-accent-soft);
+  --color-muted: var(--mm-neutral-soft);
+  --color-subtle: var(--mm-crust);
+  --color-pressed: var(--mm-pressed);
+  --color-line-subtle: var(--mm-border);
   --color-line: var(--mm-border);
   --color-line-strong: var(--mm-border-strong);
-  --color-line-accent: var(--mm-border-accent);
-  --color-h1: var(--mm-h1);
-  --color-h2: var(--mm-h2);
-  --color-body: var(--mm-body);
-  --color-meta: var(--mm-meta);
+  --color-line-accent: var(--mm-accent-border);
+  --color-h1: var(--mm-bright);
+  --color-h2: var(--mm-fg);
+  --color-body: var(--mm-subtle);
+  --color-meta: var(--mm-muted);
   --color-accent: var(--mm-accent);
   --color-accent-text: var(--mm-accent-text);
   --color-accent-hover: var(--mm-accent-hover);
   --color-accent-active: var(--mm-accent-active);
-  --color-accent-muted: var(--mm-accent-muted);
+  --color-accent-muted: var(--mm-mint-700);
   --color-accent-soft: var(--mm-accent-soft);
   --color-on-accent: var(--mm-on-accent);
-  --color-red: var(--mm-red);
-  --color-orange: var(--mm-orange);
-  --color-yellow: var(--mm-yellow);
-  --color-green: var(--mm-green);
-  --color-cyan: var(--mm-cyan);
-  --color-blue: var(--mm-blue);
-  --color-purple: var(--mm-purple);
-  --color-pink: var(--mm-pink);
+  /* Texte d'état lisible (≥ 4.5:1) ; les remplissages vifs restent dans --mm-<couleur>. */
+  --color-red: var(--mm-red-text);
+  --color-orange: var(--mm-orange-text);
+  --color-yellow: var(--mm-yellow-text);
+  --color-green: var(--mm-green-text);
+  --color-cyan: var(--mm-cyan-text);
+  --color-blue: var(--mm-blue-text);
+  --color-purple: var(--mm-purple-text);
+  --color-pink: var(--mm-pink-text);
 
-  --radius-4xl: 2rem;
-  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  /* Rayons de la charte : contrôles en pilule (rounded-full), carte/menu 10, modale 14. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 10px;
+  --radius-2xl: 10px;
+  --radius-3xl: 14px;
+  --radius-4xl: 14px;
+  --ease-expo: cubic-bezier(0.2, 0, 0, 1);
+  --ease-soft: cubic-bezier(0.2, 0, 0, 1);
+  --ease-quart: cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* ---------------------------------------------------------------------------
@@ -336,7 +91,9 @@ html {
 body {
   background-color: var(--mm-bg);
   min-height: 100dvh;
-  color: var(--mm-h2);
+  color: var(--mm-fg);
+  font-size: var(--mm-text-md);
+  line-height: var(--mm-leading-md);
 }
 
 /* Main qui pointe sur tout ce qui est cliquable (Tailwind 4 ne le fait plus pour les boutons). */
@@ -373,34 +130,45 @@ dialog::backdrop {
   outline-offset: 2px;
 }
 
-/* Champs : contour ≥ 3:1, focus en accent-hover + halo accent-soft */
+/* Champs (.mm-input de la charte) : contour ≥ 3:1, survol accent, focus accent + halo 3 px, curseur accent. */
 .field {
   background: var(--mm-field);
   border: 1px solid var(--mm-border-strong);
-  color: var(--mm-h2);
+  color: var(--mm-fg);
+  caret-color: var(--mm-accent);
   transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+    border-color var(--mm-duration-fast) var(--mm-ease),
+    box-shadow var(--mm-duration-fast) var(--mm-ease);
 }
 .field::placeholder {
-  color: var(--mm-meta);
+  color: var(--mm-muted);
+}
+.field:hover {
+  border-color: var(--mm-accent);
 }
 .field:focus,
 .field[aria-expanded="true"] {
-  border-color: var(--mm-accent-hover);
+  border-color: var(--mm-accent);
   box-shadow: 0 0 0 3px var(--mm-accent-soft);
   outline: none;
 }
 .field[aria-invalid="true"] {
-  border-color: var(--mm-red);
+  border-color: var(--mm-danger);
+}
+.field:disabled {
+  background: var(--mm-neutral-soft);
+  color: var(--mm-muted);
+  border-color: var(--mm-border);
+  cursor: not-allowed;
 }
 
 select.field {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238b93a0' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: linear-gradient(45deg, transparent 50%, var(--mm-accent) 50%), linear-gradient(135deg, var(--mm-accent) 50%, transparent 50%);
+  background-position: calc(100% - 22px) 50%, calc(100% - 17px) 50%;
+  background-size: 5px 5px;
   background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2.25rem;
+  padding-right: 40px;
 }
 
 /* Barre de défilement discrète */
@@ -413,28 +181,6 @@ select.field {
  * Mouvement — courbes de la charte, désactivées si reduced-motion
  * ------------------------------------------------------------------------- */
 
-@keyframes page-enter {
-  0% {
-    opacity: 0;
-    filter: blur(6px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-
-@keyframes rise {
-  0% {
-    opacity: 0;
-    translate: 0 10px;
-  }
-  to {
-    opacity: 1;
-    translate: 0;
-  }
-}
-
 @keyframes ping {
   0% {
     opacity: 0.6;
@@ -444,32 +190,6 @@ select.field {
   to {
     opacity: 0;
     scale: 2.4;
-  }
-}
-
-@keyframes section-drift {
-  0%,
-  to {
-    translate: 0;
-  }
-  50% {
-    translate: 3rem -2rem;
-  }
-}
-
-@keyframes glow-blob {
-  0%,
-  to {
-    scale: 1;
-    rotate: 0deg;
-  }
-  33% {
-    scale: 1.08 0.94;
-    rotate: 8deg;
-  }
-  66% {
-    scale: 0.95 1.06;
-    rotate: -6deg;
   }
 }
 
@@ -484,30 +204,11 @@ select.field {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .page-enter {
-    animation: 0.4s var(--ease-soft) page-enter;
-  }
-  .rise {
-    animation: 0.6s var(--ease-expo) both rise;
-  }
   .ping {
     animation: 2.4s cubic-bezier(0, 0, 0.2, 1) infinite ping;
   }
   .skeleton {
     animation: 1.6s ease-in-out infinite skeleton;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) and (min-width: 768px) {
-  .section-drift {
-    animation:
-      section-drift 48s ease-in-out infinite,
-      glow-blob var(--blob-duration, 28s) ease-in-out infinite;
-    animation-delay: 0s, var(--blob-delay, 0s);
-  }
-  .section-drift-reverse {
-    animation-direction: reverse, normal;
-    animation-duration: 58s, var(--blob-duration, 28s);
   }
 }
 
@@ -525,13 +226,13 @@ select.field {
   --xy-edge-stroke-selected: var(--mm-accent);
   --xy-connectionline-stroke: var(--mm-accent);
   --xy-handle-background-color: var(--mm-accent);
-  --xy-handle-border-color: var(--mm-bg-box);
-  --xy-controls-button-background-color: var(--mm-bg-elevated);
+  --xy-handle-border-color: var(--mm-surface);
+  --xy-controls-button-background-color: var(--mm-overlay);
   --xy-controls-button-background-color-hover: var(--mm-border);
-  --xy-controls-button-color: var(--mm-h2);
-  --xy-controls-button-color-hover: var(--mm-h1);
+  --xy-controls-button-color: var(--mm-fg);
+  --xy-controls-button-color-hover: var(--mm-bright);
   --xy-controls-button-border-color: var(--mm-border);
-  --xy-minimap-background-color: var(--mm-bg-crust);
+  --xy-minimap-background-color: var(--mm-crust);
   --xy-minimap-mask-background-color: #0f131a99;
   --xy-minimap-node-background-color: var(--mm-border);
   --xy-attribution-background-color: transparent;
@@ -539,47 +240,33 @@ select.field {
   --xy-selection-border: 1px dashed var(--mm-accent);
 }
 .react-flow__controls {
-  border-radius: 0.75rem;
+  border-radius: var(--mm-radius-md);
   overflow: hidden;
   border: 1px solid var(--mm-border);
   box-shadow: none;
 }
 .react-flow__minimap {
-  border-radius: 1rem;
+  border-radius: var(--mm-radius-md);
   overflow: hidden;
   border: 1px solid var(--mm-border);
 }
 .react-flow__edge-textbg {
-  fill: var(--mm-bg-elevated);
+  fill: var(--mm-overlay);
 }
 .react-flow__edge-text {
-  fill: var(--mm-body);
+  fill: var(--mm-subtle);
   font-family: var(--font-mono);
   font-size: 10px;
 }
 
 /* Dialogues natifs */
 dialog::backdrop {
-  background: var(--mm-overlay);
-  backdrop-filter: blur(4px);
+  background: var(--mm-scrim);
 }
 
-@keyframes sheet-up {
-  from {
-    translate: 0 100%;
-  }
-  to {
-    translate: 0 0;
-  }
-}
 @media (prefers-reduced-motion: no-preference) {
   dialog[open] {
-    animation: 0.35s var(--ease-soft) sheet-up;
-  }
-  @media (min-width: 640px) {
-    dialog[open] {
-      animation: 0.4s var(--ease-soft) page-enter;
-    }
+    animation: mm-in var(--mm-duration-slow) var(--mm-ease-out);
   }
 }
 
@@ -589,49 +276,12 @@ dialog::backdrop {
 .theme-transition *::before,
 .theme-transition *::after {
   transition:
-    background-color 0.35s ease,
-    border-color 0.35s ease,
-    color 0.35s ease,
-    fill 0.35s ease,
-    stroke 0.35s ease,
-    box-shadow 0.35s ease !important;
-}
-
-/* FadeIn au défilement */
-@media (prefers-reduced-motion: no-preference) {
-  .fade-in {
-    transition:
-      opacity 0.8s var(--ease-expo),
-      filter 0.8s var(--ease-expo),
-      translate 0.8s var(--ease-expo),
-      scale 0.8s var(--ease-expo);
-  }
-  .fade-in[data-shown="false"] {
-    opacity: 0;
-    filter: blur(6px);
-    translate: 0 24px;
-    scale: 0.98;
-  }
-}
-
-
-
-/* ---------------------------------------------------------------------------
- * Lueurs (portfolio : src/styles/globals.css)
- * ------------------------------------------------------------------------- */
-
-/* Lueur de la navbar et du menu mobile */
-.nav-glow {
-  box-shadow: 0 0 32px 6px var(--mm-glow-accent);
-}
-
-/* Effets de survol partagés */
-.hover-glow {
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
-.hover-glow:hover {
-  border-color: var(--mm-border-accent);
-  box-shadow: 0 0 30px var(--mm-glow-accent-strong);
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    fill 0.18s ease,
+    stroke 0.18s ease,
+    box-shadow 0.18s ease !important;
 }
 
 /* PWA installée : pas de rebond hors page, pas de sélection accidentelle sur les contrôles */
@@ -690,7 +340,7 @@ dialog::backdrop {
   height: 0.8rem;
   border-radius: 9999px;
   background: var(--mm-accent);
-  box-shadow: 0 0 14px 4px var(--mm-glow-accent-strong);
+  box-shadow: 0 0 14px 4px var(--mm-accent-soft);
   translate: -50% -50%;
   opacity: 0;
   pointer-events: none;
@@ -710,3 +360,15 @@ dialog::backdrop {
   }
 }
 
+
+/* Contrôle segmenté en liens (LinkTabs) : l'élément actif porte aria-current. */
+.mm-segmented__item[aria-current="page"] {
+  background: var(--mm-accent);
+  color: var(--mm-on-accent);
+  box-shadow: var(--mm-shadow-sm);
+}
+
+/* Icônes Lucide (SVG) dans la navigation : accent sur l'entrée active, comme .mm-icon dans la charte. */
+.mm-nav-item[aria-current="page"] > svg {
+  color: var(--mm-accent-text);
+}
