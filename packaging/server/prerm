@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+if [ "$1" = remove ]; then
+  for unit in $(systemctl list-units --all --plain --no-legend 'homelab-tools@*.service' | awk '{print $1}'); do
+    systemctl disable --now "$unit" || true
+  done
+  systemctl disable --now homelab-tools-update.path || true
+fi

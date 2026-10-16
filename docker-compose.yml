@@ -1,0 +1,50 @@
+# Two separate deployments, usually on two machines:
+#   docker compose up -d monitoring    # on the monitoring VPS (agents connect here)
+#   docker compose up -d management    # on the management VM / CT
+# Updates: docker compose pull && docker compose up -d
+x-hardening: &hardening
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  monitoring:
+    <<: *hardening
+    image: ghcr.io/midnights-ra1n/homelab-management:latest
+    container_name: hlt-monitoring
+    ports:
+      - "8080:8080"
+    volumes:
+      - monitoring-data:/data
+    environment:
+      HLT_ROLE: monitoring
+      # Public address: agents install command and CSRF check.
+      HLT_PUBLIC_URL: "https://monitoring.example.fr"
+      # Reverse proxies allowed to set X-Forwarded-For / X-Forwarded-Proto.
+      HLT_TRUSTED_PROXIES: "172.16.0.0/12"
+    deploy:
+      resources:
+        limits: { memory: 256M, cpus: "1.0" }
+
+  management:
+    <<: *hardening
+    image: ghcr.io/midnights-ra1n/homelab-management:latest
+    container_name: hlt-management
+    ports:
+      - "3000:8080"
+    volumes:
+      # To take over homelab-management: copy its homelab.db, secret.key and uploads/ here.
+      - management-data:/data
+    environment:
+      HLT_ROLE: management
+      HLT_PUBLIC_URL: "https://gestion.example.fr"
+      HLT_TRUSTED_PROXIES: "172.16.0.0/12"
+    deploy:
+      resources:
+        limits: { memory: 256M, cpus: "1.0" }
+
+volumes:
+  monitoring-data:
+  management-data:

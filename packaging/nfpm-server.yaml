@@ -1,0 +1,34 @@
+# Server package (both roles). Built by .github/workflows/release.yml:
+#   (binary staged as dist/pkg/homelab-tools) VERSION=0.2.3 ARCH=amd64 nfpm package -f packaging/nfpm-server.yaml -p deb -t dist/
+name: homelab-tools
+arch: ${ARCH}
+version: ${VERSION}
+maintainer: midnights-ra1n
+description: |
+  Homelab Tools server: monitoring (agents, probes, alerts, status page) or
+  management (inventory, IPAM, deployments, Proxmox, Webmin), one role per instance.
+homepage: https://github.com/midnights-ra1n/homelab-management
+license: Proprietary
+depends: [curl, ca-certificates]
+contents:
+  - src: dist/pkg/homelab-tools
+    dst: /usr/bin/homelab-tools
+    file_info: { mode: 0755 }
+  - src: packaging/server/homelab-tools@.service
+    dst: /lib/systemd/system/homelab-tools@.service
+  - src: packaging/server/homelab-tools-update.path
+    dst: /lib/systemd/system/homelab-tools-update.path
+  - src: packaging/server/homelab-tools-update.service
+    dst: /lib/systemd/system/homelab-tools-update.service
+  - src: packaging/server/update.sh
+    dst: /usr/lib/homelab-tools/update.sh
+    file_info: { mode: 0755 }
+  - src: packaging/server/monitoring.env
+    dst: /etc/homelab-tools/monitoring.env
+    type: config|noreplace
+  - src: packaging/server/management.env
+    dst: /etc/homelab-tools/management.env
+    type: config|noreplace
+scripts:
+  postinstall: packaging/server/postinst
+  preremove: packaging/server/prerm

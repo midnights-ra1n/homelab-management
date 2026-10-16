@@ -1,0 +1,9 @@
+[Unit]
+Description=Homelab Tools: update requested from the settings page
+
+[Path]
+PathExists=/var/lib/homelab-tools/update/request
+Unit=homelab-tools-update.service
+
+[Install]
+WantedBy=paths.target

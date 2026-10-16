@@ -1,0 +1,30 @@
+---
+# present: install or update the agent. absent: remove it completely.
+hlm_agent_state: present
+
+# Hub address, as reachable from the hosts (https:// recommended).
+hlm_hub_url: ""
+# Agent token. Either a shared enrollment token (enr_…, same value for every host:
+# each machine enrolls itself on first connection), or a per-host token from the UI.
+hlm_agent_token: ""
+# Hub public key, the same for every host.
+hlm_key: ""
+
+# binary: the release binary in /opt/hlm-agent, updated daily by the agent (as install.sh).
+# deb: the hlm-agent .deb of the release, updated by this role or the dashboard's button.
+hlm_install_method: binary
+
+# Release to install: "latest" or a tag such as v0.1.42.
+hlm_version: latest
+hlm_repo: midnights-ra1n/homelab-management
+
+# Accept a plain http:// hub (unencrypted link, trusted LAN only).
+hlm_allow_insecure: "{{ hlm_hub_url is match('^http://') }}"
+# Daily self-update. Disabled when pinning hlm_version, so Ansible and the agent agree.
+hlm_auto_update: "{{ hlm_version == 'latest' }}"
+# "Check / install updates" buttons of the dashboard (root-owned helper, fixed apt actions).
+hlm_remote_updates: true
+# Docker monitoring: auto (when docker is installed), true or false.
+hlm_docker: auto
+# SMART collection; off by default on virtual machines and containers.
+hlm_smart: "{{ ansible_facts.virtualization_role | default('host') != 'guest' }}"

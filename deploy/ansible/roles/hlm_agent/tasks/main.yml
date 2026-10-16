@@ -1,0 +1,12 @@
+---
+- name: Remove the agent
+  ansible.builtin.include_tasks: absent.yml
+  when: hlm_agent_state == 'absent'
+
+- name: Install the agent (binary + install.sh layout)
+  ansible.builtin.include_tasks: present.yml
+  when: hlm_agent_state == 'present' and hlm_install_method == 'binary'
+
+- name: Install the agent (.deb package)
+  ansible.builtin.include_tasks: present_deb.yml
+  when: hlm_agent_state == 'present' and hlm_install_method == 'deb'

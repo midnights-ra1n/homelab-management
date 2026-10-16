@@ -1,0 +1,83 @@
+---
+# Installation through the hlm-agent .deb of the release (hlm_install_method: deb).
+# The package installs the same files as install.sh; the agent then never rewrites its
+# binary: updates come from this role (hlm_version) or the dashboard's update button.
+- name: Check configuration
+  ansible.builtin.assert:
+    that:
+      - hlm_hub_url is match('^https?://')
+      - hlm_agent_token | length > 0
+      - hlm_key | length > 0
+      - ansible_facts.architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    fail_msg: "Set hlm_hub_url, hlm_agent_token and hlm_key (shown in Hôtes → Déploiement en masse). Supported: x86_64, aarch64."
+    quiet: true
+
+- name: Resolve the latest release
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/{{ hlm_repo }}/releases/latest"
+    headers:
+      Accept: application/vnd.github+json
+  register: _hlm_release
+  when: hlm_version == 'latest'
+  run_once: true
+  delegate_to: localhost
+  become: false
+  check_mode: false
+
+- name: Select the package
+  ansible.builtin.set_fact:
+    _hlm_tag: "{{ _hlm_release.json.tag_name if hlm_version == 'latest' else hlm_version }}"
+    _hlm_deb_arch: "{{ {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}[ansible_facts.architecture] }}"
+
+- name: Create the hlm-agent system user
+  ansible.builtin.user:
+    name: hlm-agent
+    system: true
+    create_home: false
+    home: /nonexistent
+    shell: /usr/sbin/nologin
+
+- name: Create /etc/hlm-agent
+  ansible.builtin.file:
+    path: /etc/hlm-agent
+    state: directory
+    owner: root
+    group: hlm-agent
+    mode: "0750"
+
+# Written before the package: its post-install script reads both files.
+- name: Write /etc/hlm-agent/agent.env
+  ansible.builtin.template:
+    src: agent.env.j2
+    dest: /etc/hlm-agent/agent.env
+    owner: root
+    group: hlm-agent
+    mode: "0640"
+  notify: Restart hlm-agent
+
+- name: Write /etc/hlm-agent/install.env
+  ansible.builtin.copy:
+    dest: /etc/hlm-agent/install.env
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (role hlm_agent): install options read by the package's scripts.
+      SMART={{ hlm_smart | bool | lower }}
+      REMOTE_UPDATES={{ hlm_remote_updates | bool | lower }}
+      DOCKER={{ hlm_docker | string | lower }}
+  notify: Reconfigure hlm-agent
+
+- name: Download the package (verified by SHA-256)
+  ansible.builtin.get_url:
+    url: "https://github.com/{{ hlm_repo }}/releases/download/{{ _hlm_tag }}/{{ _hlm_deb }}"
+    dest: "/var/cache/{{ _hlm_deb }}"
+    checksum: "sha256:https://github.com/{{ hlm_repo }}/releases/download/{{ _hlm_tag }}/{{ _hlm_deb }}.sha256"
+    mode: "0644"
+  vars:
+    _hlm_deb: "hlm-agent_{{ _hlm_tag | regex_replace('^v', '') }}_{{ _hlm_deb_arch }}.deb"
+  register: _hlm_download
+
+- name: Install the package
+  ansible.builtin.apt:
+    deb: "{{ _hlm_download.dest }}"

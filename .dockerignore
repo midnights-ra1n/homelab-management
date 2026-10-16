@@ -1,7 +1,17 @@
 .git
-.next
-node_modules
+**/node_modules
+agent/target
+server/web/dist
+**/.DS_Store
+*.pdf
+# Local hub data (database, signing key) and design sources never go into the build context.
 data
-*.md
-!README.md
-.env*
+server/data
+*.db
+*.db-wal
+*.db-shm
+*.pem
+Midnights Classic
+*.svg
+!web/**/*.svg
+dist

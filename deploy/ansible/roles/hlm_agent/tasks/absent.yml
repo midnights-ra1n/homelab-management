@@ -1,0 +1,44 @@
+---
+- name: Remove the hlm-agent package (if installed as .deb)
+  ansible.builtin.apt:
+    name: hlm-agent
+    state: absent
+  failed_when: false
+
+- name: Stop and disable the services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: [hlm-agent.service, hlm-agent-smart.timer, hlm-agent-apt.path, hlm-agent-docker.timer, hlm-agent-docker-update.path]
+  failed_when: false
+
+- name: Remove files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/hlm-agent.service
+    - /etc/systemd/system/hlm-agent-smart.service
+    - /etc/systemd/system/hlm-agent-smart.timer
+    - /etc/systemd/system/hlm-agent-apt.path
+    - /etc/systemd/system/hlm-agent-apt.service
+    - /etc/systemd/system/hlm-agent-docker.service
+    - /etc/systemd/system/hlm-agent-docker.timer
+    - /etc/systemd/system/hlm-agent-docker-update.path
+    - /etc/systemd/system/hlm-agent-docker-update.service
+    - /opt/hlm-agent
+    - /etc/hlm-agent
+    - /usr/local/lib/hlm-agent
+    - /var/lib/hlm-agent
+  register: _hlm_removed
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: _hlm_removed is changed
+
+- name: Remove the hlm-agent user
+  ansible.builtin.user:
+    name: hlm-agent
+    state: absent

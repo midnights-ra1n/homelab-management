@@ -1,0 +1,9 @@
+[Unit]
+Description=Homelab Tools: install the requested release
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Root-owned script with one job: install an official release's .deb, checked with SHA-256.
+ExecStart=/usr/lib/homelab-tools/update.sh
+TimeoutStartSec=15min

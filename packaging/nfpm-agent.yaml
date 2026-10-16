@@ -1,0 +1,56 @@
+# Agent package. Built by .github/workflows/release.yml:
+#   (binary staged as dist/pkg/hlm-agent + .sha256) VERSION=0.2.3 ARCH=amd64 nfpm package -f packaging/nfpm-agent.yaml -p deb -t dist/
+# The files are installed by install.sh (BUNDLE mode) from /usr/share/hlm-agent.
+name: hlm-agent
+arch: ${ARCH}
+version: ${VERSION}
+maintainer: midnights-ra1n
+description: |
+  Homelab Tools agent: host metrics, updates, SMART, Docker and hardware inventory,
+  streamed to the monitoring server.
+homepage: https://github.com/midnights-ra1n/homelab-management
+license: Proprietary
+depends: [ca-certificates]
+recommends: [smartmontools, curl]
+contents:
+  - src: dist/pkg/hlm-agent
+    dst: /usr/share/hlm-agent/hlm-agent
+    file_info: { mode: 0755 }
+  - src: dist/pkg/hlm-agent.sha256
+    dst: /usr/share/hlm-agent/sum
+  - src: agent/install.sh
+    dst: /usr/share/hlm-agent/install.sh
+    file_info: { mode: 0755 }
+  - src: agent/uninstall.sh
+    dst: /usr/share/hlm-agent/uninstall.sh
+    file_info: { mode: 0755 }
+  - src: agent/hlm-agent.service
+    dst: /usr/share/hlm-agent/hlm-agent.service
+  - src: agent/hlm-agent-smart.service
+    dst: /usr/share/hlm-agent/hlm-agent-smart.service
+  - src: agent/hlm-agent-smart.timer
+    dst: /usr/share/hlm-agent/hlm-agent-smart.timer
+  - src: agent/smart-collect.sh
+    dst: /usr/share/hlm-agent/smart-collect.sh
+    file_info: { mode: 0755 }
+  - src: agent/hlm-agent-apt.path
+    dst: /usr/share/hlm-agent/hlm-agent-apt.path
+  - src: agent/hlm-agent-apt.service
+    dst: /usr/share/hlm-agent/hlm-agent-apt.service
+  - src: agent/apt-action.sh
+    dst: /usr/share/hlm-agent/apt-action.sh
+    file_info: { mode: 0755 }
+  - src: agent/hlm-agent-docker.service
+    dst: /usr/share/hlm-agent/hlm-agent-docker.service
+  - src: agent/hlm-agent-docker.timer
+    dst: /usr/share/hlm-agent/hlm-agent-docker.timer
+  - src: agent/hlm-agent-docker-update.path
+    dst: /usr/share/hlm-agent/hlm-agent-docker-update.path
+  - src: agent/hlm-agent-docker-update.service
+    dst: /usr/share/hlm-agent/hlm-agent-docker-update.service
+  - src: agent/docker-helper.sh
+    dst: /usr/share/hlm-agent/docker-helper.sh
+    file_info: { mode: 0755 }
+scripts:
+  postinstall: packaging/agent/postinst
+  preremove: packaging/agent/prerm

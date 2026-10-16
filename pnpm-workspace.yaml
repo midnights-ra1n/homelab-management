@@ -1,5 +1,0 @@
-allowBuilds:
-  cpu-features: false
-  sharp: false
-  ssh2: false
-  unrs-resolver: false

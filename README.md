@@ -1,162 +1,175 @@
 # Homelab Management
 
-> [!NOTE]
-> **Personal project, built with the help of AI.** This application was designed and written with an AI assistant
-> (Claude, by Anthropic) for my own homelab. It is shared as-is, without warranty or support: read the code and test
-> it before relying on it, especially the Proxmox actions (start, stop, migration) and exposing it on a network.
+Dépôt : [midnights-ra1n/homelab-management](https://github.com/midnights-ra1n/homelab-management). Il remplace aussi [homelab-monitoring](https://github.com/midnights-ra1n/homelab-monitoring), désormais archivé. Le serveur, son paquet et son image s'appellent `homelab-tools`.
 
-> [!TIP]
-> **Want to use it for your own homelab? Fork it.** The recommended path is to fork this repository, adapt it to your
-> needs and build your own Docker image (the included GitHub Actions workflow publishes it to your fork's GHCR), rather
-> than opening pull requests here. This project follows my own setup and priorities, so contributions may not be
-> merged; a fork gives you full control over updates, features and security fixes.
+Gestion et supervision d'un homelab, réunies dans un seul projet issu de la fusion de **homelab-management** et **homelab-monitoring** :
 
-Self-hosted web application to run a homelab: inventory, IPAM, deployments, tasks, start page, interactive map,
-multi-node Proxmox management, Webmin instances and centralized monitoring (Beszel, Maintenant, PatchMon).
+- un **serveur** en Go, un seul binaire avec **deux rôles** déployés séparément :
+  - **monitoring**, en général sur un VPS dédié : les agents s'y connectent, sondes HTTP/TCP/DNS/SSL/SNMP, alertes e-mail groupées, page de statut publique, rapports, API ouverte ;
+  - **gestion**, sur une VM ou un CT : inventaire, IPAM (VLAN, sous-réseaux, VPN, pare-feu, simulation de flux), noms de domaine, déploiements, tâches (Kanban), carte, page d'applications, Proxmox multi-nœuds sans cluster, Webmin ;
+- un **agent** en Rust (binaire statique, `.deb` ou script `curl`), qui alimente à la fois le monitoring et l'inventaire ;
+- deux interfaces **React + Tailwind**, PWA et optimisées mobile, avec le même design (Midnights Classic : mêmes polices, tailles, icônes et composants), mais séparées : chaque rôle a la sienne.
 
-Available in **French and English** (switch in the user menu, the settings or the sign-in page).
-
-Design: **Midnights Mint** style guide ([noe-georget.fr/graphique](https://noe-georget.fr/graphique)) — accent `#3fbfa6`,
-Geist & Geist Mono fonts (`geist` npm package), dark / light / auto themes.
-
-## Features
-
-| Module | Contents |
-| --- | --- |
-| **Dashboard** | KPIs, live Proxmox status and monitoring alerts, deployments in progress, upcoming tasks, hardware capacity, IPAM usage, activity log |
-| **Applications** | Grouped shortcuts, search (`/`, Enter to open), availability check, [Dashboard Icons](https://dashboardicons.com) / [selfh.st](https://selfh.st/icons) icons, custom icon upload or URL, drag-and-drop reordering |
-| **Inventory** | Physical servers, VMs, LXC CTs, Docker containers, network devices. Display name + hostname, IP/VLAN/subnet, tags, parent host, hardware (CPU, sockets/cores/threads, RAM + type, GPU, disks, NICs, power draw), OS, Proxmox, Docker, notes. Automatic matching with Beszel / PatchMon |
-| **Network (IPAM)** | VLANs, subnets (gateway, DNS, DHCP range), clickable usage grid, next free IP, conflict detection, VPN tunnels, firewall rules and packet-flow simulation |
-| **Deployments** | Manual tracking: type, status, priority, target, VMID, containers/apps, subdomains, checklist (templates per type), notes. **Cards** or **List** view; one-click creation of the inventory item |
-| **Tasks** | Drag-and-drop (and keyboard) Kanban, priorities, due dates, links to inventory / deployments |
-| **Map** | React Flow topology: host → guests hierarchy, physical/logical links, type / VLAN filters, saved positions |
-| **Proxmox** | Aggregates standalone nodes (no cluster, no PDM): resources, guests, start/stop/reboot, task log, storage, **remote migration** (`remote-migrate`), sync to the inventory |
-| **Webmin** | All your Webmin instances on one page: web UI reachability plus, over key-based SSH, OS, uptime, load, memory, disk, Webmin version and service status, pending updates and reboot-required flag |
-| **Monitoring** | Built-in availability probes (HTTP/TCP), status-page style: global status, response time (24 h / 7 d / 30 d), 90-day availability bars, incidents (outage confirmed after 2 failures). Plus Beszel, Maintenant and PatchMon |
-| **Settings** | Integrations (with connection test), SSH keys, theme, language, password, JSON export / restore |
-
-## Mobile & PWA
-
-- Installable (manifest, icons, shortcuts): *Add to Home Screen* on iOS / Android, or *Install* on desktop.
-- Bottom tab bar (thumb zone), sliding "More" sheet, sheet dialogs on mobile, tables shown as cards.
-- Service worker: static assets cached, offline page when the server is unreachable (no data is cached).
-- Respects safe areas (notch, home bar) and the "reduce motion" preference.
-
-> PWA installation requires HTTPS (or `localhost`): serve it through your reverse proxy with a certificate.
-
-## Quick start
-
-### Docker / Podman
-
-```bash
-docker compose up -d
-# → http://<host>:3000 : the first visit offers to create the admin account
-```
-
-Data (SQLite database, uploaded icons, encryption key) lives in the `/data` volume.
-
-### Your own image (recommended for a fork)
-
-```bash
-docker build -t homelab-management .
-```
-
-Or push to your fork's `stable` branch: the GitHub Actions workflow builds a multi-arch (amd64 + arm64) image on
-native runners and publishes it to `ghcr.io/<your-account>/homelab-management`. Update `image:` in `compose.yaml`
-accordingly.
-
-### Proxmox CT from an OCI image (PVE 9.1+)
-
-The image is published with OCI media types and no attestation manifests, so Proxmox can pull it directly:
-*Storage → CT Templates → Pull from OCI registry* → `ghcr.io/midnights-ra1n/homelab-management:latest`.
-
-To upload an archive instead, export it in OCI layout:
-
-```bash
-docker buildx build --platform linux/amd64 --output type=oci,dest=homelab-management.tar .
-```
-
-Create the CT from the template, add a mount point on `/data` and open port `3000`. The image is built for this:
-`tini` is PID 1 (clean CT shutdown), the entrypoint gives `/data` to the `app` user (UID 1001) even when Proxmox
-creates the mount point as root, then drops root privileges. Environment variables (`APP_SECRET`,
-`COOKIE_SECURE`…) can be set in the CT *Options*.
-
-### Development
-
-```bash
-pnpm install
-pnpm dev        # http://localhost:3000
-pnpm test && pnpm lint && pnpm build
-```
-
-Requirements: Node.js ≥ 22.13 (uses the built-in `node:sqlite` module, no native dependency to compile).
-
-## Configuration
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `DATA_DIR` | `./data` (`/data` in the image) | SQLite database, icons, key |
-| `APP_SECRET` | generated in `DATA_DIR/secret.key` | AES-256-GCM encryption key for integration secrets and SSH keys |
-| `COOKIE_SECURE` | `false` | `Secure` session cookie (behind HTTPS) |
-| `AUTH_DISABLED` | `false` | Disables the built-in sign-in (only behind an SSO) |
-| `MONITOR_DISABLED` | `false` | Disables the background availability monitor |
-| `PORT` / `TZ` | `3000` / `Europe/Paris` | |
-
-## Integrations
-
-- **Proxmox VE** — one integration per node. API token (*Datacenter → Permissions → API Tokens*): `PVEAuditor` is
-  enough for read access, `PVEVMAdmin` for actions. For remote migration, the target token needs `Sys.Incoming`.
-  Disable TLS verification for the self-signed certificate.
-- **Beszel** — hub URL + a user's e-mail / password (PocketBase API).
-- **Maintenant** — URL; no built-in auth, an optional header lets you get through the reverse proxy.
-- **PatchMon** — *Integration API* credentials with the `host:get` scope (Basic auth).
-- **Webmin** — one integration per instance: the Webmin URL, plus optionally an SSH key, user and port. Create or
-  import the key in *Settings → SSH keys* (Ed25519 recommended), then add its public key to the user's
-  `~/.ssh/authorized_keys` on each host. Everything is read-only, so a non-root account is enough. The host key
-  fingerprint is pinned on first connection (trust on first use); a changed fingerprint is refused until you reset it.
-
-Secrets and private keys are encrypted in the database and never sent to the browser.
-
-## Languages
-
-The interface is French by default and fully translated into English. The language is picked from the `hm-lang`
-cookie (set by the switcher), otherwise from the browser's `Accept-Language`. URLs stay the same: the proxy rewrites
-each page to its prerendered `/fr/…` or `/en/…` version.
-
-Translations live in `src/i18n/en.ts`, keyed by the French source text (gettext style). A missing entry falls back
-to French, and a test fails if a French string passed to `tr()` has no English translation.
-
-## Security
-
-- **WAF** (`src/lib/security.ts`, applied by `src/proxy.ts`): returns 403 for SQL injection, XSS, path traversal,
-  Log4Shell / command injection and CRLF signatures, known scanners (`sqlmap`, `nikto`, `nuclei`…), common probes
-  (`/.env`, `/.git`, `/wp-login.php`, `*.php`…) and unusual HTTP methods. The URL and User-Agent are inspected, not
-  form bodies (protected by parameterized SQL, zod and React escaping).
-- **Brute-force protection**: 10 failures on a username → 15 s lock, doubled on each new failure (max 5 min);
-  25 failures from an IP → IP banned from the whole app (30 s doubled, max 10 min). 15 WAF hits → IP banned for 60 s
-  (doubled, max 30 min). Response `429` + `Retry-After`. Events are logged (`[auth]`, `[waf]`) for fail2ban / CrowdSec.
-- **Passkeys** (WebAuthn, HTTPS only): add them in *Settings → Account*, then use “Sign in with a passkey”.
-  User verification (biometrics / PIN) is required; failures count toward the IP ban. A passkey is bound to the
-  hostname it was created on.
-- **Headers**: CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP.
-- The client IP is the last entry of `X-Forwarded-For`. **Run the app behind a reverse proxy** that sets this header:
-  when exposed directly, the IP can be spoofed and only the per-username lock protects the sign-in.
-- Counters are kept in memory: a restart resets them.
+L'interface est en français.
 
 ## Architecture
 
 ```
-src/
-  app/[lang]/(auth)  sign-in, first start
-  app/[lang]/(app)   pages (dashboard, inventory, network, Webmin, …)
-  app/api            health, export, uploaded icons
-  actions/           server actions (zod validation, session required)
-  i18n/              translator, English dictionary, locale provider
-  lib/db             SQLite (node:sqlite) + migrations
-  lib/data           data access per domain
-  lib/integrations   Proxmox, Beszel, Maintenant, PatchMon, Webmin (SSH) clients
-  components/        style-guide UI (buttons, fields, cards, dialogs…)
-  features/          feature components per module
+            agents (hlm-agent)                         navigateur
+                   │ WebSocket, authentification mutuelle    │
+                   ▼                                         ▼
+  ┌──────────────────────────────┐   API /api/v1   ┌──────────────────────────┐
+  │ homelab-tools  (monitoring)  │◀────────────────│ homelab-tools (gestion)  │
+  │ VPS · hlm.db                 │  jeton hlm_…    │ VM / CT · homelab.db     │
+  └──────────────────────────────┘                 └──────────────────────────┘
 ```
 
-Stack: Next.js 16 (App Router, Cache Components, React Compiler), React 19, Tailwind CSS 4, zod, React Flow, ssh2, lucide.
+- Les agents ne parlent **qu'au monitoring**.
+- La gestion lit l'API du monitoring avec un jeton (scopes `hosts:read`, `monitors:read`, et `hosts:write` pour le décommissionnement) : tableau de bord, alertes, page *Monitoring* et **synchronisation de l'inventaire**.
+- Les intégrations **Proxmox** (Paramètres → Intégrations) restent **indépendantes** de l'inventaire et du monitoring. Elles centralisent plusieurs nœuds autonomes sans créer de cluster, donc sans problème de quorum.
+- Intégrations disponibles : Proxmox VE, Homelab Monitoring et Webmin. Beszel, Maintenant et PatchMon ont été retirés.
+
+## Inventaire et monitoring
+
+Toutes les 2 minutes (ou avec *Paramètres → Synchroniser maintenant*), la gestion relie chaque hôte équipé de l'agent à un élément de l'inventaire :
+
+1. un élément déjà relié est mis à jour ;
+2. sinon, un élément non relié qui porte le même nom d'hôte est relié ;
+3. sinon, un élément est créé (tag `monitoring`), de type déduit de la virtualisation (physique, VM, LXC, Docker).
+
+Les champs qui viennent de l'agent sont mis à jour : système et version, processeur (modèle, cœurs, threads, sockets), mémoire, disques, interfaces, fabricant, modèle et n° de série (lisible seulement si l'agent en a le droit), plus la première adresse IP si l'élément n'en a pas. L'état (en ligne / hors ligne) suit celui du monitoring, sauf les états manuels (maintenance, planifié, retiré). Chaque création ou modification est inscrite au journal, avec l'auteur « synchronisation ». La fiche d'un élément relié affiche ses mesures en direct et un lien vers l'hôte dans le monitoring. On peut désactiver la synchronisation dans les paramètres.
+
+## Décommissionnement
+
+Sur la fiche d'un élément, **Décommissionner** le passe à l'état *Retiré* et prépare une liste d'étapes adaptée à ce qui lui est lié :
+
+- sauvegarder les données ;
+- arrêter les services ;
+- **retirer l'hôte du monitoring** (automatique, via l'API) puis désinstaller l'agent ;
+- **réaffecter les éléments hébergés** (automatique) ;
+- **supprimer les domaines** (automatique) ;
+- **supprimer les règles de pare-feu et les raccourcis** (automatique) ;
+- supprimer la VM / le CT ou effacer les disques, selon le type.
+
+Les étapes manuelles se cochent, les automatiques s'exécutent depuis la fiche. La dernière étape supprime l'élément et libère ses adresses IP. Tout est journalisé. On peut annuler le décommissionnement à tout moment : l'élément retrouve alors son état précédent.
+
+## Mettre à jour les agents depuis l'inventaire
+
+La liste de l'inventaire affiche **Mettre à jour N agents** quand des agents reliés ont une version plus ancienne que la dernière release ; un clic les met tous à jour. La fiche d'un élément relié montre la version de son agent et un bouton **Mettre à jour l'agent**. La gestion passe par l'API du monitoring (`POST /api/v1/hosts/{id}/agent-update`, scope `hosts:write`). L'agent se met à jour seul (installation par script) ou via son paquet `.deb` (installation par paquet, par l'assistant root `apt-action.sh`).
+
+Les agents installés avant la fusion téléchargent encore leurs mises à jour depuis le dépôt archivé : réinstallez-les une fois (commande de *Hôtes → Ajouter un hôte*, Ansible ou paquet `.deb`) pour qu'ils suivent ce dépôt.
+
+## Serveur MCP
+
+Chaque rôle propose un serveur MCP (outils en lecture seule) pour un assistant comme Claude : « est-ce que j'ai un service inaccessible ? ». Il se règle dans *Paramètres → Serveur MCP* (activation et jeton, affiché une seule fois), à l'adresse `https://<serveur>/api/mcp` (transport HTTP, en-tête `Authorization: Bearer mcp_…`).
+
+- Outils du monitoring : `etat_global`, `lister_hotes`, `details_hote`, `lister_sondes`, `mises_a_jour`.
+- Outils de la gestion : `rechercher_inventaire`, `details_element`, `lister_taches`, `lister_deploiements`, `reseau`, `etat_monitoring`.
+
+Le serveur MCP comme les **passkeys** ne fonctionnent **qu'en HTTPS**, derrière un reverse proxy. Celui-ci doit transmettre `X-Forwarded-Proto: https`, et son adresse doit figurer dans `HLT_TRUSTED_PROXIES`. En HTTP, `/api/mcp` refuse toutes les requêtes.
+
+## Journaux, base de données, mises à jour
+
+Ces trois fonctions existent sur les deux rôles :
+
+- **Journaux** (menu *Journaux*) : tout ce qui a été fait depuis l'interface, l'API ou par les tâches automatiques, avec l'auteur (utilisateur, jeton d'API, IP pour les échecs de connexion, « synchronisation »). Les entrées sont conservées **90 jours**. Recherche et filtre par catégorie.
+- **Base de données** (*Paramètres*) : taille du fichier, du journal WAL et des données, occupation du disque, taille par table ; **Nettoyer** (rétention), **Compacter** (`VACUUM`) et **taille maximale**. Au-delà de la limite, l'historique le plus ancien (métriques, résultats de sondes, journal) est supprimé ; les réglages et l'inventaire ne sont jamais touchés. SQLite tourne en WAL, `synchronous=NORMAL` et petit cache, avec une seule connexion : peu d'écritures disque, peu de CPU et de RAM.
+- **Mises à jour du serveur** (*Paramètres*) : *Rechercher les mises à jour*, puis :
+  - installation **.deb** : bouton *Mettre à jour*. Le serveur, non privilégié, écrit seulement le numéro de version demandé ; l'unité root `homelab-tools-update.path` télécharge le paquet de la release GitHub, vérifie son SHA-256 et l'installe ;
+  - installation **Docker** : la version disponible est affichée, la mise à jour se fait avec `docker compose pull && docker compose up -d`.
+
+## Installer le serveur
+
+### Paquet .deb (Debian, amd64 / arm64)
+
+```sh
+sudo apt install ./homelab-tools_<version>_$(dpkg --print-architecture).deb
+sudo systemctl enable --now homelab-tools@monitoring   # sur le VPS de monitoring, port 8080
+sudo systemctl enable --now homelab-tools@management   # sur la VM / le CT de gestion, port 3000
+```
+
+Les réglages se trouvent dans `/etc/homelab-tools/<rôle>.env` (adresse d'écoute, URL publique, proxys de confiance) et les données dans `/var/lib/homelab-tools/<rôle>/`. Le service tourne sous l'utilisateur `homelab-tools`, avec un sandbox systemd strict.
+
+### Docker (linux/amd64, linux/arm64)
+
+`docker-compose.yml` décrit les deux services ; sur chaque machine, ne démarrez que le sien :
+
+```sh
+docker compose up -d monitoring    # VPS
+docker compose up -d management    # VM / CT
+```
+
+Image : `ghcr.io/midnights-ra1n/homelab-management`, distroless, non-root, système de fichiers en lecture seule. Le rôle se choisit avec `HLT_ROLE`.
+
+### Variables
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `HLT_ROLE` | `monitoring` | `monitoring` ou `management` |
+| `HLT_LISTEN` | `:8080` | Adresse d'écoute |
+| `HLT_DATA_DIR` | `./data` (`/data` en Docker) | Base, clés, icônes |
+| `HLT_PUBLIC_URL` | — | Adresse publique (commandes d'installation de l'agent, contrôle d'origine) |
+| `HLT_TRUSTED_PROXIES` | — | CIDR des reverse proxies autorisés à transmettre `X-Forwarded-*` |
+| `HLT_INSTALL` | `deb` / `docker` (fixée par le paquet ou l'image) | Mode de mise à jour proposé dans les paramètres |
+| `APP_SECRET` | `DATA_DIR/secret.key` | Clé de chiffrement des secrets d'intégration (gestion) |
+
+Les anciennes variables `HLM_*` de homelab-monitoring sont encore lues.
+
+Premier démarrage : ouvrez l'interface et créez le compte administrateur (12 caractères minimum). Une **passkey** peut ensuite être ajoutée (HTTPS uniquement, derrière un reverse proxy).
+
+## Reprendre les données existantes
+
+- **homelab-monitoring** : le rôle monitoring utilise la même base (`hlm.db`) et la même clé (`hub_ed25519.pem`). Copiez le contenu de l'ancien volume `/data` : les agents déjà installés se reconnectent sans changement.
+- **homelab-management** : le rôle gestion ouvre le même `homelab.db`. Copiez `homelab.db` (avec `-wal` et `-shm` s'ils existent), `secret.key` et `uploads/` dans son répertoire de données. Au premier démarrage, une migration :
+  - retire les intégrations Beszel, Maintenant et PatchMon ainsi que les sondes intégrées (le monitoring s'en charge) ;
+  - ajoute le journal (auteur), le lien inventaire ↔ monitoring et le décommissionnement ;
+  - garde les comptes (le mot de passe est rehaché en Argon2id à la première connexion) et les passkeys ; les sessions sont réinitialisées, il faut se reconnecter.
+
+  Les sauvegardes JSON de homelab-management (*Paramètres → Sauvegarde & restauration*) se restaurent aussi.
+- Pour relier la gestion au monitoring : dans le monitoring, *Paramètres → API*, activez l'API et créez un jeton `hosts:read`, `monitors:read` et `hosts:write`. Dans la gestion, *Paramètres → Intégrations → Homelab Monitoring*, renseignez l'URL et ce jeton.
+
+## Installer l'agent
+
+| Méthode | Mise à jour |
+|---|---|
+| Script : *Hôtes → Ajouter un hôte* du monitoring, `curl … install.sh \| sudo HUB_URL=… TOKEN=… KEY=… sh` | automatique, chaque jour |
+| Paquet `hlm-agent_<version>_<arch>.deb` | bouton *Mettre à jour l'agent*, Ansible ou nouveau paquet |
+| Ansible : rôle `deploy/ansible/roles/hlm_agent` (`hlm_install_method: binary` ou `deb`) | selon la méthode |
+
+Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). API du monitoring : [docs/API.md](docs/API.md).
+
+## Développement
+
+```sh
+cd web && npm install && npm run build            # interface → server/web/dist (embarquée dans le binaire)
+cd server && go run .                             # rôle monitoring sur :8080
+cd server && HLT_ROLE=management HLT_LISTEN=:3000 HLT_DATA_DIR=./data-mg go run .
+cd web && HLT_API=http://127.0.0.1:3000 npm run dev   # interface en direct sur :5173
+cd agent && HUB_URL=http://127.0.0.1:8080 ALLOW_INSECURE=true TOKEN=… KEY=… cargo run
+```
+
+Mode test du monitoring : `go run -tags devmode .` crée le compte `admin` / `devmode-password` et des hôtes simulés. Ce mode n'est jamais compilé dans les releases.
+
+Tests : `go test ./...` (server), `cargo test` (agent), `npm run build` (vérification des types incluse).
+
+Organisation :
+
+```
+server/        Go : fichiers du monitoring, mg_*.go pour la gestion, journal.go, dbadmin.go, selfupdate.go, passkeys.go
+web/src/       interface monitoring (pages/, ui.tsx, layout.tsx), shared/ (journal, base, mises à jour, passkeys)
+web/src/mg/    interface gestion : composants de homelab-management (React), app/ = pages, actions/ = appels API
+agent/         agent Rust, install.sh / uninstall.sh, unités systemd et assistants root
+packaging/     paquets .deb (nfpm) : serveur (homelab-tools@.service, mise à jour) et agent
+deploy/        rôle Ansible de l'agent
+```
+
+## Publication
+
+[`release.yml`](.github/workflows/release.yml) teste chaque pull request. Sur un push vers `stable`, il publie la release `v0.2.<n>`, qui contient :
+
+- `homelab-tools-linux-{amd64,arm64}` et `homelab-tools_<v>_{amd64,arm64}.deb` ;
+- `hlm-agent-linux-{x86_64,aarch64}` et `hlm-agent_<v>_{amd64,arm64}.deb` ;
+- une empreinte `.sha256` pour chaque fichier ;
+- l'image multi-arch `ghcr.io/<dépôt>:<v>` et `:latest`.
+
+Les builds ARM64 tournent nativement sur des runners Ubuntu 24.04 ARM.

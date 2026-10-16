@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+  id homelab-tools >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin homelab-tools
+  install -d -o root -g homelab-tools -m 0770 /var/lib/homelab-tools/update
+  chown root:homelab-tools /etc/homelab-tools/*.env && chmod 0640 /etc/homelab-tools/*.env
+  systemctl daemon-reload
+  systemctl enable --now homelab-tools-update.path >/dev/null 2>&1 || true
+  # Restart the roles already enabled (an update from the settings page ends here).
+  for unit in $(systemctl list-units --plain --no-legend 'homelab-tools@*.service' | awk '{print $1}'); do
+    systemctl try-restart "$unit" || true
+  done
+  if [ -z "$2" ]; then
+    echo "homelab-tools installé. Activez un rôle :"
+    echo "  systemctl enable --now homelab-tools@monitoring   # http://<hôte>:8080"
+    echo "  systemctl enable --now homelab-tools@management   # http://<hôte>:3000"
+  fi
+fi

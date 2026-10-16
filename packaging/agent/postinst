@@ -1,0 +1,16 @@
+#!/bin/sh
+# Installs with the same steps as install.sh, from the files of the package (no download).
+# Configuration: /etc/hlm-agent/agent.env (HUB_URL, TOKEN, KEY…), written before the package
+# by Ansible, or by hand followed by: dpkg-reconfigure hlm-agent
+set -e
+if [ "$1" = configure ]; then
+  # Install options (SMART, REMOTE_UPDATES, DOCKER), written by the Ansible role.
+  if [ -f /etc/hlm-agent/install.env ]; then set -a; . /etc/hlm-agent/install.env; set +a; fi
+  if [ -f /etc/hlm-agent/agent.env ] || [ -n "${HUB_URL:-}" ]; then
+    INSTALL_METHOD=deb BUNDLE=/usr/share/hlm-agent sh /usr/share/hlm-agent/install.sh \
+      || echo "hlm-agent : installation incomplète, voir journalctl -u hlm-agent" >&2
+  else
+    echo "hlm-agent installé mais pas configuré : créez /etc/hlm-agent/agent.env"
+    echo "(HUB_URL=…, TOKEN=…, KEY=…, voir Hôtes → Ajouter un hôte), puis : dpkg-reconfigure hlm-agent"
+  fi
+fi

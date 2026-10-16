@@ -1,0 +1,6 @@
+#!/bin/sh
+# Removing the package removes the agent completely (services, configuration, state, user).
+set -e
+if [ "$1" = remove ]; then
+  sh /usr/share/hlm-agent/uninstall.sh || true
+fi

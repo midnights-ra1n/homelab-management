@@ -1,47 +1,31 @@
 # syntax=docker/dockerfile:1
-# Homelab Management — image OCI (Docker, Podman, ou CT Proxmox VE 9.1+ depuis une image OCI)
+# Server image (both roles): React UI + Go server in one static binary on distroless (no shell, non-root).
+# The role is chosen at run time: HLT_ROLE=monitoring (default) or HLT_ROLE=management.
 
-FROM node:24-alpine AS deps
-WORKDIR /app
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+FROM node:24-slim AS web
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY web/ ./
+RUN mkdir -p ../server/web/dist && npm run build
 
-FROM node:24-alpine AS build
-WORKDIR /app
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-ARG NEXT_PUBLIC_APP_VERSION=dev
-ENV NEXT_TELEMETRY_DISABLED=1 \
-    NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
-RUN pnpm build
+FROM golang:1.27-alpine AS server
+WORKDIR /src/server
+COPY server/go.mod server/go.sum ./
+RUN go mod download
+COPY server/ ./
+COPY --from=web /src/server/web/dist ./web/dist
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/homelab-tools . \
+ && mkdir -p /out/data
 
-FROM node:24-alpine AS runner
-LABEL org.opencontainers.image.source="https://github.com/midnights-ra1n/homelab-management"
-WORKDIR /app
-ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000 \
-    HOSTNAME=0.0.0.0 \
-    DATA_DIR=/data \
-    TZ=Europe/Paris
-# tini : PID 1 qui relaie les signaux (arrêt propre du CT Proxmox) ; su-exec : abandon des droits root ;
-# iputils-ping : état de l'inventaire par ping (sockets ICMP sans privilège pour l'utilisateur 1001).
-RUN apk add --no-cache tzdata tini su-exec iputils-ping \
- && addgroup -S app -g 1001 && adduser -S app -u 1001 -G app \
- && mkdir -p /data && chown app:app /data
-COPY --from=build --chown=app:app /app/.next/standalone ./
-COPY --from=build --chown=app:app /app/.next/static ./.next/static
-COPY --from=build --chown=app:app /app/public ./public
-COPY --chmod=755 docker/entrypoint.sh /entrypoint.sh
-# Pas de USER : l'entrypoint démarre en root pour corriger les droits de /data, puis passe en 1001.
-VOLUME ["/data"]
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
-  CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
-STOPSIGNAL SIGTERM
-ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
-CMD ["node", "server.js"]
+FROM gcr.io/distroless/static-debian13:nonroot
+COPY --from=server /out/homelab-tools /homelab-tools
+COPY --from=server --chown=65532:65532 /out/data /data
+# HLT_INSTALL=docker: the settings page shows new releases; Docker applies them (docker compose pull).
+ENV HLT_ROLE=monitoring HLT_DATA_DIR=/data HLT_LISTEN=:8080 HLT_INSTALL=docker
+VOLUME /data
+EXPOSE 8080
+USER nonroot:nonroot
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["/homelab-tools", "healthcheck"]
+ENTRYPOINT ["/homelab-tools"]

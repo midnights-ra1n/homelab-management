@@ -1,0 +1,48 @@
+# One instance per role: systemctl enable --now homelab-tools@monitoring (VPS)
+#                     or systemctl enable --now homelab-tools@management (VM / CT).
+# Settings (address, public URL, proxies): /etc/homelab-tools/<role>.env
+[Unit]
+Description=Homelab Tools (%i)
+Documentation=https://github.com/midnights-ra1n/homelab-management
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=homelab-tools
+Group=homelab-tools
+Environment=HLT_ROLE=%i HLT_DATA_DIR=/var/lib/homelab-tools/%i HLT_INSTALL=deb
+EnvironmentFile=-/etc/homelab-tools/%i.env
+ExecStart=/usr/bin/homelab-tools
+Restart=always
+RestartSec=5
+MemoryMax=512M
+
+StateDirectory=homelab-tools/%i
+StateDirectoryMode=0700
+# The update button only writes a request here; homelab-tools-update.service (root) installs.
+ReadWritePaths=/var/lib/homelab-tools/update
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
