@@ -1,5 +1,12 @@
 # Homelab Management
 
+> [!NOTE]
+> **Projet utilisé à titre personnel, développé avec l'aide d'une IA.** Cette application a été conçue et écrite avec un assistant
+> d'intelligence artificielle (Claude, d'Anthropic), pour mon usage personnel sur mon homelab. Elle est partagée
+> telle quelle, sans garantie ni support : il est très conseillé de relire le code et le tester avant usage, en particulier pour les
+> actions Proxmox (démarrage, arrêt, migration) et l'exposition sur un réseau. Une mise en production à grande échelle de cette application n'est pas recommandée.
+> Pour information, ce dépôt pourrait faire l'objet d'une visiblité privée prochainement.
+
 Dépôt : [midnights-ra1n/homelab-management](https://github.com/midnights-ra1n/homelab-management). Il remplace aussi [homelab-monitoring](https://github.com/midnights-ra1n/homelab-monitoring), désormais archivé. Le serveur, son paquet et son image s'appellent `homelab-tools`.
 
 Gestion et supervision d'un homelab, réunies dans un seul projet issu de la fusion de **homelab-management** et **homelab-monitoring** :
