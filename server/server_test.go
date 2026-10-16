@@ -355,3 +355,28 @@ func TestTimezoneSetting(t *testing.T) {
 	}
 	tzLoc.Store(time.UTC) // other tests expect the default
 }
+
+func TestForwardedProto(t *testing.T) {
+	for hdr, want := range map[[2]string]string{
+		{"X-Forwarded-Proto", "https"}:                    "https",
+		{"X-Forwarded-Proto", "HTTPS, http"}:              "https",
+		{"Forwarded", `for=1.2.3.4;proto="https";host=x`}: "https",
+		{"Forwarded", "for=1.2.3.4"}:                      "",
+	} {
+		r := httptest.NewRequest("GET", "/", nil)
+		r.Header.Set(hdr[0], hdr[1])
+		if got := forwardedProto(r); got != want {
+			t.Errorf("%s: %q → %q, want %q", hdr[0], hdr[1], got, want)
+		}
+	}
+}
+
+func TestParseProxies(t *testing.T) {
+	nets, bad := parseProxies(`"192.168.1.10, 172.18.0.0/16;::1 nope"`)
+	if len(nets) != 3 || len(bad) != 1 || nets[0].String() != "192.168.1.10/32" || nets[2].String() != "::1/128" {
+		t.Fatalf("%v %v", nets, bad)
+	}
+	if publicURL(`"https://mon.example.fr/"`) != "https://mon.example.fr" || publicURL("mon.example.fr") != "" {
+		t.Fatal("public URL")
+	}
+}

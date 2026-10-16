@@ -33,7 +33,7 @@ export function VncConsole({ integrationId, node, type, vmid }: { integrationId:
         return;
       }
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      const r = new RFB(screen.current, `${proto}//${location.host}/api/vnc?token=${session.token}`, {
+      const r = new RFB(screen.current, `${proto}//${location.host}/api/mg/vnc?token=${session.token}`, {
         credentials: { password: session.password },
         wsProtocols: ["binary"],
       }) as unknown as Rfb;

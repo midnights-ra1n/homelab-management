@@ -68,12 +68,18 @@ Les agents installés avant la fusion téléchargent encore leurs mises à jour 
 
 ## Serveur MCP
 
-Chaque rôle propose un serveur MCP (outils en lecture seule) pour un assistant comme Claude : « est-ce que j'ai un service inaccessible ? ». Il se règle dans *Paramètres → Serveur MCP* (activation et jeton, affiché une seule fois), à l'adresse `https://<serveur>/api/mcp` (transport HTTP, en-tête `Authorization: Bearer mcp_…`).
+Chaque rôle propose un serveur MCP (outils en lecture seule) pour un assistant comme Claude : « est-ce que j'ai un service inaccessible ? ». Il s'active dans *Paramètres → Serveur MCP*, à l'adresse `https://<serveur>/api/mcp` (transport HTTP). Trois façons de s'y connecter :
+
+- **Claude, configuration automatique (OAuth)** : dans Claude (web, bureau ou mobile), *Paramètres → Connecteurs → Ajouter un connecteur personnalisé*, collez l'adresse `https://<serveur>/api/mcp`. Claude découvre le serveur d'autorisation (`/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`), s'inscrit tout seul (inscription dynamique, RFC 7591) puis ouvre la page `/oauth/authorize` de ce serveur : connectez-vous si besoin et cliquez sur **Autoriser**. Avec Claude Code : `claude mcp add --transport http homelab https://<serveur>/api/mcp`, puis `/mcp` pour se connecter. L'inscription automatique n'accepte que les adresses de retour de Claude (`https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`) et les applications locales (`http://localhost…`) ; elle peut être désactivée.
+- **Votre propre client OAuth** : *Clients OAuth → Créer le client* donne un **ID client** et un **secret** (affiché une seule fois). Dans Claude, *Ajouter un connecteur personnalisé → Paramètres avancés*, renseignez-les avec l'adresse du serveur. Par défaut le client accepte les adresses de retour de Claude ; on peut en indiquer d'autres (https ou localhost) pour un autre client MCP.
+- **Jeton fixe** : pour un client sans OAuth, en-tête `Authorization: Bearer mcp_…` (jeton généré dans la même section, affiché une seule fois).
+
+Sécurité : flux *authorization code* avec PKCE (S256) obligatoire, approuvé par un utilisateur connecté ; jetons d'accès d'une heure, jetons de renouvellement de 90 jours à usage unique (rotation), tous stockés hachés. *Révoquer* un client coupe immédiatement ses accès. Les clients inscrits automatiquement mais jamais utilisés sont supprimés après 24 heures. Chaque autorisation, création et révocation est inscrite au journal.
 
 - Outils du monitoring : `etat_global`, `lister_hotes`, `details_hote`, `lister_sondes`, `mises_a_jour`.
 - Outils de la gestion : `rechercher_inventaire`, `details_element`, `lister_taches`, `lister_deploiements`, `reseau`, `etat_monitoring`.
 
-Le serveur MCP comme les **passkeys** ne fonctionnent **qu'en HTTPS**, derrière un reverse proxy. Celui-ci doit transmettre `X-Forwarded-Proto: https`, et son adresse doit figurer dans `HLT_TRUSTED_PROXIES`. En HTTP, `/api/mcp` refuse toutes les requêtes.
+Le serveur MCP comme les **passkeys** ne fonctionnent **qu'en HTTPS**, derrière un reverse proxy. Celui-ci doit transmettre `X-Forwarded-Proto: https`, et son adresse doit figurer dans `HLT_TRUSTED_PROXIES` (voir [HTTPS derrière un reverse proxy](#https-derrière-un-reverse-proxy)). En HTTP, `/api/mcp` refuse toutes les requêtes.
 
 ## Journaux, base de données, mises à jour
 
@@ -116,7 +122,7 @@ Image : `ghcr.io/midnights-ra1n/homelab-management`, distroless, non-root, syst�
 | `HLT_LISTEN` | `:8080` | Adresse d'écoute |
 | `HLT_DATA_DIR` | `./data` (`/data` en Docker) | Base, clés, icônes |
 | `HLT_PUBLIC_URL` | — | Adresse publique (commandes d'installation de l'agent, contrôle d'origine) |
-| `HLT_TRUSTED_PROXIES` | — | CIDR des reverse proxies autorisés à transmettre `X-Forwarded-*` |
+| `HLT_TRUSTED_PROXIES` | — | Reverse proxies autorisés à transmettre `X-Forwarded-*` : IP ou CIDR, séparés par des virgules (une entrée invalide est ignorée et signalée dans les journaux) |
 | `HLT_INSTALL` | `deb` / `docker` (fixée par le paquet ou l'image) ; `lxc-oci` à définir soi-même pour un CT Proxmox créé depuis l'image OCI | Mode de mise à jour proposé dans les paramètres (en `lxc-oci` : étapes manuelles pour recréer le CT) |
 | `HLT_WATCHTOWER_URL`, `HLT_WATCHTOWER_TOKEN` | vides | Docker : adresse et jeton de l'API HTTP de Watchtower, pour le bouton de mise à jour |
 | `APP_SECRET` | `DATA_DIR/secret.key` | Clé de chiffrement des secrets d'intégration (gestion) |
@@ -124,6 +130,70 @@ Image : `ghcr.io/midnights-ra1n/homelab-management`, distroless, non-root, syst�
 Les anciennes variables `HLM_*` de homelab-monitoring sont encore lues.
 
 Premier démarrage : ouvrez l'interface et créez le compte administrateur (12 caractères minimum). Une **passkey** peut ensuite être ajoutée (HTTPS uniquement, derrière un reverse proxy).
+
+## HTTPS derrière un reverse proxy
+
+Le serveur parle HTTP ; le HTTPS est assuré par un reverse proxy (Zoraxy, NPMPlus / Nginx Proxy Manager, Caddy, Traefik, nginx…). Pour savoir que le navigateur est en HTTPS, ce qui est requis par les **passkeys**, le **serveur MCP** et les cookies `Secure`, le serveur vérifie deux choses à chaque requête :
+
+1. la connexion arrive d'une adresse listée dans `HLT_TRUSTED_PROXIES` ;
+2. le proxy annonce le schéma d'origine avec `X-Forwarded-Proto: https` (ou l'en-tête standard `Forwarded: proto=https`).
+
+Si l'une des deux manque, l'en-tête est ignoré : sans cette règle, n'importe qui pourrait se prétendre en HTTPS ou usurper une adresse IP.
+
+### 1. Trouver l'adresse à déclarer
+
+Il faut l'adresse **vue par le serveur**, c'est-à-dire celle du proxy du point de vue de la machine qui fait tourner homelab-tools, et non l'IP publique ni le nom de domaine. Le plus simple : ouvrez *Paramètres → Serveur MCP* à travers le proxy. Tant que le HTTPS n'est pas reconnu, un diagnostic indique l'adresse reçue, si elle est de confiance et ce que le proxy a annoncé.
+
+| Situation | Valeur typique |
+|---|---|
+| Proxy sur une autre machine ou un autre CT / VM | son IP : `192.168.1.10/32` |
+| Proxy et serveur sur la même machine, sans Docker | `127.0.0.1/32,::1/128` |
+| Proxy et serveur dans le même réseau Docker | le sous-réseau de ce réseau (`docker network inspect <réseau>` → `Subnet`), par ex. `172.18.0.0/16` |
+| Proxy en Docker, serveur installé par `.deb` sur l'hôte | la passerelle du réseau du proxy, souvent `172.17.0.1/32` |
+| Cloudflare Tunnel | l'adresse de la machine où tourne `cloudflared` (`127.0.0.1/32` s'il est sur la même) |
+
+Plusieurs valeurs se séparent par des virgules. Restez aussi précis que possible : chaque adresse listée peut choisir l'IP client et le schéma que le serveur croira.
+
+### 2. Régler le serveur
+
+- `.deb` : dans `/etc/homelab-tools/monitoring.env` (ou `management.env`), puis `systemctl restart homelab-tools@monitoring` :
+  ```sh
+  HLT_PUBLIC_URL=https://monitoring.example.fr
+  HLT_TRUSTED_PROXIES=192.168.1.10/32
+  ```
+- Docker : les mêmes variables dans `environment:` de `docker-compose.yml`, puis `docker compose up -d`.
+- CT LXC Proxmox (image OCI) : dans les variables d'environnement du CT, puis redémarrez-le.
+
+`HLT_PUBLIC_URL` doit commencer par `https://` et correspondre exactement à l'adresse tapée dans le navigateur.
+
+### 3. Régler le proxy
+
+Le proxy doit transmettre `X-Forwarded-Proto: https`, conserver l'en-tête `Host` et laisser passer les **WebSockets**. Ceux-ci servent aux agents (monitoring) et à la console noVNC Proxmox (gestion).
+
+- **Zoraxy** : créez un *HTTP Proxy* vers `http://<ip-du-serveur>:8080` avec TLS activé sur le domaine. Zoraxy ajoute lui-même `X-Forwarded-Proto` et `X-Forwarded-For` et relaie les WebSockets. Si le diagnostic n'affiche aucun en-tête reçu, ajoutez-le dans les règles de l'hôte : *Edit → Custom Headers*, en-tête `X-Forwarded-Proto`, valeur `https`, sens *To upstream*.
+- **NPMPlus / Nginx Proxy Manager** : *Proxy Host* avec le schéma `http`, l'IP et le port `8080`. Cochez **Websockets Support**. Dans l'onglet SSL, prenez un certificat et cochez *Force SSL*. L'en-tête `X-Forwarded-Proto` est déjà envoyé par le modèle de configuration ; rien à ajouter dans *Advanced*.
+- **Caddy** : `monitoring.example.fr { reverse_proxy 192.168.1.20:8080 }`. Les en-têtes et les WebSockets sont gérés d'office.
+- **Traefik** : un routeur avec `tls` vers le service `http://…:8080`. Les en-têtes `X-Forwarded-*` et les WebSockets sont gérés d'office.
+- **nginx** (à la main) :
+  ```nginx
+  location / {
+      proxy_pass http://192.168.1.20:8080;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-Proto https;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $http_connection;
+      proxy_read_timeout 1h;   # consoles noVNC et agents restent connectés
+  }
+  ```
+- **HAProxy** : `http-request set-header X-Forwarded-Proto https if { ssl_fc }` et `option forwardfor` dans le *backend* ; les WebSockets passent sans réglage.
+- **Apache** : `ProxyPreserveHost On`, `RequestHeader set X-Forwarded-Proto "https"` et `ProxyPass / http://192.168.1.20:8080/ upgrade=websocket`.
+- **Cloudflare Tunnel** : service `http://localhost:8080`. Cloudflare envoie `X-Forwarded-Proto: https` ; déclarez l'adresse de `cloudflared` comme indiqué ci-dessus.
+
+### 4. Vérifier
+
+Rechargez *Paramètres* en HTTPS : l'avertissement « HTTPS requis » du serveur MCP disparaît et l'ajout d'une passkey devient possible. Sinon, le diagnostic indique la cause : adresse absente de `HLT_TRUSTED_PROXIES` (ajoutez celle affichée) ou en-tête manquant (réglez le proxy).
 
 ## Reprendre les données existantes
 

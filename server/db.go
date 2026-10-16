@@ -111,6 +111,7 @@ var migrations = []string{
 	activityTable,
 	passkeysTable,
 	`ALTER TABLE monitors ADD COLUMN category TEXT NOT NULL DEFAULT '';`,
+	oauthTables,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's

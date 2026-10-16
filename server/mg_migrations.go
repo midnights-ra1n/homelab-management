@@ -395,6 +395,7 @@ var mgMigrations = []string{
 	mgFusionMigration,
 	// Name of the linked monitoring host at the last sync: a rename there renames the item.
 	`ALTER TABLE assets ADD COLUMN hlm_name TEXT NOT NULL DEFAULT '';`,
+	oauthTables,
 }
 
 // mgFusionMigration (010) moves homelab.db to the Go server: Go session format, only the

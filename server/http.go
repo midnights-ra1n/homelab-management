@@ -42,6 +42,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("/api/mcp", s.handleMCP) // bearer token, HTTPS only (see mcp.go)
 	mux.HandleFunc("GET /api/mcp/state", auth(s.handleMCPState))
 	mux.HandleFunc("PUT /api/mcp/config", auth(s.handleMCPConfig))
+	s.oauthRoutes(mux)
 
 	if s.cfg.Role == RoleManagement {
 		s.mgRoutes(mux)
@@ -195,7 +196,27 @@ func (s *Server) isHTTPS(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
 	}
-	return s.trustedPeer(r) && r.Header.Get("X-Forwarded-Proto") == "https"
+	return s.trustedPeer(r) && forwardedProto(r) == "https"
+}
+
+// forwardedProto is the scheme the client used, as told by the proxy: X-Forwarded-Proto
+// (first value when proxies are chained, any case), else the standard Forwarded header.
+func forwardedProto(r *http.Request) string {
+	if v := r.Header.Get("X-Forwarded-Proto"); v != "" {
+		return strings.ToLower(strings.TrimSpace(strings.Split(v, ",")[0]))
+	}
+	for _, part := range strings.Split(strings.Split(r.Header.Get("Forwarded"), ",")[0], ";") {
+		if k, v, ok := strings.Cut(strings.TrimSpace(part), "="); ok && strings.EqualFold(k, "proto") {
+			return strings.ToLower(strings.Trim(v, `"`))
+		}
+	}
+	return ""
+}
+
+// proxyDiagnostic explains why a request is (not) seen as HTTPS, for the settings page.
+func (s *Server) proxyDiagnostic(r *http.Request) map[string]any {
+	peer, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return map[string]any{"peer": peer, "trusted": s.trustedPeer(r), "proto": forwardedProto(r), "configured": len(s.cfg.TrustedProxies) > 0}
 }
 
 func (s *Server) requestHost(r *http.Request) string {
