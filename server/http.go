@@ -66,6 +66,7 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/hosts/{id}", auth(s.handleDeleteHost))
 	mux.HandleFunc("POST /api/hosts/{id}/token", auth(s.handleRotateHostToken))
 	mux.HandleFunc("GET /api/hosts/{id}/metrics", auth(s.handleHostMetrics))
+	mux.HandleFunc("GET /api/hosts/{id}/live", auth(s.handleHostLive))
 	mux.HandleFunc("POST /api/hosts/{id}/action", auth(s.handleHostAction))
 
 	mux.HandleFunc("GET /api/monitors", auth(s.handleListMonitors))

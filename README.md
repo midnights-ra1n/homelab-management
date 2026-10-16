@@ -12,7 +12,7 @@ Dépôt : [midnights-ra1n/homelab-management](https://github.com/midnights-ra1n/
 Gestion et supervision d'un homelab, réunies dans un seul projet issu de la fusion de **homelab-management** et **homelab-monitoring** :
 
 - un **serveur** en Go, un seul binaire avec **deux rôles** déployés séparément :
-  - **monitoring**, en général sur un VPS dédié : les agents s'y connectent, sondes HTTP/TCP/DNS/SSL/SNMP/TrueNAS rangées par catégories, alertes e-mail groupées (dont SMART et espace disque, seuil réglable), page de statut publique, rapports mensuels et état de santé hebdomadaire facultatif, API ouverte ;
+  - **monitoring**, en général sur un VPS dédié : les agents s'y connectent, sondes HTTP/TCP/UDP/ping/DNS/SSL/SNMP/TrueNAS rangées par catégories, alertes e-mail groupées (dont SMART et espace disque, seuil réglable), page de statut publique, rapports mensuels et état de santé hebdomadaire facultatif, API ouverte ;
   - **gestion**, sur une VM ou un CT : inventaire, IPAM (VLAN, sous-réseaux, VPN, pare-feu, simulation de flux), noms de domaine, déploiements, tâches (Kanban), carte, page d'applications, Proxmox multi-nœuds sans cluster, Webmin ;
 - un **agent** en Rust (binaire statique, `.deb` ou script `curl`), qui alimente à la fois le monitoring et l'inventaire ;
 - deux interfaces **React + Tailwind**, PWA et optimisées mobile, avec le même design (Midnights Classic : mêmes polices, tailles, icônes et composants), mais séparées : chaque rôle a la sienne.
@@ -213,6 +213,15 @@ Rechargez *Paramètres* en HTTPS : l'avertissement « HTTPS requis » du serveur
 | Script : *Hôtes → Ajouter un hôte* du monitoring, `curl … install.sh \| sudo HUB_URL=… TOKEN=… KEY=… sh` | automatique, chaque jour |
 | Paquet `hlm-agent_<version>_<arch>.deb` | bouton *Mettre à jour l'agent*, Ansible ou nouveau paquet |
 | Ansible : rôle `deploy/ansible/roles/hlm_agent` (`hlm_install_method: binary` ou `deb`) | selon la méthode |
+
+L'agent envoie ses mesures à l'intervalle choisi dans *Paramètres* (30 s par défaut, 5 s au minimum). Tant que la fiche d'un hôte est ouverte, il passe **en direct** et envoie une mesure toutes les 2 secondes, affichées sans être enregistrées. Un agent d'une version antérieure garde l'affichage habituel.
+
+Si l'agent ne répond plus (service arrêté, bloqué), le monitoring pingue la première adresse IPv4 qu'il avait remontée :
+
+- l'hôte répond : état **Performances dégradées**, avec la mention *Agent hors ligne* ;
+- l'hôte ne répond pas : **Panne majeure**.
+
+Dans les deux cas, une alerte e-mail est envoyée. Le ping et la sonde *Ping (ICMP)* passent par une socket ICMP non privilégiée : `net.ipv4.ping_group_range` doit inclure le groupe du serveur. C'est le cas par défaut sous Docker et Debian. Sinon, un agent arrêté reste en panne majeure.
 
 Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). API du monitoring : [docs/API.md](docs/API.md).
 

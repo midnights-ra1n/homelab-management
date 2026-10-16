@@ -55,8 +55,9 @@ type Server struct {
 	setupMu   sync.Mutex
 	setupOpen bool // true until the first account exists
 
-	agentsMu sync.Mutex
-	agents   map[int64]*agentConn
+	agentsMu  sync.Mutex
+	agents    map[int64]*agentConn
+	hostPings pingCache // ping answers of hosts whose agent is down
 
 	mg  *mgState // management role only
 	csp string

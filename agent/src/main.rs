@@ -194,6 +194,10 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // After a dashboard request, look for the new SMART file every 15 s for up to 10 minutes.
     let mut smart_until = 0u64;
     let mut smart_poll = tokio::time::interval(Duration::from_secs(15));
+    // Live view: while a dashboard watches this host, stream metrics every 2 s (not stored).
+    let mut live_until = 0u64;
+    let mut live_tick = tokio::time::interval(Duration::from_secs(2));
+    live_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         tokio::select! {
             _ = smart_tick.tick() => {
@@ -225,6 +229,12 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
             }
             _ = tick.tick() => {
                 let m = serde_json::json!({"type": "metrics", "metrics": collector.collect()});
+                if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                    return Failure::Retry(e.to_string());
+                }
+            }
+            _ = live_tick.tick(), if live_until > actions::now() => {
+                let m = serde_json::json!({"type": "live", "metrics": collector.collect()});
                 if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
                     return Failure::Retry(e.to_string());
                 }
@@ -272,6 +282,11 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                 Some(Ok(Message::Close(f))) => return Failure::Retry(format!("closed by hub: {f:?}")),
                 Some(Ok(Message::Text(t))) => {
                     let Ok(m) = serde_json::from_str::<serde_json::Value>(&t) else { continue };
+                    if m["type"] == "live" {
+                        live_until = actions::now() + m["seconds"].as_u64().unwrap_or(60).min(300);
+                        live_tick.reset_immediately();
+                        continue;
+                    }
                     if m["type"] != "action" { continue; }
                     let action = m["action"].as_str().unwrap_or("").to_string();
                     let (state, message) = match action.as_str() {

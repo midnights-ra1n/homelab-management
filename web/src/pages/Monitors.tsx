@@ -6,10 +6,12 @@ import {
   StatusIcon, Switch, Tag, UptimeBars, cn, fmtLatency, formatPct, inputClass, kindTone, navigate, statusKind, usePoll, useTitle, useToast,
 } from "../ui";
 
-const TYPES: Record<MonitorType, string> = { http: "HTTP(S)", tcp: "Port TCP", dns: "DNS", ssl: "Certificat SSL", snmp: "SNMP", meross: "Prise Meross", truenas: "TrueNAS" };
+const TYPES: Record<MonitorType, string> = { http: "HTTP(S)", tcp: "Port TCP", udp: "Port UDP", ping: "Ping (ICMP)", dns: "DNS", ssl: "Certificat SSL", snmp: "SNMP", meross: "Prise Meross", truenas: "TrueNAS" };
 const TARGET_HINT: Record<MonitorType, [string, string]> = {
   http: ["URL", "https://nextcloud.example.fr/status.php"],
   tcp: ["Hôte et port", "192.168.1.10:22"],
+  udp: ["Hôte et port", "vpn.example.fr:51820"],
+  ping: ["Adresse IP ou nom d'hôte", "192.168.1.10"],
   dns: ["Nom de domaine", "example.fr"],
   ssl: ["Domaine (port facultatif)", "example.fr ou example.fr:8443"],
   snmp: ["Équipement (port facultatif)", "192.168.1.2 ou switch.lan:161"],
@@ -233,8 +235,10 @@ function MonitorDialog({ monitor, categories = [], onClose }: { monitor?: Monito
       footer={<><Button variant="secondary" onClick={() => onClose(false)}>Annuler</Button><Button type="submit" form="monitor-form" loading={busy}>{monitor ? "Enregistrer la sonde" : "Créer la sonde"}</Button></>}>
       <form id="monitor-form" className="grid gap-5" onSubmit={submit} noValidate>
         {error && <Alert kind="error" title={error} />}
-        <Field label="Type">
-          <Segmented label="Type de sonde" value={m.type} onChange={(t) => setM((x) => ({ ...x, type: t, config: {} }))} options={Object.entries(TYPES) as [MonitorType, string][]} />
+        <Field label="Type de sonde" htmlFor="m-type">
+          <select id="m-type" className={inputClass} value={m.type} onChange={(e) => { const t = e.target.value as MonitorType; setM((x) => ({ ...x, type: t, config: {} })); }}>
+            {(Object.entries(TYPES) as [MonitorType, string][]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
         </Field>
         <div className="flex flex-wrap items-end gap-3 [&>.mm-field]:min-w-40 [&>.mm-field]:flex-1">
           <Field label="Nom" htmlFor="m-name"><input id="m-name" className={inputClass} value={m.name} onChange={(e) => set("name", e.target.value)} /></Field>
@@ -276,6 +280,15 @@ function MonitorDialog({ monitor, categories = [], onClose }: { monitor?: Monito
             <Field label="Serveur DNS (facultatif)" htmlFor="m-dns" hint="Vide : résolveur du système"><input id="m-dns" className={`${inputClass} font-mono`} placeholder="192.168.1.53" value={m.config.dns_server ?? ""} onChange={(e) => cfg("dns_server", e.target.value)} /></Field>
             <Field label="Réponse attendue (facultatif)" htmlFor="m-exp"><input id="m-exp" className={`${inputClass} font-mono`} value={m.config.expected ?? ""} onChange={(e) => cfg("expected", e.target.value)} /></Field>
           </div>
+        )}
+        {m.type === "udp" && (
+          <>
+            <div className="flex flex-wrap items-end gap-3 [&>.mm-field]:min-w-40 [&>.mm-field]:flex-1">
+              <Field label="Message envoyé (facultatif)" htmlFor="m-pl" hint="Vide : datagramme vide"><input id="m-pl" className={`${inputClass} font-mono`} value={m.config.payload ?? ""} onChange={(e) => cfg("payload", e.target.value)} /></Field>
+              <Field label="Réponse attendue (facultatif)" htmlFor="m-exp-udp" hint="Vide : le silence est accepté"><input id="m-exp-udp" className={`${inputClass} font-mono`} value={m.config.expected ?? ""} onChange={(e) => cfg("expected", e.target.value)} /></Field>
+            </div>
+            <p className="mm-help -mt-3">Sans réponse attendue, la sonde ne signale une panne que si le port est refusé : c'est le cas d'un tunnel WireGuard, qui ne répond jamais à un inconnu. Ajoute une sonde ping sur la même machine pour savoir si elle est éteinte.</p>
+          </>
         )}
         {m.type === "snmp" && <SnmpFields m={m} cfg={cfg} editing={!!monitor} />}
         {m.type === "meross" && (

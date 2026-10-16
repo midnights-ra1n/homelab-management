@@ -173,7 +173,7 @@ function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau">["sea
         <SectionTitle
           id="subnets"
           actions={
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <IpDialog {...options} />
               <SubnetDialog vlans={vlans} />
             </div>

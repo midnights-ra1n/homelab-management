@@ -286,7 +286,7 @@ export function Stat({ label, value, detail, icon, href, tone, className }: {
   const content = (
     <>
       <div className="flex items-center justify-between gap-3">
-        <p className="mm-stat__label min-w-0 truncate">{label}</p>
+        <p className="mm-stat__label min-w-0 line-clamp-2 text-pretty">{label}</p>
         {icon && (
           <span className={cn(
             "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
@@ -295,7 +295,7 @@ export function Stat({ label, value, detail, icon, href, tone, className }: {
         )}
       </div>
       <p className="mm-stat__value">{value}</p>
-      {detail && <p className="mm-stat__meta truncate">{detail}</p>}
+      {detail && <p className="mm-stat__meta line-clamp-2">{detail}</p>}
     </>
   );
   const cls = cn("mm-card mm-stat transition-colors duration-[120ms]", href && "hover:border-line-strong", className);
@@ -313,7 +313,7 @@ export function PageHeader({ title, description, actions, crumbs }: { title: Rea
         <h1 className="mm-h1">{title}</h1>
         {description && <div className="mt-1 text-pretty text-meta">{description}</div>}
       </div>
-      {actions && <div className="mm-btn-group shrink-0 items-center">{actions}</div>}
+      {actions && <div className="mm-btn-group min-w-0 items-center">{actions}</div>}
     </header>
   );
 }

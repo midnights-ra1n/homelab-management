@@ -43,8 +43,8 @@ export function BlockEditor<T extends Block>({ blocks, onChange, types, renderFi
   };
 
   return (
-    <div className="grid gap-3">
-      <ol className="grid gap-2" aria-label="Blocs">
+    <div className="grid grid-cols-1 gap-3">
+      <ol className="grid grid-cols-1 gap-2" aria-label="Blocs">
         {blocks.map((b, i) => {
           const isSel = b.id === selected;
           return (
@@ -71,7 +71,7 @@ export function BlockEditor<T extends Block>({ blocks, onChange, types, renderFi
                 <IconButton label="Descendre" icon={<ArrowDown size={15} />} disabled={i === blocks.length - 1} onClick={() => move(i, i + 1)} />
                 <IconButton label="Supprimer le bloc" icon={<Trash2 size={15} />} onClick={() => onChange(blocks.filter((x) => x.id !== b.id))} />
               </div>
-              {isSel && <div className="grid gap-4 border-t border-line-subtle p-4">{renderFields(b, update(b.id))}</div>}
+              {isSel && <div className="grid grid-cols-1 gap-4 border-t border-line-subtle p-4">{renderFields(b, update(b.id))}</div>}
             </li>
           );
         })}

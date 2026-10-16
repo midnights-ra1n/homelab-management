@@ -23,7 +23,7 @@ export function Stat({
   const content = (
     <>
       <div className="flex items-center justify-between gap-3">
-        <p className="mm-stat__label min-w-0 truncate">{label}</p>
+        <p className="mm-stat__label min-w-0 line-clamp-2 text-pretty">{label}</p>
         {icon && (
           <span
             className={cn(
@@ -42,7 +42,7 @@ export function Stat({
         )}
       </div>
       <p className="mm-stat__value">{value}</p>
-      {detail && <p className="mm-stat__meta truncate">{detail}</p>}
+      {detail && <p className="mm-stat__meta line-clamp-2">{detail}</p>}
     </>
   );
   const cls = cn(

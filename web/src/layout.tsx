@@ -373,7 +373,7 @@ export function AlertBanner({ list }: { list: Incident[] }) {
         </div>
         <Link to="/incidents" className="mm-btn mm-btn--secondary mm-btn--sm no-underline"><ArrowUpRight size={14} />Voir les incidents</Link>
       </div>
-      <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
+      <ul className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         {shown.slice(0, 6).map((a) => (
           <li key={a.key}>
             <Link to={a.to} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm no-underline hover:bg-page">

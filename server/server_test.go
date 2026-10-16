@@ -170,11 +170,34 @@ func TestAgentHandshakeAndMetrics(t *testing.T) {
 			if h["status"] != StatusOperational || !h["connected"].(bool) {
 				t.Fatalf("host status: %v", h)
 			}
+			testLive(t, ctx, c, ts, cookie)
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatal("metrics were not stored")
+}
+
+// testLive: the first poll asks the agent for live mode, the samples it streams are served.
+func testLive(t *testing.T, ctx context.Context, c *websocket.Conn, ts *httptest.Server, cookie string) {
+	if _, l := do(t, ts, "GET", "/api/hosts/1/live", cookie, nil); l["live"] != false {
+		t.Fatalf("no sample yet: %v", l)
+	}
+	var ask map[string]any
+	if err := wsjson.Read(ctx, c, &ask); err != nil || ask["type"] != "live" || ask["seconds"] != 60.0 {
+		t.Fatalf("live request: %v %v", ask, err)
+	}
+	wsjson.Write(ctx, c, agentMsg{Type: "live", Metrics: &agentMetrics{CPU: 42}})
+	for range 60 {
+		if _, l := do(t, ts, "GET", "/api/hosts/1/live", cookie, nil); l["live"] == true {
+			if l["metrics"].(map[string]any)["cpu"] != 42.0 {
+				t.Fatalf("live sample: %v", l)
+			}
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("live sample not served")
 }
 
 func TestStatusMatcher(t *testing.T) {
@@ -223,6 +246,57 @@ func TestHTTPAndTCPChecks(t *testing.T) {
 	}
 }
 
+func TestPingCheck(t *testing.T) {
+	m := Monitor{Name: "p", Type: "ping", Target: "127.0.0.1"}
+	if msg := m.validate(); msg != "" {
+		t.Fatal(msg)
+	}
+	got := runCheck(context.Background(), &m)
+	if got.status == StatusUnknown {
+		t.Skip("ICMP unavailable here:", got.message)
+	}
+	if got.status != StatusOperational || got.latency == nil {
+		t.Fatalf("got %s (%s)", got.status, got.message)
+	}
+}
+
+func TestUDPCheck(t *testing.T) {
+	echo, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	defer echo.Close()
+	go func() {
+		buf := make([]byte, 64)
+		for {
+			n, a, err := echo.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			echo.WriteTo(append([]byte("pong "), buf[:n]...), a)
+		}
+	}()
+	silent, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	defer silent.Close()
+	closed, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	closedAddr := closed.LocalAddr().String()
+	closed.Close()
+	for _, c := range []struct {
+		m    Monitor
+		want string
+	}{
+		{Monitor{Name: "echo", Type: "udp", Target: echo.LocalAddr().String(), Config: MonitorConfig{Payload: "ping", Expected: "pong"}}, StatusOperational},
+		{Monitor{Name: "bad answer", Type: "udp", Target: echo.LocalAddr().String(), Config: MonitorConfig{Expected: "nope"}}, StatusMinor},
+		{Monitor{Name: "wireguard-like", Type: "udp", Target: silent.LocalAddr().String(), TimeoutS: 1}, StatusOperational},
+		{Monitor{Name: "silent, answer expected", Type: "udp", Target: silent.LocalAddr().String(), TimeoutS: 1, Config: MonitorConfig{Expected: "x"}}, StatusMajor},
+		{Monitor{Name: "closed", Type: "udp", Target: closedAddr, TimeoutS: 1}, StatusMajor},
+	} {
+		if msg := c.m.validate(); msg != "" {
+			t.Fatalf("%s: %s", c.m.Name, msg)
+		}
+		if got := runCheck(context.Background(), &c.m); got.status != c.want {
+			t.Errorf("%s: got %s (%s), want %s", c.m.Name, got.status, got.message, c.want)
+		}
+	}
+}
+
 func TestMonitorValidation(t *testing.T) {
 	for _, m := range []Monitor{
 		{Name: "x", Type: "http", Target: "file:///etc/passwd"},
@@ -231,6 +305,7 @@ func TestMonitorValidation(t *testing.T) {
 		{Name: "x", Type: "exec", Target: "rm -rf /"},
 		{Name: "", Type: "tcp", Target: "a:1"},
 		{Name: "x", Type: "tcp", Target: "a:1", IntervalS: 5},
+		{Name: "x", Type: "ping", Target: "192.168.1.1:22"},
 	} {
 		if m.validate() == "" {
 			t.Errorf("%+v must be rejected", m)
@@ -378,5 +453,32 @@ func TestParseProxies(t *testing.T) {
 	}
 	if publicURL(`"https://mon.example.fr/"`) != "https://mon.example.fr" || publicURL("mon.example.fr") != "" {
 		t.Fatal("public URL")
+	}
+}
+
+func TestHostStatusAgentDown(t *testing.T) {
+	s, _ := newTestServer(t)
+	now := time.Now().Unix()
+	yes, no := true, false
+	for _, c := range []struct {
+		name      string
+		h         Host
+		reachable *bool
+		want      string
+	}{
+		{"connected", Host{ID: 1, LastSeen: now, Connected: true}, nil, StatusOperational},
+		{"just disconnected", Host{ID: 2, LastSeen: now - 20}, nil, StatusOperational},
+		{"agent stopped, host up", Host{ID: 3, LastSeen: now - 120}, &yes, StatusDegraded},
+		{"agent stopped, host down", Host{ID: 4, LastSeen: now - 120}, &no, StatusMajor},
+		{"agent stopped, no ICMP", Host{ID: 5, LastSeen: now - 120}, nil, StatusMajor},
+		{"silent but connected", Host{ID: 6, LastSeen: now - 600, Connected: true}, &yes, StatusDegraded},
+	} {
+		s.hostPings.set(c.h.ID, c.reachable)
+		if got := s.hostStatus(&c.h); got != c.want {
+			t.Errorf("%s: got %s, want %s", c.name, got, c.want)
+		}
+	}
+	if ip := hostAddress(json.RawMessage(`{"ips":[{"iface":"lo","address":"127.0.0.1"},{"iface":"docker0","address":"172.17.0.1"},{"iface":"eth0","address":"fe80::1"},{"iface":"eth0","address":"192.168.1.20"}]}`)); ip != "192.168.1.20" {
+		t.Errorf("hostAddress = %q", ip)
 	}
 }

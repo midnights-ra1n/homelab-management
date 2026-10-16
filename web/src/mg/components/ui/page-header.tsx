@@ -17,7 +17,7 @@ export function PageHeader({
         <h1 className="mm-h1">{title}</h1>
         {description && <p className="mt-1 text-pretty text-meta">{description}</p>}
       </div>
-      {actions && <div className="mm-btn-group shrink-0 items-center">{actions}</div>}
+      {actions && <div className="mm-btn-group min-w-0 items-center">{actions}</div>}
     </header>
   );
 }
@@ -25,7 +25,7 @@ export function PageHeader({
 /** Titre de sous-section dans une page. */
 export function SectionTitle({ children, actions, id }: { children: ReactNode; actions?: ReactNode; id?: string }) {
   return (
-    <div className="mb-3 flex items-center justify-between gap-4">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
       <h2 id={id} className="mm-h2">
         {children}
       </h2>
