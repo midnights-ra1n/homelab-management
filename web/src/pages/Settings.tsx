@@ -114,7 +114,7 @@ export function SettingsPage({ version }: { version: string }) {
               try { await api.post("/api/settings/test-email"); toast("E-mail de test envoyé"); } catch (e) { setError((e as Error).message); }
               setBusy(undefined);
             }}>Envoyer un e-mail de test</Button>
-            <Button loading={busy === "smtp"} onClick={() => save("smtp", ["smtp_enabled", "smtp_host", "smtp_port", "smtp_tls", "smtp_user", "smtp_pass", "smtp_from", "smtp_to", "notify_window_s", "status_title", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_smart_level"])}>Enregistrer les notifications</Button>
+            <Button loading={busy === "smtp"} onClick={() => save("smtp", ["smtp_enabled", "smtp_host", "smtp_port", "smtp_tls", "smtp_user", "smtp_pass", "smtp_from", "smtp_to", "notify_window_s", "status_title", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_smart_level", "notify_disk_pct"])}>Enregistrer les notifications</Button>
           </>}>
           <Switch label="Activer les notifications" checked={bool("smtp_enabled")} onChange={(c) => setDraft({ ...draft, smtp_enabled: String(c) })} />
           <div className="grid gap-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
@@ -152,6 +152,7 @@ export function SettingsPage({ version }: { version: string }) {
                 <option value="off">Jamais</option>
               </select>
             </Field>
+            {input("notify_disk_pct", "Espace disque : seuil d'alerte (%)", { type: "number", min: 0, max: 99 }, "Alerte quand une partition dépasse ce taux d'occupation ; 0 : jamais")}
           </fieldset>
         </SettingsSection>
 
@@ -169,8 +170,8 @@ export function SettingsPage({ version }: { version: string }) {
             </>}>
             {null}
           </SettingsSection>
-          <SettingsSection id="report" title="Rapport mensuel"
-            description="Bilan du mois précédent (disponibilité, latence, incidents, mises à jour, disques), envoyé par e-mail le 1er du mois à 8 h."
+          <SettingsSection id="report" title="Rapports par e-mail"
+            description="Bilan du mois précédent (disponibilité, latence, incidents, mises à jour, disques, espace disque), envoyé le 1er du mois à 8 h. Le même bilan sur la semaine passée peut partir chaque lundi à 8 h."
             actions={<>
               <ButtonLink to="/reports" variant="ghost">Voir les rapports</ButtonLink>
               <Button variant="secondary" icon={<Send size={16} />} loading={busy === "sendrep"} onClick={async () => {
@@ -178,9 +179,16 @@ export function SettingsPage({ version }: { version: string }) {
                 try { await api.post("/api/reports/monthly/send"); toast("Rapport du mois dernier envoyé"); } catch (e) { setError((e as Error).message); }
                 setBusy(undefined);
               }}>Envoyer le dernier</Button>
-              <Button loading={busy === "report"} onClick={() => save("report", ["report_monthly_enabled", "report_energy"])}>Enregistrer</Button>
+              <Button variant="secondary" icon={<Send size={16} />} loading={busy === "sendweek"} onClick={async () => {
+                setBusy("sendweek");
+                try { await api.post("/api/reports/weekly/send"); toast("État de santé de la semaine envoyé"); } catch (e) { setError((e as Error).message); }
+                setBusy(undefined);
+              }}>Envoyer l'hebdomadaire</Button>
+              <Button loading={busy === "report"} onClick={() => save("report", ["report_monthly_enabled", "report_weekly_enabled", "report_energy"])}>Enregistrer</Button>
             </>}>
             <Switch label="Envoyer le rapport chaque mois" checked={bool("report_monthly_enabled")} onChange={(c) => setDraft({ ...draft, report_monthly_enabled: String(c) })} />
+            <Switch label="Envoyer l'état de santé chaque semaine" hint="Disques, espace disponible, ressources utilisées, sondes et mises à jour"
+              checked={bool("report_weekly_enabled")} onChange={(c) => setDraft({ ...draft, report_weekly_enabled: String(c) })} />
             <Field label="Rapport de consommation électrique" htmlFor="s-energy" hint="Envoyé à 8 h : la veille, la semaine passée (le lundi) ou le mois passé (le 1er)">
               <select id="s-energy" className={inputClass} value={v("report_energy")} onChange={set("report_energy")}>
                 <option value="off">Jamais</option><option value="daily">Chaque jour</option><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option>

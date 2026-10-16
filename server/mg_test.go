@@ -136,6 +136,13 @@ func TestInventorySyncFromMonitoring(t *testing.T) {
 	if n, _ := s.syncInventory(context.Background()); n != 1 {
 		t.Fatal("RAM change not synced")
 	}
+	host = strings.Replace(host, `"name":"nas"`, `"name":"nas-salon"`, 1)
+	s.syncInventory(context.Background())
+	var name string
+	s.db.QueryRow(`SELECT display_name FROM assets WHERE hlm_host_id = 7`).Scan(&name)
+	if name != "nas-salon" {
+		t.Fatalf("rename in the monitoring not followed: %q", name)
+	}
 }
 
 // Every management MCP tool runs on an empty database without SQL errors.

@@ -102,7 +102,7 @@ export function DatabaseSection() {
 
 /* ---------- Server updates ---------- */
 
-interface UpdateState { current: string; latest: string; available: boolean; install: string; checked_at: number; repo: string; pending?: string }
+interface UpdateState { current: string; latest: string; available: boolean; install: string; checked_at: number; repo: string; pending?: string; docker_auto?: boolean }
 
 export function UpdateSection() {
   const [u, setU] = useState<UpdateState>();
@@ -131,18 +131,19 @@ export function UpdateSection() {
   };
   const isDocker = u.install === "docker";
   const isDeb = u.install === "deb";
+  const isLxc = u.install === "lxc-oci";
 
   return (
     <SettingsSection
       id="updates"
       title="Mises à jour du serveur"
-      description={isDocker ? "Installé avec Docker : l'image se met à jour avec Docker (docker compose pull puis up -d)." : isDeb ? "Installé par paquet .deb : la mise à jour télécharge le paquet de la release GitHub, vérifie son empreinte SHA-256 et l'installe." : "Installation manuelle : remplacez le binaire par celui de la dernière release."}
+      description={isLxc ? "Conteneur LXC Proxmox créé depuis l'image OCI : Proxmox ne remplace pas l'image d'un conteneur existant, la mise à jour se fait en recréant le CT." : isDocker ? (u.docker_auto ? "Installé avec Docker : le bouton demande à Watchtower de télécharger la nouvelle image et de recréer le conteneur." : "Installé avec Docker : l'image se met à jour avec Docker (docker compose pull puis up -d), ou depuis ce bouton si Watchtower est configuré (voir docker-compose.yml).") : isDeb ? "Installé par paquet .deb : la mise à jour télécharge le paquet de la release GitHub, vérifie son empreinte SHA-256 et l'installe." : "Installation manuelle : remplacez le binaire par celui de la dernière release."}
       actions={
         <>
           <Button variant="secondary" icon={<RefreshCw size={15} />} loading={busy === "check"} onClick={() => run("check", "/api/system/update/check")}>
             Rechercher les mises à jour
           </Button>
-          {isDeb && u.available && !u.pending && (
+          {(isDeb || u.docker_auto) && u.available && !u.pending && (
             <Button icon={<Download size={15} />} loading={busy === "apply"} onClick={() => run("apply", "/api/system/update")}>
               Mettre à jour vers {u.latest}
             </Button>
@@ -159,7 +160,15 @@ export function UpdateSection() {
         {u.checked_at > 0 && <span className="text-xs text-meta">vérifié le {new Date(u.checked_at * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>}
       </div>
       {u.pending && <Alert kind="info" title={`Installation de ${u.pending} en cours`}>Le service redémarre tout seul ; cette page se recharge quand la nouvelle version répond.</Alert>}
-      {isDocker && u.available && <CodeBlock text="docker compose pull && docker compose up -d" />}
+      {isLxc && u.available && (
+        <ol className="grid list-decimal gap-1 pl-5 text-sm text-body">
+          <li>Proxmox → stockage → Modèles CT → <strong>Télécharger depuis un registre OCI</strong> : <span className="font-mono">ghcr.io/midnights-ra1n/homelab-management:{u.latest}</span></li>
+          <li>Arrêtez ce CT et notez sa configuration (réseau, variables <span className="font-mono">HLT_*</span>, point de montage de <span className="font-mono">/data</span>).</li>
+          <li>Créez un CT depuis la nouvelle image avec la même configuration, en rattachant le <strong>même volume</strong> sur <span className="font-mono">/data</span>, sans oublier <span className="font-mono">HLT_INSTALL=lxc-oci</span>.</li>
+          <li>Démarrez-le, vérifiez qu'il répond, puis supprimez l'ancien CT <strong>sans supprimer le volume</strong>.</li>
+        </ol>
+      )}
+      {isDocker && !u.docker_auto && u.available && <CodeBlock text="docker compose pull && docker compose up -d" />}
       <a className="text-sm text-accent-text" href={`https://github.com/${u.repo}/releases`} target="_blank" rel="noreferrer">Notes de version</a>
     </SettingsSection>
   );

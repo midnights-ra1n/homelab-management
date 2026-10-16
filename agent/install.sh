@@ -22,7 +22,7 @@ CONF="$CONF_DIR/agent.env"
 SYSTEMD=/etc/systemd/system
 LIBEXEC=/usr/local/lib/hlm-agent
 STATE=/var/lib/hlm-agent
-FILES="install.sh hlm-agent.service hlm-agent-smart.service hlm-agent-smart.timer smart-collect.sh
+FILES="install.sh hlm-agent.service hlm-agent-smart.service hlm-agent-smart.timer hlm-agent-smart.path smart-collect.sh
        hlm-agent-apt.path hlm-agent-apt.service apt-action.sh
        hlm-agent-docker.service hlm-agent-docker.timer hlm-agent-docker-update.path
        hlm-agent-docker-update.service docker-helper.sh"
@@ -111,7 +111,7 @@ smart=true; [ "${SMART:-true}" = false ] && smart=false
 if [ "$smart" = true ] && ! command -v smartctl >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq smartmontools >/dev/null || echo "hlm-agent install: smartmontools not installed, SMART disabled" >&2
 fi
-helper "$smart" hlm-agent-smart.timer smart-collect.sh hlm-agent-smart.service hlm-agent-smart.timer
+helper "$smart" "hlm-agent-smart.timer hlm-agent-smart.path" smart-collect.sh hlm-agent-smart.service hlm-agent-smart.timer hlm-agent-smart.path
 [ "$smart" = true ] && { systemctl start hlm-agent-smart.service || true; }
 
 remote=true; [ "${REMOTE_UPDATES:-true}" = false ] && remote=false

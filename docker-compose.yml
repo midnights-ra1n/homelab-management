@@ -1,7 +1,8 @@
 # Two separate deployments, usually on two machines:
 #   docker compose up -d monitoring    # on the monitoring VPS (agents connect here)
 #   docker compose up -d management    # on the management VM / CT
-# Updates: docker compose pull && docker compose up -d
+# Updates: docker compose pull && docker compose up -d, or the "Mettre à jour" button through
+# the watchtower service below (start it beside each role: docker compose up -d monitoring watchtower).
 x-hardening: &hardening
   restart: unless-stopped
   read_only: true
@@ -20,10 +21,13 @@ services:
       - monitoring-data:/data
     environment:
       HLT_ROLE: monitoring
+      HLT_WATCHTOWER_URL: "http://watchtower:8080"
+      HLT_WATCHTOWER_TOKEN: "change-me-long-random-token"
       # Public address: agents install command and CSRF check.
       HLT_PUBLIC_URL: "https://monitoring.example.fr"
       # Reverse proxies allowed to set X-Forwarded-For / X-Forwarded-Proto.
       HLT_TRUSTED_PROXIES: "172.16.0.0/12"
+    labels: ["com.centurylinklabs.watchtower.enable=true"]
     deploy:
       resources:
         limits: { memory: 256M, cpus: "1.0" }
@@ -39,11 +43,26 @@ services:
       - management-data:/data
     environment:
       HLT_ROLE: management
+      HLT_WATCHTOWER_URL: "http://watchtower:8080"
+      HLT_WATCHTOWER_TOKEN: "change-me-long-random-token"
       HLT_PUBLIC_URL: "https://gestion.example.fr"
       HLT_TRUSTED_PROXIES: "172.16.0.0/12"
+    labels: ["com.centurylinklabs.watchtower.enable=true"]
     deploy:
       resources:
         limits: { memory: 256M, cpus: "1.0" }
+
+  # Updates the labelled containers only when the server asks (HTTP API, no periodic poll).
+  # It holds the Docker socket, so it publishes no port: only the servers on this network reach it.
+  watchtower:
+    image: nickfedor/watchtower:latest
+    container_name: hlt-watchtower
+    restart: unless-stopped
+    command: ["--http-api-update", "--label-enable", "--cleanup"]
+    environment:
+      WATCHTOWER_HTTP_API_TOKEN: "change-me-long-random-token"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   monitoring-data:

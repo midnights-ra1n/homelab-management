@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, Cpu, HardDrive, KeyRound, MemoryStick, Plus, Server, Thermometer, Trash2, Users } from "lucide-react";
+import { ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, Server, Thermometer, Trash2, Users } from "lucide-react";
 import { api, fmtAgo, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostSeries, type Install } from "../api";
 import {
-  Alert, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Link, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
+  Alert, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
   Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, usePoll, useTitle, useToast,
 } from "../ui";
 import { DiskCard, type HostDisks } from "./Disks";
@@ -96,6 +96,7 @@ export function HostDetailPage({ id }: { id: number }) {
   const myDisks = disks.data?.find((d) => d.host_id === id);
   const [install, setInstall] = useState<Install>();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [rename, setRename] = useState<string>();
   const toast = useToast();
   const h = host.data;
   useTitle(h?.name ?? "Hôtes");
@@ -133,6 +134,7 @@ export function HostDetailPage({ id }: { id: number }) {
         description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} />{h.info.os && <Tag>{h.info.os}</Tag>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
         actions={<>
           <Switch label="Maintenance" checked={h.maintenance} onChange={(v) => update({ maintenance: v })} />
+          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setRename(h.name)}>Renommer</Button>
           <Button variant="secondary" icon={<KeyRound size={16} />} onClick={() => api.post<{ install: Install }>(`/api/hosts/${id}/token`).then((r) => setInstall(r.install))}>Régénérer le jeton</Button>
           <Button variant="danger-ghost" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)}>Supprimer</Button>
         </>} />
@@ -245,6 +247,14 @@ export function HostDetailPage({ id }: { id: number }) {
       <Dialog open={!!install} onClose={() => setInstall(undefined)} size="lg" title="Nouveau jeton" description="L'ancien jeton est révoqué et l'agent a été déconnecté."
         footer={<Button onClick={() => setInstall(undefined)}>Terminer</Button>}>
         {install && <InstallInstructions install={install} name={h.name} />}
+      </Dialog>
+      <Dialog open={rename != null} onClose={() => setRename(undefined)} size="sm" title={`Renommer ${h.name}`}
+        description="Le nouveau nom est repris par l'inventaire de la gestion à la prochaine synchronisation."
+        footer={<><Button variant="secondary" onClick={() => setRename(undefined)}>Annuler</Button>
+          <Button type="submit" form="rename-form">Renommer</Button></>}>
+        <form id="rename-form" onSubmit={async (e) => { e.preventDefault(); await update({ name: rename }); setRename(undefined); }}>
+          <Field label="Nom" htmlFor="h-name"><input id="h-name" className={inputClass} value={rename ?? ""} onChange={(e) => setRename(e.target.value)} autoFocus /></Field>
+        </form>
       </Dialog>
       <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} size="sm" title={`Supprimer ${h.name}`}
         footer={<><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annuler</Button>

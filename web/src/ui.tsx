@@ -5,6 +5,9 @@ import uPlot from "uplot";
 import { CircleAlert, CircleCheck, CirclePause, Clock, Copy, TriangleAlert, Wrench, X } from "lucide-react";
 import { statusLabel, type Day, type Status } from "./api";
 
+/** Search shortcut label: ⌘K on Apple systems, Ctrl K elsewhere. */
+export const SEARCH_KEY = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘K" : "Ctrl K";
+
 export function cn(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
 }
@@ -305,7 +308,7 @@ export const STAT_GRID = "grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-
 export function PageHeader({ title, description, actions, crumbs }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; crumbs?: ReactNode }) {
   return (
     <header className="mm-page__head mb-6">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 grow basis-96">
         {crumbs && <nav aria-label="Fil d'Ariane" className="mb-1 flex items-center gap-1.5 text-sm text-meta">{crumbs}</nav>}
         <h1 className="mm-h1">{title}</h1>
         {description && <div className="mt-1 text-pretty text-meta">{description}</div>}

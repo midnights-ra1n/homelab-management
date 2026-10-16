@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Download, Plug, Send, Zap } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Download, Plug, Send, Zap } from "lucide-react";
 import { api, fmtNum } from "../api";
 import {
-  Alert, Button, ButtonAnchor, Card, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, Chart, usePoll, useToast,
+  Alert, Button, ButtonAnchor, ButtonLink, Card, CardBody, CardHeader, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, Chart, usePoll, useToast,
 } from "../ui";
 
 interface EnergyPlug { id: number; name: string; total_wh: number; avg_day_wh: number | null; avg_week_wh: number | null; avg_month_wh: number | null; daily: (number | null)[] }
@@ -11,9 +11,10 @@ interface EnergyReport { from: number; to: number; days: number[]; total_wh: num
 const kwh = (wh: number | null | undefined) => (wh == null ? "—" : `${fmtNum(wh / 1000, wh < 10000 ? 2 : 1)} kWh`);
 type Range = "7" | "30" | "90" | "365";
 
-export function EnergyPage() {
+/** Also shown read-only by the management UI, which relays the monitoring report through `source`. */
+export function EnergyPage({ source }: { source?: string }) {
   const [days, setDays] = useState<Range>("30");
-  const { data, error } = usePoll(() => api.get<EnergyReport>(`/api/reports/energy?days=${days}`), 300000, [days]);
+  const { data, error } = usePoll(() => api.get<EnergyReport>(`${source ?? "/api/reports/energy"}?days=${days}`), 300000, [days]);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   // Daily kWh per plug; uPlot wants seconds on x.
@@ -24,17 +25,19 @@ export function EnergyPage() {
       <PageHeader title="Consommation électrique" description="Relevés des prises Meross, lus en local. Moyennes calculées sur les jours mesurés."
         actions={<div className="mm-btn-group">
           <Segmented label="Période" value={days} onChange={setDays} options={[["7", "7 j"], ["30", "30 j"], ["90", "90 j"], ["365", "1 an"]]} />
+          {!source && <>
           <ButtonAnchor variant="secondary" href={`/api/reports/energy.csv?days=${days}`} download icon={<Download size={16} />}>Exporter (CSV)</ButtonAnchor>
           <Button variant="secondary" icon={<Send size={16} />} loading={busy} onClick={async () => {
             setBusy(true);
             try { await api.post(`/api/reports/energy/send?days=${days}`); toast("Rapport envoyé par e-mail"); } catch (e) { toast((e as Error).message, "error"); }
             setBusy(false);
           }}>Envoyer par e-mail</Button>
+          </>}
         </div>} />
       {error && <Alert kind="error" title="Impossible de charger la consommation" className="mb-6">{error}</Alert>}
       {!data && !error && <Skeleton className="h-64" />}
       {data && data.plugs.length === 0 && (
-        <EmptyState icon={<Plug size={20} />} title="Aucune prise connectée" action={<Link to="/monitors">Ajouter une sonde « Prise Meross »</Link>}>
+        <EmptyState icon={<Plug size={20} />} title="Aucune prise connectée" action={!source && <Link to="/monitors">Ajouter une sonde « Prise Meross »</Link>}>
           Connecte ton compte Meross dans Configuration, puis ajoute chaque prise comme sonde avec son adresse IP locale.
         </EmptyState>
       )}
@@ -56,7 +59,7 @@ export function EnergyPage() {
                 <thead><tr><th scope="col">Prise</th><th scope="col" className="mm-col-num">Total</th><th scope="col" className="mm-col-num">/ jour</th><th scope="col" className="mm-col-num">/ semaine</th><th scope="col" className="mm-col-num">/ mois</th></tr></thead>
                 <tbody>{data.plugs.map((p) => (
                   <tr key={p.id}>
-                    <td className="mm-col-strong"><Link to={`/monitors/${p.id}`} className="text-inherit no-underline hover:text-accent-text">{p.name}</Link></td>
+                    <td className="mm-col-strong">{source ? p.name : <Link to={`/monitors/${p.id}`} className="text-inherit no-underline hover:text-accent-text">{p.name}</Link>}</td>
                     {[p.total_wh, p.avg_day_wh, p.avg_week_wh, p.avg_month_wh].map((v, i) => <td key={i} className="mm-col-num font-mono text-xs">{kwh(v)}</td>)}
                   </tr>
                 ))}</tbody>
@@ -66,5 +69,21 @@ export function EnergyPage() {
         </div>
       )}
     </>
+  );
+}
+
+/** Dashboard card: average power over the last 30 days; nothing when no plug is measured. */
+export function EnergyCard({ source, href }: { source?: string; href: string }) {
+  const { data } = usePoll(() => api.get<EnergyReport>(`${source ?? "/api/reports/energy"}?days=30`), 300000);
+  if (!data?.plugs.length) return null;
+  return (
+    <Card className="h-full">
+      <CardHeader overline="Énergie" title="Puissance moyenne, 30 derniers jours"
+        actions={<ButtonLink to={href} variant="ghost" size="sm" icon={<ArrowUpRight size={14} />}>Détails</ButtonLink>} />
+      <CardBody>
+        <p className="font-mono text-4xl font-semibold tracking-tight text-h1 tabular-nums">{data.avg_day_wh == null ? "—" : `${fmtNum(data.avg_day_wh / 24, 0)} W`}</p>
+        <p className="mt-1 text-sm text-meta">{kwh(data.avg_day_wh)} par jour · {kwh(data.avg_month_wh)} par mois · {data.plugs.length} prise(s)</p>
+      </CardBody>
+    </Card>
   );
 }

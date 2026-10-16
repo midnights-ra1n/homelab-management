@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // Statuses follow Atlassian Statuspage / Better Stack wording.
@@ -72,13 +73,14 @@ type MonitorConfig struct {
 	PrivProto   string   `json:"priv_proto,omitempty"`   // snmp v3: AES, AES256, DES
 	PrivPass    string   `json:"priv_pass,omitempty"`    // snmp v3, secret
 	Channel     int      `json:"channel,omitempty"`      // meross: socket of a power strip
+	APIKey      string   `json:"api_key,omitempty"`      // truenas, secret
 }
 
 // MarshalJSON hides the secrets from every API response and export; stored() keeps them for the database.
 func (c MonitorConfig) MarshalJSON() ([]byte, error) {
 	type plain MonitorConfig
 	p := plain(c)
-	p.Community, p.AuthPass, p.PrivPass = "", "", ""
+	p.Community, p.AuthPass, p.PrivPass, p.APIKey = "", "", "", ""
 	return json.Marshal(p)
 }
 
@@ -99,6 +101,9 @@ func (c *MonitorConfig) keepSecrets(old MonitorConfig) {
 	if c.PrivPass == "" {
 		c.PrivPass = old.PrivPass
 	}
+	if c.APIKey == "" {
+		c.APIKey = old.APIKey
+	}
 }
 
 type Monitor struct {
@@ -112,6 +117,7 @@ type Monitor struct {
 	Enabled     bool          `json:"enabled"`
 	Maintenance bool          `json:"maintenance"`
 	Public      bool          `json:"public"`
+	Category    string        `json:"category"` // free label used to group probes ("VM", "Domotique"…)
 	Status      string        `json:"status"`
 	Message     string        `json:"message"`
 	LatencyMs   *float64      `json:"latency_ms"`
@@ -139,6 +145,9 @@ func (m *Monitor) validate() string {
 	var msg string
 	if m.Name, msg = validName(m.Name); msg != "" {
 		return msg
+	}
+	if m.Category = strings.TrimSpace(m.Category); utf8.RuneCountInString(m.Category) > 40 {
+		return "La catégorie ne doit pas dépasser 40 caractères"
 	}
 	m.Target = strings.TrimSpace(m.Target)
 	c := &m.Config
@@ -211,8 +220,16 @@ func (m *Monitor) validate() string {
 		if c.Channel < 0 || c.Channel > 8 {
 			return "Le canal doit être compris entre 0 et 8"
 		}
+	case "truenas":
+		u, err := url.Parse(m.Target)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || (u.Path != "" && u.Path != "/") {
+			return "L'adresse doit ressembler à https://truenas.lan"
+		}
+		if len(c.APIKey) > 200 {
+			return "La clé d'API doit contenir au plus 200 caractères"
+		}
 	default:
-		return "Le type de sonde doit être http, tcp, dns, ssl, snmp ou meross"
+		return "Le type de sonde doit être http, tcp, dns, ssl, snmp, meross ou truenas"
 	}
 	if c.MinValue != nil && c.MaxValue != nil && *c.MinValue > *c.MaxValue {
 		return "Le seuil bas doit être inférieur au seuil haut"
@@ -328,6 +345,8 @@ func runCheck(ctx context.Context, m *Monitor) checkResult {
 		return checkSSL(ctx, m)
 	case "snmp":
 		return checkSNMP(ctx, m)
+	case "truenas":
+		return checkTrueNAS(ctx, m)
 	}
 	return checkResult{StatusUnknown, nil, "Type inconnu", nil, nil}
 }
@@ -595,7 +614,7 @@ func (s *Server) recordResult(m *Monitor, res checkResult, eff string) error {
 	return nil
 }
 
-const monitorCols = `id,name,type,target,interval_s,timeout_s,config,enabled,maintenance,public,status,message,latency_ms,last_check,cert_expires_at,cert_alerted_for`
+const monitorCols = `id,name,type,target,interval_s,timeout_s,config,enabled,maintenance,public,status,message,latency_ms,last_check,cert_expires_at,cert_alerted_for,category`
 
 func (s *Server) loadMonitors(where string, args ...any) ([]Monitor, error) {
 	rows, err := s.db.Query(`SELECT `+monitorCols+` FROM monitors `+where+` ORDER BY name COLLATE NOCASE`, args...)
@@ -607,7 +626,7 @@ func (s *Server) loadMonitors(where string, args ...any) ([]Monitor, error) {
 	for rows.Next() {
 		var m Monitor
 		var cfg string
-		if err := rows.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalS, &m.TimeoutS, &cfg, &m.Enabled, &m.Maintenance, &m.Public, &m.Status, &m.Message, &m.LatencyMs, &m.LastCheck, &m.CertExpires, &m.certAlertedFor); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalS, &m.TimeoutS, &cfg, &m.Enabled, &m.Maintenance, &m.Public, &m.Status, &m.Message, &m.LatencyMs, &m.LastCheck, &m.CertExpires, &m.certAlertedFor, &m.Category); err != nil {
 			return nil, err
 		}
 		json.Unmarshal([]byte(cfg), &m.Config)
@@ -707,17 +726,18 @@ type monitorInput struct {
 	Enabled     *bool         `json:"enabled"`
 	Maintenance bool          `json:"maintenance"`
 	Public      bool          `json:"public"`
+	Category    string        `json:"category"`
 }
 
 func (in monitorInput) toMonitor() (Monitor, string) {
 	m := Monitor{Name: in.Name, Type: in.Type, Target: in.Target, IntervalS: in.IntervalS, TimeoutS: in.TimeoutS,
-		Config: in.Config, Enabled: in.Enabled == nil || *in.Enabled, Maintenance: in.Maintenance, Public: in.Public}
+		Config: in.Config, Enabled: in.Enabled == nil || *in.Enabled, Maintenance: in.Maintenance, Public: in.Public, Category: in.Category}
 	return m, m.validate()
 }
 
 func (s *Server) insertMonitor(m *Monitor) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO monitors(name,type,target,interval_s,timeout_s,config,enabled,maintenance,public,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`,
-		m.Name, m.Type, m.Target, m.IntervalS, m.TimeoutS, m.Config.stored(), m.Enabled, m.Maintenance, m.Public, time.Now().Unix())
+	res, err := s.db.Exec(`INSERT INTO monitors(name,type,target,interval_s,timeout_s,config,enabled,maintenance,public,category,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+		m.Name, m.Type, m.Target, m.IntervalS, m.TimeoutS, m.Config.stored(), m.Enabled, m.Maintenance, m.Public, m.Category, time.Now().Unix())
 	if err != nil {
 		return 0, err
 	}
@@ -763,8 +783,8 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Reset last_check so the new settings are checked right away.
-	res, err := s.db.Exec(`UPDATE monitors SET name=?,type=?,target=?,interval_s=?,timeout_s=?,config=?,enabled=?,maintenance=?,public=?,last_check=0 WHERE id=?`,
-		m.Name, m.Type, m.Target, m.IntervalS, m.TimeoutS, m.Config.stored(), m.Enabled, m.Maintenance, m.Public, id)
+	res, err := s.db.Exec(`UPDATE monitors SET name=?,type=?,target=?,interval_s=?,timeout_s=?,config=?,enabled=?,maintenance=?,public=?,category=?,last_check=0 WHERE id=?`,
+		m.Name, m.Type, m.Target, m.IntervalS, m.TimeoutS, m.Config.stored(), m.Enabled, m.Maintenance, m.Public, m.Category, id)
 	if err != nil {
 		serverErr(w, err)
 		return

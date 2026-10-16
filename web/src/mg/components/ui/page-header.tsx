@@ -13,7 +13,7 @@ export function PageHeader({
   return (
     <header className="mm-page__head mb-6">
       {/* Pas de largeur max : la description tient sur une ligne tant que la place le permet. */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 grow basis-96">
         <h1 className="mm-h1">{title}</h1>
         {description && <p className="mt-1 text-pretty text-meta">{description}</p>}
       </div>

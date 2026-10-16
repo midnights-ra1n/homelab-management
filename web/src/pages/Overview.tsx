@@ -4,19 +4,21 @@ import { api, certDays, fmtMs, pct, statusLabel, type Overview, type Status } fr
 import { updateTotals } from "./Updates";
 import { incidents } from "./Incidents";
 import { AgentVersion } from "./AgentVersion";
+import { EnergyCard } from "./Energy";
 import { AlertBanner } from "../layout";
 import {
   Alert, Badge, Button, ButtonLink, Card, CardBody, CardHeader, EmptyState, IconButton, Link, Meter, STAT_GRID, SectionTitle, Skeleton, Stat,
   StatusBadge, StatusIcon, UptimeBars, cn, fmtLatency, formatPct, kindTone, statusKind, usePoll, useToast,
 } from "../ui";
 
-type WidgetId = "kpis" | "problems" | "latency" | "updates" | "uptime" | "hosts";
+type WidgetId = "kpis" | "problems" | "latency" | "energy" | "updates" | "uptime" | "hosts";
 interface Widget { id: WidgetId; visible: boolean; full: boolean }
 
 const WIDGETS: Record<WidgetId, string> = {
   kpis: "Indicateurs",
   problems: "Incidents en cours",
   latency: "Latence moyenne (24 h)",
+  energy: "Consommation électrique",
   updates: "Mises à jour",
   uptime: "Disponibilité sur 90 jours",
   hosts: "Ressources des hôtes",
@@ -26,6 +28,7 @@ const DEFAULT_LAYOUT: Widget[] = [
   { id: "latency", visible: true, full: false },
   { id: "problems", visible: true, full: false },
   { id: "updates", visible: true, full: false },
+  { id: "energy", visible: true, full: false },
   { id: "uptime", visible: true, full: true },
   { id: "hosts", visible: true, full: true },
 ];
@@ -198,6 +201,8 @@ function WidgetView({ id, data }: { id: WidgetId; data: Overview }) {
         </Card>
       );
     }
+    case "energy":
+      return <EnergyCard href="/energy" />;
     case "latency":
       return (
         <Card className="h-full">

@@ -4,6 +4,8 @@
 # Writes one smartctl JSON file per disk; the agent reads them from /var/lib/hlm-agent/smart.
 set -eu
 OUT=/var/lib/hlm-agent/smart
+# Request dropped by the agent (hlm-agent-smart.path): consumed first so it fires once.
+rm -f /var/lib/hlm-agent/state/smart-request
 rm -rf "$OUT.new"
 mkdir -m 0750 "$OUT.new"
 if ! command -v smartctl >/dev/null 2>&1; then

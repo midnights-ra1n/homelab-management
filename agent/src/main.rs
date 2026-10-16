@@ -191,11 +191,24 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // The root collector refreshes SMART hourly; forward each new file once.
     let mut smart_tick = tokio::time::interval(Duration::from_secs(600));
     let mut smart_sent = 0u64;
+    // After a dashboard request, look for the new SMART file every 15 s for up to 10 minutes.
+    let mut smart_until = 0u64;
+    let mut smart_poll = tokio::time::interval(Duration::from_secs(15));
     loop {
         tokio::select! {
             _ = smart_tick.tick() => {
                 if let Some(rep) = smart::read_report().filter(|r| r.collected_at != smart_sent) {
                     smart_sent = rep.collected_at;
+                    let m = serde_json::json!({"type": "smart", "smart": rep});
+                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                        return Failure::Retry(e.to_string());
+                    }
+                }
+            }
+            _ = smart_poll.tick(), if smart_until > actions::now() => {
+                if let Some(rep) = smart::read_report().filter(|r| r.collected_at != smart_sent) {
+                    smart_sent = rep.collected_at;
+                    smart_until = 0;
                     let m = serde_json::json!({"type": "smart", "smart": rep});
                     if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
                         return Failure::Retry(e.to_string());
@@ -271,6 +284,10 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         }
                         "update_container" => match actions::request_container_update(m["target"].as_str().unwrap_or("")) {
                             Ok(()) => { apt_pending = Some((action.clone(), actions::now(), actions::DOCKER_OUTPUT)); ("running", String::new()) }
+                            Err(e) => ("failed", e),
+                        },
+                        "refresh_smart" => match actions::request_smart() {
+                            Ok(()) => { smart_until = actions::now() + 600; ("running", String::new()) }
                             Err(e) => ("failed", e),
                         },
                         "update_agent" if cfg.deb => match actions::request_apt("agentdeb") {

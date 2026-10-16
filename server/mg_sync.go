@@ -61,6 +61,30 @@ func (s *Server) mgMonitoring(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, collect(ctx, list, s.hlmData))
 }
 
+// mgEnergy relays the energy report of the first enabled monitoring integration (scope reports:read).
+func (s *Server) mgEnergy(w http.ResponseWriter, r *http.Request) {
+	days, err := strconv.Atoi(r.URL.Query().Get("days"))
+	if err != nil || days < 1 || days > 3650 {
+		writeErr(w, 400, "days doit être compris entre 1 et 3650")
+		return
+	}
+	list, err := s.loadIntegrations(`WHERE type = 'hlm' AND enabled = 1`)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	if len(list) == 0 {
+		writeErr(w, 404, "Aucune intégration Homelab Monitoring active")
+		return
+	}
+	var rep json.RawMessage
+	if err := hlmGet(r.Context(), &list[0], fmt.Sprintf("/reports/energy?days=%d", days), &rep); err != nil {
+		writeErr(w, 502, err.Error())
+		return
+	}
+	writeJSON(w, 200, rep)
+}
+
 // mgAssetMonitoring returns the monitoring view of a linked asset (host with its latest metrics).
 func (s *Server) mgAssetMonitoring(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
@@ -229,7 +253,7 @@ func (s *Server) syncHost(i *integration, h map[string]any) (int, error) {
 			}
 		}
 		if assetID > 0 {
-			s.db.Exec(`UPDATE assets SET hlm_integration_id = ?, hlm_host_id = ? WHERE id = ?`, i.ID, int64(hostID), assetID)
+			s.db.Exec(`UPDATE assets SET hlm_integration_id = ?, hlm_host_id = ?, hlm_name = ? WHERE id = ?`, i.ID, int64(hostID), name, assetID)
 			s.logEvent("synchronisation", "asset", assetID, "update", "« "+name+" » relié à l'hôte du monitoring « "+i.Name+" »")
 		} else {
 			return s.createFromHost(i, int64(hostID), name, status, inv)
@@ -347,6 +371,7 @@ func (s *Server) createFromHost(i *integration, hostID int64, name, status strin
 	cols["tags"] = `["monitoring"]`
 	cols["hlm_integration_id"] = i.ID
 	cols["hlm_host_id"] = hostID
+	cols["hlm_name"] = name
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
@@ -426,12 +451,16 @@ func (s *Server) updateFromHost(assetID int64, name, status string, inv hostInve
 	if st := assetStatusFor(status); st != "" && (before["status"] == "online" || before["status"] == "offline") && st != before["status"] {
 		cols["status"] = st
 	}
+	// Renamed in the monitoring since the last sync: follow it (an unknown previous name is only recorded).
+	if prev := fmtVal(before["hlm_name"]); prev != "" && prev != name && fmtVal(before["display_name"]) != name {
+		cols["display_name"] = clip(name, 120)
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
-	tx.Exec(`UPDATE assets SET status_source = 'hlm', status_checked_at = datetime('now') WHERE id = ?`, assetID)
+	tx.Exec(`UPDATE assets SET status_source = 'hlm', status_checked_at = datetime('now'), hlm_name = ? WHERE id = ?`, name, assetID)
 	ipAdded := s.addAgentIP(tx, assetID, inv, fmtVal(before["hostname"]))
 	if len(cols) > 0 {
 		if err := s.updateRow(tx, "assets", assetID, cols); err != nil {

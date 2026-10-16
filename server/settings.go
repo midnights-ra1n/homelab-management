@@ -45,8 +45,10 @@ var settingDefs = map[string]string{
 	"notify_security_updates": "true",
 	"notify_reboot":           "true",
 	"notify_smart_level":      DiskReplace,
+	"notify_disk_pct":         "90",
 	"notify_docker_updates":   "false",
 	"report_monthly_enabled":  "false",
+	"report_weekly_enabled":   "false",
 	"report_energy":           "off",
 	"meross_key":              "",
 	"db_max_mb":               "0",
@@ -68,6 +70,7 @@ var intSettings = map[string][2]int{
 	"notify_window_s":        {0, 3600},
 	"smtp_port":              {1, 65535},
 	"db_max_mb":              {0, 1 << 20},
+	"notify_disk_pct":        {0, 99},
 }
 
 // defs returns the settings of this server's role.
@@ -158,7 +161,7 @@ func validateSettings(defs, in map[string]string) string {
 	if v, ok := in["notify_smart_level"]; ok && v != DiskWatch && v != DiskReplace && v != DiskFailing && v != "off" {
 		return "Le seuil d'alerte SMART doit être watch, replace, failing ou off"
 	}
-	for _, k := range []string{"smtp_enabled", "status_enabled", "api_enabled", "report_monthly_enabled", "notify_security_updates", "notify_reboot", "notify_docker_updates"} {
+	for _, k := range []string{"smtp_enabled", "status_enabled", "api_enabled", "report_monthly_enabled", "report_weekly_enabled", "notify_security_updates", "notify_reboot", "notify_docker_updates"} {
 		if v, ok := in[k]; ok && v != "true" && v != "false" {
 			return k + " doit valoir true ou false"
 		}

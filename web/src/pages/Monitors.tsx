@@ -6,7 +6,7 @@ import {
   StatusIcon, Switch, Tag, UptimeBars, cn, fmtLatency, formatPct, inputClass, kindTone, navigate, statusKind, usePoll, useTitle, useToast,
 } from "../ui";
 
-const TYPES: Record<MonitorType, string> = { http: "HTTP(S)", tcp: "Port TCP", dns: "DNS", ssl: "Certificat SSL", snmp: "SNMP", meross: "Prise Meross" };
+const TYPES: Record<MonitorType, string> = { http: "HTTP(S)", tcp: "Port TCP", dns: "DNS", ssl: "Certificat SSL", snmp: "SNMP", meross: "Prise Meross", truenas: "TrueNAS" };
 const TARGET_HINT: Record<MonitorType, [string, string]> = {
   http: ["URL", "https://nextcloud.example.fr/status.php"],
   tcp: ["Hôte et port", "192.168.1.10:22"],
@@ -14,10 +14,11 @@ const TARGET_HINT: Record<MonitorType, [string, string]> = {
   ssl: ["Domaine (port facultatif)", "example.fr ou example.fr:8443"],
   snmp: ["Équipement (port facultatif)", "192.168.1.2 ou switch.lan:161"],
   meross: ["Adresse IP locale de la prise", "192.168.1.40"],
+  truenas: ["Adresse de TrueNAS", "https://truenas.lan"],
 };
 
 /** Unit of the value read by snmp / meross probes. */
-const unitOf = (m: { type: MonitorType; config: { unit?: string } }) => (m.type === "meross" ? "W" : m.config.unit ?? "");
+const unitOf = (m: { type: MonitorType; config: { unit?: string } }) => (m.type === "meross" ? "W" : m.type === "truenas" ? "%" : m.config.unit ?? "");
 const fmtValue = (unit: string) => (v: number) => `${fmtNum(v, v < 10 ? 2 : 1)}${unit ? ` ${unit}` : ""}`;
 
 /** Certificate expiry badge: always paired with a text label, never colour alone. */
@@ -48,6 +49,12 @@ export function MonitorsPage() {
   const expiring = certs.filter((m) => certDays(m)! < (m.config.warn_days ?? 14)).length;
   const ups = active.map((m) => uptime(m)).filter((u): u is number => u != null);
   const lat = active.filter((m) => m.latency_ms != null && m.type !== "ssl");
+  // Probes grouped by category, named ones first; no heading while nobody uses categories.
+  const groups = [...new Set((data ?? []).map((m) => m.category))]
+    .sort((a, b) => (!a ? 1 : !b ? -1 : a.localeCompare(b, "fr")))
+    .map((c) => [c, data!.filter((m) => m.category === c)] as const);
+  const categories = groups.map(([c]) => c).filter(Boolean);
+  const heading = (c: string) => categories.length > 0 && <h3 className="mm-label-caps mb-2 mt-4 first:mt-0">{c || "Sans catégorie"}</h3>;
 
   return (
     <>
@@ -73,14 +80,15 @@ export function MonitorsPage() {
               <Segmented size="sm" label="Affichage" value={view} onChange={changeView}
                 options={[["cards", <><LayoutGrid size={14} aria-hidden />Tuiles</>], ["table", <><List size={14} aria-hidden />Tableau</>]]} />
             }>{data.length} sonde(s)</SectionTitle>
-            {view === "cards" ? (
+            {view === "cards" ? groups.map(([cat, list]) => (
+              <div key={cat}>{heading(cat)}
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {data.map((m) => {
+                {list.map((m) => {
                   const kind = statusKind(m.status, m);
                   const d = certDays(m);
                   const note = kind === "down" || kind === "warn" ? m.message
                     : d != null && d < (m.config.warn_days ?? 14) ? `Certificat : ${d} j restants`
-                    : m.latency_ms != null && m.type !== "snmp" && m.type !== "meross" ? fmtLatency(m.latency_ms) : m.message;
+                    : m.latency_ms != null && m.type !== "snmp" && m.type !== "meross" && m.type !== "truenas" ? fmtLatency(m.latency_ms) : m.message;
                   return (
                     <li key={m.id} className={cn("relative grid gap-3 rounded-xl border border-line-subtle bg-box p-4 transition-colors hover:border-line-strong", !m.enabled && "opacity-60")}
                       style={kind === "down" ? { borderColor: `color-mix(in srgb, ${kindTone("down")} 40%, var(--mm-border))` } : undefined}>
@@ -97,13 +105,16 @@ export function MonitorsPage() {
                   );
                 })}
               </ul>
-            ) : (
+              </div>
+            )) : (
               <Card flush title="Toutes les sondes" sub={`${data.length} sonde(s)`}>
                 <div className="mm-table-wrap">
                   <table className="mm-table min-w-[56rem]">
                     <thead><tr><th scope="col">Nom</th><th scope="col">Type</th><th scope="col">État</th><th scope="col" className="mm-col-num">Latence</th><th scope="col">Certificat</th><th scope="col" className="min-w-60">30 derniers jours</th><th scope="col">Vérifiée</th></tr></thead>
-                    <tbody>
-                      {data.map((m) => (
+                    {groups.map(([cat, list]) => (
+                    <tbody key={cat}>
+                      {categories.length > 0 && <tr><th scope="colgroup" colSpan={7} className="mm-label-caps">{cat || "Sans catégorie"}</th></tr>}
+                      {list.map((m) => (
                         <tr key={m.id} className="cursor-pointer" onClick={() => navigate(`/monitors/${m.id}`)}>
                           <td className="mm-col-strong max-w-[22rem]">
                             <Link to={`/monitors/${m.id}`} className="flex min-w-0 items-center gap-2.5 py-1.5 text-inherit no-underline hover:text-accent-text">
@@ -120,6 +131,7 @@ export function MonitorsPage() {
                         </tr>
                       ))}
                     </tbody>
+                    ))}
                   </table>
                 </div>
               </Card>
@@ -127,7 +139,7 @@ export function MonitorsPage() {
           </section>
         </div>
       )}
-      {editing && <MonitorDialog monitor={editing === "new" ? undefined : editing} onClose={(changed) => { setEditing(undefined); if (changed) refresh(); }} />}
+      {editing && <MonitorDialog monitor={editing === "new" ? undefined : editing} categories={categories} onClose={(changed) => { setEditing(undefined); if (changed) refresh(); }} />}
     </>
   );
 }
@@ -185,13 +197,13 @@ function SnmpFields({ m, cfg, editing }: { m: MonitorInput; cfg: CfgSetter; edit
   );
 }
 
-const blank: MonitorInput = { name: "", type: "http", target: "", interval_s: 60, timeout_s: 10, config: {}, enabled: true, maintenance: false, public: false };
+const blank: MonitorInput = { name: "", type: "http", target: "", interval_s: 60, timeout_s: 10, config: {}, enabled: true, maintenance: false, public: false, category: "" };
 
-function MonitorDialog({ monitor, onClose }: { monitor?: Monitor; onClose: (changed: boolean, m?: Monitor) => void }) {
+function MonitorDialog({ monitor, categories = [], onClose }: { monitor?: Monitor; categories?: string[]; onClose: (changed: boolean, m?: Monitor) => void }) {
   // Only send editable fields: the API rejects unknown ones.
   const [m, setM] = useState<MonitorInput>(() => monitor ? {
     name: monitor.name, type: monitor.type, target: monitor.target, interval_s: monitor.interval_s, timeout_s: monitor.timeout_s,
-    config: { ...monitor.config }, enabled: monitor.enabled, maintenance: monitor.maintenance, public: monitor.public,
+    config: { ...monitor.config }, enabled: monitor.enabled, maintenance: monitor.maintenance, public: monitor.public, category: monitor.category,
   } : blank);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -227,6 +239,10 @@ function MonitorDialog({ monitor, onClose }: { monitor?: Monitor; onClose: (chan
         <div className="flex flex-wrap items-end gap-3 [&>.mm-field]:min-w-40 [&>.mm-field]:flex-1">
           <Field label="Nom" htmlFor="m-name"><input id="m-name" className={inputClass} value={m.name} onChange={(e) => set("name", e.target.value)} /></Field>
           <Field label={targetLabel} htmlFor="m-target"><input id="m-target" className={`${inputClass} font-mono`} placeholder={targetPh} value={m.target} onChange={(e) => set("target", e.target.value)} /></Field>
+          <Field label="Catégorie" htmlFor="m-cat" hint="Choisis-en une ou tape un nouveau nom">
+            <input id="m-cat" className={inputClass} list="m-cats" maxLength={40} placeholder="VM, Domotique…" value={m.category} onChange={(e) => set("category", e.target.value)} />
+            <datalist id="m-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
+          </Field>
         </div>
         <div className="flex flex-wrap items-end gap-3 [&>.mm-field]:min-w-40 [&>.mm-field]:flex-1">
           <Field label="Intervalle (secondes)" htmlFor="m-int"><input id="m-int" className={`${inputClass} tabular-nums`} type="number" min={10} value={m.interval_s} onChange={(e) => set("interval_s", Number(e.target.value))} /></Field>
@@ -277,13 +293,27 @@ function MonitorDialog({ monitor, onClose }: { monitor?: Monitor; onClose: (chan
             </Field>
           </div>
         )}
+        {m.type === "truenas" && (
+          <>
+            <div className="flex flex-wrap items-end gap-3 [&>.mm-field]:min-w-40 [&>.mm-field]:flex-1">
+              <Field label="Clé d'API" htmlFor="m-key" hint="TrueNAS → Paramètres → Clés d'API ; un utilisateur en lecture seule suffit">
+                <input id="m-key" className={`${inputClass} font-mono`} type="password" autoComplete="new-password" placeholder={monitor ? "Inchangée" : ""} value={m.config.api_key ?? ""} onChange={(e) => cfg("api_key", e.target.value)} />
+              </Field>
+              <Field label="Occupation maximale des pools (%)" htmlFor="m-pool" hint="Au-delà, la sonde passe en « performances dégradées »">
+                <input id="m-pool" className={`${inputClass} tabular-nums`} type="number" min={1} max={100} placeholder="90" value={m.config.max_value ?? ""} onChange={(e) => cfg("max_value", num(e.target.value))} />
+              </Field>
+            </div>
+            <label className="flex cursor-pointer items-start gap-3 text-sm text-h2"><input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--mm-accent)]" checked={!!m.config.ignore_tls} onChange={(e) => cfg("ignore_tls", e.target.checked)} />Accepter les certificats auto-signés</label>
+            <p className="mm-help -mt-3">TrueNAS 25.04 ou plus récent : état et remplissage des pools, alertes critiques. Rien n'est installé sur le NAS.</p>
+          </>
+        )}
         {m.type === "meross" && <p className="mm-help -mt-3">Lecture directe sur le réseau local, sans passer par le cloud. Connecte d'abord le compte Meross dans Configuration.</p>}
         {(m.type === "ssl" || (m.type === "http" && m.config.check_ssl)) && (
           <Field label="Avertir par e-mail avant expiration (jours)" htmlFor="m-warn" hint="Un seul e-mail par certificat, par exemple 3 jours avant">
             <input id="m-warn" className={`${inputClass} tabular-nums`} type="number" min={1} max={365} placeholder="14" value={m.config.warn_days ?? ""} onChange={(e) => cfg("warn_days", num(e.target.value))} />
           </Field>
         )}
-        {m.type !== "ssl" && m.type !== "meross" && (
+        {m.type !== "ssl" && m.type !== "meross" && m.type !== "truenas" && (
           <Field label="Seuil de lenteur en ms (facultatif)" htmlFor="m-slow" hint="Au-delà, la sonde passe en « performances dégradées »">
             <input id="m-slow" className={`${inputClass} tabular-nums`} type="number" min={0} value={m.config.degraded_ms ?? ""} onChange={(e) => cfg("degraded_ms", num(e.target.value))} />
           </Field>
@@ -346,9 +376,9 @@ export function MonitorDetailPage({ id }: { id: number }) {
           <SectionTitle id="lat-title" actions={<Segmented size="sm" label="Période" value={range} onChange={setRange} options={[["1h", "1 h"], ["24h", "24 h"], ["7d", "7 j"], ["30d", "30 j"], ["90d", "90 j"]]} />}>Latence</SectionTitle>
           <Card className="p-5"><Chart t={res.data?.t ?? []} series={series} format={fmtLatency} height={260} /></Card>
         </section>
-        {(m.type === "snmp" || m.type === "meross") && (
+        {(m.type === "snmp" || m.type === "meross" || m.type === "truenas") && (
           <section aria-labelledby="val-title">
-            <SectionTitle id="val-title">{m.type === "meross" ? "Consommation instantanée" : "Valeur relevée"}</SectionTitle>
+            <SectionTitle id="val-title">{m.type === "meross" ? "Consommation instantanée" : m.type === "truenas" ? "Occupation du pool le plus plein" : "Valeur relevée"}</SectionTitle>
             <Card className="p-5"><Chart t={res.data?.t ?? []} series={valueSeries} format={fmtValue(unitOf(m))} height={260} /></Card>
           </section>
         )}

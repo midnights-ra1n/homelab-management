@@ -29,6 +29,7 @@ const (
 	KindUpdates = "Mises à jour"
 	KindReboot  = "Redémarrage"
 	KindImage   = "Image Docker"
+	KindSpace   = "Espace disque"
 )
 
 // warningLabels gives the badge text and colour of each warning kind in e-mails.
@@ -38,6 +39,7 @@ var warningLabels = map[string][2]string{
 	KindUpdates: {"Mises à jour de sécurité", statusColors[StatusDegraded]},
 	KindReboot:  {"Redémarrage requis", statusColors[StatusDegraded]},
 	KindImage:   {"Image à mettre à jour", statusColors[StatusMaintenance]},
+	KindSpace:   {"Espace disque faible", statusColors[StatusMinor]},
 }
 
 type Event struct {

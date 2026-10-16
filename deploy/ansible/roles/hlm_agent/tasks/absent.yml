@@ -10,7 +10,7 @@
     name: "{{ item }}"
     state: stopped
     enabled: false
-  loop: [hlm-agent.service, hlm-agent-smart.timer, hlm-agent-apt.path, hlm-agent-docker.timer, hlm-agent-docker-update.path]
+  loop: [hlm-agent.service, hlm-agent-smart.timer, hlm-agent-smart.path, hlm-agent-apt.path, hlm-agent-docker.timer, hlm-agent-docker-update.path]
   failed_when: false
 
 - name: Remove files
@@ -21,6 +21,7 @@
     - /etc/systemd/system/hlm-agent.service
     - /etc/systemd/system/hlm-agent-smart.service
     - /etc/systemd/system/hlm-agent-smart.timer
+    - /etc/systemd/system/hlm-agent-smart.path
     - /etc/systemd/system/hlm-agent-apt.path
     - /etc/systemd/system/hlm-agent-apt.service
     - /etc/systemd/system/hlm-agent-docker.service

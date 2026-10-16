@@ -82,9 +82,11 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/import", auth(s.handleImport))
 
 	mux.HandleFunc("GET /api/disks", auth(s.handleDisks))
+	mux.HandleFunc("POST /api/disks/refresh", auth(s.handleSmartRefresh))
 	mux.HandleFunc("GET /api/containers", auth(s.handleContainers))
 	mux.HandleFunc("GET /api/reports/monthly", auth(s.handleMonthlyReport))
 	mux.HandleFunc("POST /api/reports/monthly/send", auth(s.handleSendMonthlyReport))
+	mux.HandleFunc("POST /api/reports/weekly/send", auth(s.handleSendWeeklyReport))
 	mux.HandleFunc("GET /api/reports/energy", auth(s.handleEnergyReport))
 	mux.HandleFunc("GET /api/reports/energy.csv", auth(s.handleEnergyCSV))
 	mux.HandleFunc("POST /api/reports/energy/send", auth(s.handleSendEnergyReport))

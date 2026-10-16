@@ -26,6 +26,7 @@ import { Stat } from "@/components/ui/stat";
 import { KindIcon } from "@/components/kind-icon";
 import { cn, formatBytes, formatDate, formatGb, isOverdue, pct } from "@/lib/utils";
 import { getT } from "@/i18n/server";
+import { EnergyCard } from "../../pages/Energy";
 
 export default function DashboardPage() {
   const tr = use(getT());
@@ -156,8 +157,9 @@ function Dashboard() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
-        <div>
+        <div className="grid gap-8 xl:gap-10">
           <CapacityWidget />
+          {hasMonitoring && <EnergyCard source="/api/mg/energy" href="/energie" />}
         </div>
         <div>
           <SubnetsWidget />

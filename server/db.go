@@ -110,6 +110,7 @@ var migrations = []string{
 	ALTER TABLE monitor_daily ADD COLUMN energy_wh REAL NOT NULL DEFAULT 0;`,
 	activityTable,
 	passkeysTable,
+	`ALTER TABLE monitors ADD COLUMN category TEXT NOT NULL DEFAULT '';`,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's

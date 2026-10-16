@@ -1,6 +1,7 @@
-import { CircleAlert, CircleCheck, HardDrive, TriangleAlert } from "lucide-react";
+import { useState } from "react";
+import { CircleAlert, CircleCheck, HardDrive, RefreshCw, TriangleAlert } from "lucide-react";
 import { api, fmtAgo, fmtBytes, fmtNum } from "../api";
-import { Alert, Badge, Card, EmptyState, Link, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Skeleton, Stat, StatusIcon, TONE_VAR, type Tone, usePoll } from "../ui";
+import { Alert, Badge, Button, Card, EmptyState, Link, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Skeleton, Stat, StatusIcon, TONE_VAR, type Tone, usePoll, useToast } from "../ui";
 
 export type DiskHealthLevel = "good" | "watch" | "replace" | "failing";
 export interface Disk {
@@ -78,11 +79,22 @@ export function DiskCard({ d }: { d: Disk }) {
 
 export function DisksPage() {
   const { data, error } = usePoll(() => api.get<HostDisks[]>("/api/disks"), 60000);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post<{ sent: number }>("/api/disks/refresh");
+      toast(r.sent ? `Relevé demandé à ${r.sent} hôte(s) : les données arrivent d'ici quelques minutes` : "Aucun agent connecté", r.sent ? "success" : "error");
+    } catch (e) { toast((e as Error).message, "error"); }
+    setBusy(false);
+  };
   const all = (data ?? []).flatMap((h) => h.disks);
   const count = (l: DiskHealthLevel) => all.filter((d) => d.health === l).length;
   return (
     <>
-      <PageHeader title="Disques" description="Santé SMART des disques durs et SSD, relevée toutes les heures. Les durées restantes sont des estimations." />
+      <PageHeader title="Disques" description="Santé SMART des disques durs et SSD, relevée toutes les heures. Les durées restantes sont des estimations."
+        actions={<Button variant="secondary" icon={<RefreshCw size={16} />} loading={busy} onClick={refresh}>Relever maintenant</Button>} />
       {error && <Alert kind="error" title="Impossible de charger les disques" className="mb-6">{error}</Alert>}
       {!data && !error && <Skeleton className="h-64" />}
       {data && (

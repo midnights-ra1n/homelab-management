@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { api, type Overview } from "./api";
 import { incidents } from "./pages/Incidents";
-import { Link, Logo, StatusDot, StatusIcon, STATUS_TONE, ThemeSwitch, TONE_VAR, cn, isActive, navigate, toggleRail, usePath, useRail } from "./ui";
+import { Link, Logo, StatusDot, StatusIcon, STATUS_TONE, ThemeSwitch, TONE_VAR, SEARCH_KEY, cn, isActive, navigate, toggleRail, usePath, useRail } from "./ui";
 
 type NavItem = { href: string; label: string; short: string; icon: LucideIcon };
 
@@ -66,10 +66,10 @@ function AppSidebar({ version, account }: { version: string; account: ReactNode 
     <aside className="mm-sidebar" aria-label="Navigation principale">
       <SideHead version={version} />
       <nav className="mm-sidebar__nav">
-        <button type="button" onClick={openSearch} title="Rechercher (⌘K)" className="mm-nav-item">
+        <button type="button" onClick={openSearch} title={`Rechercher (${SEARCH_KEY})`} className="mm-nav-item">
           <Search size={16} aria-hidden="true" className="shrink-0" />
           <span className="mm-nav-item__label">Rechercher</span>
-          <kbd className="mm-nav-item__count font-mono">⌘K</kbd>
+          <kbd className="mm-nav-item__count font-mono">{SEARCH_KEY}</kbd>
         </button>
         {NAV_SECTIONS.map((section, i) => (
           <div key={i} className="mm-sidebar__section">

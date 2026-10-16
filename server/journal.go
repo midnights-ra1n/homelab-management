@@ -146,6 +146,7 @@ var journalLabels = map[string]journalLabel{
 	// Monitoring
 	"POST /api/hosts":                       jl("host", "create", "Hôte ajouté"),
 	"PATCH /api/hosts/{id}":                 jl("host", "update", "Hôte modifié"),
+	"POST /api/disks/refresh":               jl("host", "action", "Relevé SMART demandé à tous les hôtes"),
 	"DELETE /api/hosts/{id}":                jl("host", "delete", "Hôte supprimé"),
 	"POST /api/hosts/{id}/token":            jl("host", "update", "Jeton d'agent régénéré"),
 	"POST /api/hosts/{id}/action":           jl("host", "action", "Action lancée sur l'hôte"),
@@ -154,6 +155,7 @@ var journalLabels = map[string]journalLabel{
 	"DELETE /api/monitors/{id}":             jl("monitor", "delete", "Sonde supprimée"),
 	"POST /api/settings/test-email":         jl("settings", "test", "E-mail de test envoyé"),
 	"POST /api/reports/monthly/send":        jl("report", "send", "Rapport mensuel envoyé"),
+	"POST /api/reports/weekly/send":         jl("report", "send", "Rapport hebdomadaire envoyé"),
 	"POST /api/reports/energy/send":         jl("report", "send", "Rapport de consommation envoyé"),
 	"POST /api/meross/login":                jl("settings", "update", "Compte Meross connecté"),
 	"DELETE /api/meross":                    jl("settings", "update", "Compte Meross déconnecté"),

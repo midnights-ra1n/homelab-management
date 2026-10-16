@@ -42,19 +42,19 @@ export interface HostAction { action: HostActionName; target?: string; state: "p
 export const actionBusy = (h: Host) => !!h.action && (h.action.state === "pending" || h.action.state === "running") && Date.now() / 1000 - h.action.at < 7200;
 export interface Install { hub_url: string; key: string; token: string; command: string }
 
-export type MonitorType = "http" | "tcp" | "dns" | "ssl" | "snmp" | "meross";
+export type MonitorType = "http" | "tcp" | "dns" | "ssl" | "snmp" | "meross" | "truenas";
 export interface MonitorConfig {
   method?: string; expected_status?: string; keyword?: string; ignore_tls?: boolean; check_ssl?: boolean; degraded_ms?: number;
   dns_server?: string; record_type?: string; expected?: string; warn_days?: number; failure_threshold?: number;
   min_value?: number; max_value?: number; unit?: string; oid?: string; snmp_version?: "1" | "2c" | "3";
   /** Secrets are write-only: the API never returns them, an empty value keeps the saved one. */
-  community?: string; snmp_user?: string; auth_proto?: string; auth_pass?: string; priv_proto?: string; priv_pass?: string; channel?: number;
+  community?: string; snmp_user?: string; auth_proto?: string; auth_pass?: string; priv_proto?: string; priv_pass?: string; channel?: number; api_key?: string;
 }
 export interface Day { day: number; uptime: number | null; worst: Status }
 export interface Monitor {
   id: number; name: string; type: MonitorType; target: string; interval_s: number; timeout_s: number;
   config: MonitorConfig; enabled: boolean; maintenance: boolean; public: boolean; status: Status;
-  message: string; latency_ms: number | null; last_check: number; cert_expires_at: number | null; days?: Day[];
+  message: string; latency_ms: number | null; last_check: number; cert_expires_at: number | null; days?: Day[]; category: string;
 }
 
 /** Days until the monitored certificate expires, or null when not tracked. */
@@ -62,7 +62,7 @@ export function certDays(m: Monitor) {
   if (m.cert_expires_at == null || !(m.type === "ssl" || m.config.check_ssl)) return null;
   return Math.floor((m.cert_expires_at * 1000 - Date.now()) / 86400000);
 }
-export type MonitorInput = Pick<Monitor, "name" | "type" | "target" | "interval_s" | "timeout_s" | "config" | "enabled" | "maintenance" | "public">;
+export type MonitorInput = Pick<Monitor, "name" | "type" | "target" | "interval_s" | "timeout_s" | "config" | "enabled" | "maintenance" | "public" | "category">;
 
 export interface Series { t: number[]; latency: (number | null)[]; value?: (number | null)[]; worst: Status[]; name?: string }
 export interface Overview { status: Status; hosts: Host[]; monitors: Monitor[]; latency: Series[] }

@@ -588,6 +588,7 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 			if err := s.storeMetrics(id, m.Metrics); err != nil {
 				slog.Error("store metrics", "err", err)
 			}
+			s.checkDiskSpace(id, hostName, m.Metrics.Disks)
 		}
 	}
 }

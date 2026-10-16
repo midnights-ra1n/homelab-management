@@ -111,6 +111,7 @@ func (s *Server) mgRoutes(mux *http.ServeMux) {
 	h("POST /api/mg/ssh-keys", s.mgSaveSSHKey)
 	h("DELETE /api/mg/ssh-keys/{id}", s.mgDelete("ssh_keys", "system", "name", "Clé SSH « %s » supprimée"))
 	h("GET /api/mg/monitoring", s.mgMonitoring)
+	h("GET /api/mg/energy", s.mgEnergy)
 	h("GET /api/mg/webmin", s.mgWebmin)
 
 	// Proxmox

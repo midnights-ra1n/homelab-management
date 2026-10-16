@@ -12,7 +12,7 @@ Dépôt : [midnights-ra1n/homelab-management](https://github.com/midnights-ra1n/
 Gestion et supervision d'un homelab, réunies dans un seul projet issu de la fusion de **homelab-management** et **homelab-monitoring** :
 
 - un **serveur** en Go, un seul binaire avec **deux rôles** déployés séparément :
-  - **monitoring**, en général sur un VPS dédié : les agents s'y connectent, sondes HTTP/TCP/DNS/SSL/SNMP, alertes e-mail groupées, page de statut publique, rapports, API ouverte ;
+  - **monitoring**, en général sur un VPS dédié : les agents s'y connectent, sondes HTTP/TCP/DNS/SSL/SNMP/TrueNAS rangées par catégories, alertes e-mail groupées (dont SMART et espace disque, seuil réglable), page de statut publique, rapports mensuels et état de santé hebdomadaire facultatif, API ouverte ;
   - **gestion**, sur une VM ou un CT : inventaire, IPAM (VLAN, sous-réseaux, VPN, pare-feu, simulation de flux), noms de domaine, déploiements, tâches (Kanban), carte, page d'applications, Proxmox multi-nœuds sans cluster, Webmin ;
 - un **agent** en Rust (binaire statique, `.deb` ou script `curl`), qui alimente à la fois le monitoring et l'inventaire ;
 - deux interfaces **React + Tailwind**, PWA et optimisées mobile, avec le même design (Midnights Classic : mêmes polices, tailles, icônes et composants), mais séparées : chaque rôle a la sienne.
@@ -83,7 +83,7 @@ Ces trois fonctions existent sur les deux rôles :
 - **Base de données** (*Paramètres*) : taille du fichier, du journal WAL et des données, occupation du disque, taille par table ; **Nettoyer** (rétention), **Compacter** (`VACUUM`) et **taille maximale**. Au-delà de la limite, l'historique le plus ancien (métriques, résultats de sondes, journal) est supprimé ; les réglages et l'inventaire ne sont jamais touchés. SQLite tourne en WAL, `synchronous=NORMAL` et petit cache, avec une seule connexion : peu d'écritures disque, peu de CPU et de RAM.
 - **Mises à jour du serveur** (*Paramètres*) : *Rechercher les mises à jour*, puis :
   - installation **.deb** : bouton *Mettre à jour*. Le serveur, non privilégié, écrit seulement le numéro de version demandé ; l'unité root `homelab-tools-update.path` télécharge le paquet de la release GitHub, vérifie son SHA-256 et l'installe ;
-  - installation **Docker** : la version disponible est affichée, la mise à jour se fait avec `docker compose pull && docker compose up -d`.
+  - installation **Docker** : la version disponible est affichée, la mise à jour se fait avec `docker compose pull && docker compose up -d`, ou avec le bouton **Mettre à jour** si le service `watchtower` de `docker-compose.yml` tourne à côté (`HLT_WATCHTOWER_URL` et `HLT_WATCHTOWER_TOKEN`, même jeton que `WATCHTOWER_HTTP_API_TOKEN`). Watchtower télécharge l'image et recrée le conteneur ; le serveur n'a jamais accès au socket Docker.
 
 ## Installer le serveur
 
@@ -117,7 +117,8 @@ Image : `ghcr.io/midnights-ra1n/homelab-management`, distroless, non-root, syst�
 | `HLT_DATA_DIR` | `./data` (`/data` en Docker) | Base, clés, icônes |
 | `HLT_PUBLIC_URL` | — | Adresse publique (commandes d'installation de l'agent, contrôle d'origine) |
 | `HLT_TRUSTED_PROXIES` | — | CIDR des reverse proxies autorisés à transmettre `X-Forwarded-*` |
-| `HLT_INSTALL` | `deb` / `docker` (fixée par le paquet ou l'image) | Mode de mise à jour proposé dans les paramètres |
+| `HLT_INSTALL` | `deb` / `docker` (fixée par le paquet ou l'image) ; `lxc-oci` à définir soi-même pour un CT Proxmox créé depuis l'image OCI | Mode de mise à jour proposé dans les paramètres (en `lxc-oci` : étapes manuelles pour recréer le CT) |
+| `HLT_WATCHTOWER_URL`, `HLT_WATCHTOWER_TOKEN` | vides | Docker : adresse et jeton de l'API HTTP de Watchtower, pour le bouton de mise à jour |
 | `APP_SECRET` | `DATA_DIR/secret.key` | Clé de chiffrement des secrets d'intégration (gestion) |
 
 Les anciennes variables `HLM_*` de homelab-monitoring sont encore lues.
