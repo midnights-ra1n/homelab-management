@@ -12,7 +12,7 @@ if [ "$1" = configure ]; then
   done
   if [ -z "$2" ]; then
     echo "homelab-tools installé. Activez un rôle :"
-    echo "  systemctl enable --now homelab-tools@monitoring   # http://<hôte>:8080"
-    echo "  systemctl enable --now homelab-tools@management   # http://<hôte>:3000"
+    echo "  systemctl enable --now homelab-tools@monitoring   # http://<hôte>:3000"
+    echo "  systemctl enable --now homelab-tools@management   # http://<hôte>:3000 (même hôte : changez HLT_LISTEN dans /etc/homelab-tools/management.env)"
   fi
 fi

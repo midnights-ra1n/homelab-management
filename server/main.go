@@ -78,7 +78,7 @@ func env(k, def string) string {
 func main() {
 	// Used by the Docker HEALTHCHECK: the distroless image has no curl.
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
-		_, port, _ := net.SplitHostPort(env("LISTEN", ":8080"))
+		_, port, _ := net.SplitHostPort(env("LISTEN", ":3000"))
 		c := &http.Client{Timeout: 3 * time.Second}
 		resp, err := c.Get("http://127.0.0.1:" + port + "/api/health")
 		if err != nil || resp.StatusCode != 200 {
@@ -93,7 +93,7 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, nil)))
 	cfg := Config{
 		Role:      env("ROLE", RoleMonitoring),
-		Listen:    env("LISTEN", ":8080"),
+		Listen:    env("LISTEN", ":3000"),
 		DataDir:   env("DATA_DIR", "./data"),
 		PublicURL: publicURL(env("PUBLIC_URL", "")),
 		Install:   env("INSTALL", ""),
@@ -153,20 +153,31 @@ func run(cfg Config) error {
 	go s.runRetention(ctx)
 	go s.runReleaseCheck(ctx)
 
-	srv := &http.Server{
-		Addr:              cfg.Listen,
-		Handler:           s.routes(),
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    64 << 10,
-	}
+	handler := s.routes()
+	srv := newHTTPServer(cfg.Listen, handler)
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		srv.Shutdown(shutdownCtx)
 	}()
+	_, newPort, _ := net.SplitHostPort(cfg.Listen)
+	if legacy := env("LEGACY_LISTEN", ""); legacy != "" && legacy != cfg.Listen {
+		_, oldPort, _ := net.SplitHostPort(legacy)
+		// In Docker the host-side port mapping is unknown: serve the old port, never redirect.
+		old := newHTTPServer(legacy, legacyHandler(handler, oldPort, newPort, cfg.Install != "docker"))
+		go func() {
+			<-ctx.Done()
+			old.Close()
+		}()
+		go func() {
+			slog.Info("homelab-tools: former port kept, pages redirected to the new one", "addr", legacy)
+			if err := old.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				// Not fatal: the port may now belong to another service.
+				slog.Warn("HLT_LEGACY_LISTEN: former port unavailable", "addr", legacy, "err", err)
+			}
+		}()
+	}
 	slog.Info("homelab-tools listening", "role", cfg.Role, "addr", cfg.Listen, "version", version)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
@@ -175,6 +186,33 @@ func run(cfg Config) error {
 		s.notifier.flush()
 	}
 	return nil
+}
+
+func newHTTPServer(addr string, h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    64 << 10,
+	}
+}
+
+// legacyHandler serves the former port 8080 (HLT_LEGACY_LISTEN) after the move to 3000.
+// A page opened as host:8080 is redirected to the new port; the API, agents and reverse proxies
+// (whose Host has no :8080) are served as before, so they keep working until they are updated.
+func legacyHandler(next http.Handler, oldPort, newPort string, redirect bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, port, err := net.SplitHostPort(r.Host)
+		page := (r.Method == http.MethodGet || r.Method == http.MethodHead) &&
+			!strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/.well-known/")
+		if redirect && err == nil && port == oldPort && page {
+			http.Redirect(w, r, "http://"+net.JoinHostPort(host, newPort)+r.URL.RequestURI(), http.StatusPermanentRedirect)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) initMonitoring() error {

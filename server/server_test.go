@@ -482,3 +482,30 @@ func TestHostStatusAgentDown(t *testing.T) {
 		t.Errorf("hostAddress = %q", ip)
 	}
 }
+
+func TestLegacyPortRedirect(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) })
+	h := legacyHandler(ok, "8080", "3000", true)
+	for _, c := range []struct{ method, host, path, loc string }{
+		{"GET", "192.168.1.20:8080", "/hosts?x=1", "http://192.168.1.20:3000/hosts?x=1"},
+		{"GET", "[fd00::1]:8080", "/", "http://[fd00::1]:3000/"},
+		{"GET", "192.168.1.20:8080", "/api/health", ""},   // API and agents are served
+		{"POST", "192.168.1.20:8080", "/oauth/token", ""}, // writes are served
+		{"GET", "monitoring.example.fr", "/", ""},         // behind a reverse proxy: served
+	} {
+		r := httptest.NewRequest(c.method, c.path, nil)
+		r.Host = c.host
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if got := w.Header().Get("Location"); got != c.loc || (c.loc == "" && w.Code != 200) {
+			t.Errorf("%s %s%s: code %d, Location %q, want %q", c.method, c.host, c.path, w.Code, got, c.loc)
+		}
+	}
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Host = "192.168.1.20:8080"
+	w := httptest.NewRecorder()
+	legacyHandler(ok, "8080", "3000", false).ServeHTTP(w, r)
+	if w.Code != 200 {
+		t.Errorf("docker: code %d, want 200 (no redirect)", w.Code)
+	}
+}

@@ -1,3 +1,4 @@
+| `HLT_LEGACY_LISTEN` | vide (`:8080` dans l’image Docker et dans `monitoring.env`) | Ancien port, gardé après le passage de 8080 à 3000. Une page ouverte sur `hôte:8080` est redirigée vers le nouveau port ; l’API, les agents et les reverse proxies qui visent encore 8080 sont servis normalement. En Docker, pas de redirection (le port publié sur l’hôte n’est pas connu) : le port reste seulement servi. Videz-la quand tout est passé sur 3000 |
 # Midnights Management
 
 > [!NOTE]
@@ -97,9 +98,11 @@ Ces trois fonctions existent sur les deux rôles :
 
 ```sh
 sudo apt install ./homelab-tools_<version>_$(dpkg --print-architecture).deb
-sudo systemctl enable --now homelab-tools@monitoring   # sur le VPS de monitoring, port 8080
+sudo systemctl enable --now homelab-tools@monitoring   # sur le VPS de monitoring, port 3000
 sudo systemctl enable --now homelab-tools@management   # sur la VM / le CT de gestion, port 3000
 ```
+
+Les deux rôles écoutent sur le port 3000. Pour les faire tourner sur le même hôte, changez `HLT_LISTEN` dans l’un des deux fichiers `.env` (par exemple `HLT_LISTEN=:3001` dans `management.env`), puis redémarrez le service.
 
 Les réglages se trouvent dans `/etc/homelab-tools/<rôle>.env` (adresse d'écoute, URL publique, proxys de confiance) et les données dans `/var/lib/homelab-tools/<rôle>/`. Le service tourne sous l'utilisateur `homelab-tools`, avec un sandbox systemd strict.
 
@@ -112,6 +115,8 @@ docker compose up -d monitoring    # VPS
 docker compose up -d management    # VM / CT
 ```
 
+Les deux conteneurs écoutent sur le port 3000, publié par défaut sur le port 3000 de l’hôte. Pour lancer les deux sur la même machine, choisissez un autre port hôte pour l’un d’eux : `HLT_MANAGEMENT_PORT=3001 docker compose up -d monitoring management` (ou `HLT_MONITORING_PORT`, à mettre aussi dans un fichier `.env` à côté du compose).
+
 Image : `ghcr.io/midnights-ra1n/homelab-management`, distroless, non-root, système de fichiers en lecture seule. Le rôle se choisit avec `HLT_ROLE`.
 
 ### Variables
@@ -119,7 +124,7 @@ Image : `ghcr.io/midnights-ra1n/homelab-management`, distroless, non-root, syst�
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `HLT_ROLE` | `monitoring` | `monitoring` ou `management` |
-| `HLT_LISTEN` | `:8080` | Adresse d'écoute |
+| `HLT_LISTEN` | `:3000` | Adresse d’écoute (ex. `:3001` pour faire tourner les deux rôles sur le même hôte) |
 | `HLT_DATA_DIR` | `./data` (`/data` en Docker) | Base, clés, icônes |
 | `HLT_PUBLIC_URL` | — | Adresse publique (commandes d'installation de l'agent, contrôle d'origine) |
 | `HLT_TRUSTED_PROXIES` | — | Reverse proxies autorisés à transmettre `X-Forwarded-*` : IP ou CIDR, séparés par des virgules (une entrée invalide est ignorée et signalée dans les journaux) |
@@ -170,14 +175,14 @@ Plusieurs valeurs se séparent par des virgules. Restez aussi précis que possib
 
 Le proxy doit transmettre `X-Forwarded-Proto: https`, conserver l'en-tête `Host` et laisser passer les **WebSockets**. Ceux-ci servent aux agents (monitoring) et à la console noVNC Proxmox (gestion).
 
-- **Zoraxy** : créez un *HTTP Proxy* vers `http://<ip-du-serveur>:8080` avec TLS activé sur le domaine. Zoraxy ajoute lui-même `X-Forwarded-Proto` et `X-Forwarded-For` et relaie les WebSockets. Si le diagnostic n'affiche aucun en-tête reçu, ajoutez-le dans les règles de l'hôte : *Edit → Custom Headers*, en-tête `X-Forwarded-Proto`, valeur `https`, sens *To upstream*.
-- **NPMPlus / Nginx Proxy Manager** : *Proxy Host* avec le schéma `http`, l'IP et le port `8080`. Cochez **Websockets Support**. Dans l'onglet SSL, prenez un certificat et cochez *Force SSL*. L'en-tête `X-Forwarded-Proto` est déjà envoyé par le modèle de configuration ; rien à ajouter dans *Advanced*.
-- **Caddy** : `monitoring.example.fr { reverse_proxy 192.168.1.20:8080 }`. Les en-têtes et les WebSockets sont gérés d'office.
-- **Traefik** : un routeur avec `tls` vers le service `http://…:8080`. Les en-têtes `X-Forwarded-*` et les WebSockets sont gérés d'office.
+- **Zoraxy** : créez un *HTTP Proxy* vers `http://<ip-du-serveur>:3000` avec TLS activé sur le domaine. Zoraxy ajoute lui-même `X-Forwarded-Proto` et `X-Forwarded-For` et relaie les WebSockets. Si le diagnostic n'affiche aucun en-tête reçu, ajoutez-le dans les règles de l'hôte : *Edit → Custom Headers*, en-tête `X-Forwarded-Proto`, valeur `https`, sens *To upstream*.
+- **NPMPlus / Nginx Proxy Manager** : *Proxy Host* avec le schéma `http`, l'IP et le port `3000`. Cochez **Websockets Support**. Dans l'onglet SSL, prenez un certificat et cochez *Force SSL*. L'en-tête `X-Forwarded-Proto` est déjà envoyé par le modèle de configuration ; rien à ajouter dans *Advanced*.
+- **Caddy** : `monitoring.example.fr { reverse_proxy 192.168.1.20:3000 }`. Les en-têtes et les WebSockets sont gérés d'office.
+- **Traefik** : un routeur avec `tls` vers le service `http://…:3000`. Les en-têtes `X-Forwarded-*` et les WebSockets sont gérés d'office.
 - **nginx** (à la main) :
   ```nginx
   location / {
-      proxy_pass http://192.168.1.20:8080;
+      proxy_pass http://192.168.1.20:3000;
       proxy_http_version 1.1;
       proxy_set_header Host $host;
       proxy_set_header X-Forwarded-Proto https;
@@ -188,8 +193,8 @@ Le proxy doit transmettre `X-Forwarded-Proto: https`, conserver l'en-tête `Host
   }
   ```
 - **HAProxy** : `http-request set-header X-Forwarded-Proto https if { ssl_fc }` et `option forwardfor` dans le *backend* ; les WebSockets passent sans réglage.
-- **Apache** : `ProxyPreserveHost On`, `RequestHeader set X-Forwarded-Proto "https"` et `ProxyPass / http://192.168.1.20:8080/ upgrade=websocket`.
-- **Cloudflare Tunnel** : service `http://localhost:8080`. Cloudflare envoie `X-Forwarded-Proto: https` ; déclarez l'adresse de `cloudflared` comme indiqué ci-dessus.
+- **Apache** : `ProxyPreserveHost On`, `RequestHeader set X-Forwarded-Proto "https"` et `ProxyPass / http://192.168.1.20:3000/ upgrade=websocket`.
+- **Cloudflare Tunnel** : service `http://localhost:3000`. Cloudflare envoie `X-Forwarded-Proto: https` ; déclarez l'adresse de `cloudflared` comme indiqué ci-dessus.
 
 ### 4. Vérifier
 
@@ -229,10 +234,10 @@ Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). A
 
 ```sh
 cd web && npm install && npm run build            # interface → server/web/dist (embarquée dans le binaire)
-cd server && go run .                             # rôle monitoring sur :8080
-cd server && HLT_ROLE=management HLT_LISTEN=:3000 HLT_DATA_DIR=./data-mg go run .
-cd web && HLT_API=http://127.0.0.1:3000 npm run dev   # interface en direct sur :5173
-cd agent && HUB_URL=http://127.0.0.1:8080 ALLOW_INSECURE=true TOKEN=… KEY=… cargo run
+cd server && go run .                             # rôle monitoring sur :3000
+cd server && HLT_ROLE=management HLT_LISTEN=:3001 HLT_DATA_DIR=./data-mg go run .
+cd web && HLT_API=http://127.0.0.1:3001 npm run dev   # interface en direct sur :5173
+cd agent && HUB_URL=http://127.0.0.1:3000 ALLOW_INSECURE=true TOKEN=… KEY=… cargo run
 ```
 
 Mode test du monitoring : `go run -tags devmode .` crée le compte `admin` / `devmode-password` et des hôtes simulés. Ce mode n'est jamais compilé dans les releases.

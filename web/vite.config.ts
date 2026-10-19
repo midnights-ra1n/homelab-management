@@ -17,5 +17,5 @@ export default defineConfig({
   },
   build: { outDir: "../server/web/dist", emptyOutDir: true, chunkSizeWarningLimit: 800 },
   // Dev proxy to a server started with `cd server && go run .` (override with HLT_API=http://host:port).
-  server: { proxy: { "/api": { target: process.env.HLT_API || "http://127.0.0.1:8080", ws: true } } },
+  server: { proxy: { "/api": { target: process.env.HLT_API || "http://127.0.0.1:3000", ws: true } } },
 });

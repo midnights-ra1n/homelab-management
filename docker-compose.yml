@@ -3,6 +3,8 @@
 #   docker compose up -d management    # on the management VM / CT
 # Updates: docker compose pull && docker compose up -d, or the "Mettre à jour" button through
 # the watchtower service below (start it beside each role: docker compose up -d monitoring watchtower).
+# Both roles listen on port 3000; on the same host, give one another host port:
+#   HLT_MANAGEMENT_PORT=3001 docker compose up -d monitoring management
 x-hardening: &hardening
   restart: unless-stopped
   read_only: true
@@ -16,7 +18,7 @@ services:
     image: ghcr.io/midnights-ra1n/homelab-management:latest
     container_name: hlt-monitoring
     ports:
-      - "8080:8080"
+      - "${HLT_MONITORING_PORT:-3000}:3000"
     volumes:
       - monitoring-data:/data
     environment:
@@ -43,7 +45,7 @@ services:
     image: ghcr.io/midnights-ra1n/homelab-management:latest
     container_name: hlt-management
     ports:
-      - "3000:8080"
+      - "${HLT_MANAGEMENT_PORT:-3000}:3000"
     volumes:
       # To take over homelab-management: copy its homelab.db, secret.key and uploads/ here.
       - management-data:/data
