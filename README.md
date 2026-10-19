@@ -136,7 +136,7 @@ Premier démarrage : ouvrez l'interface et créez le compte administrateur (12 c
 | Paquet `hlm-agent_<version>_<arch>.deb` | bouton *Mettre à jour l'agent*, Ansible ou nouveau paquet |
 | Ansible : rôle `deploy/ansible/roles/hlm_agent` (`hlm_install_method: binary` ou `deb`) | selon la méthode |
 
-Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). API du monitoring : [docs/API.md](docs/API.md) ; app iOS / macOS (notifications push, widgets, préférences) : [docs/API-APPLE.md](docs/API-APPLE.md).
+Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). API du monitoring : [docs/API.md](docs/API.md) ; app iOS / macOS (notifications push, widgets, préférences) : [docs/API-APPLE.md](docs/API-APPLE.md) ; sondes SNMP, bande passante et routeur TP-Link Omada ER605 : [docs/SNMP.md](docs/SNMP.md).
 
 ## Développement
 

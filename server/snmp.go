@@ -209,7 +209,8 @@ func counterDelta(prev, n, wrap uint64) (delta uint64, wrapped, ok bool) {
 	return 0, false, false
 }
 
-// ifIndex finds an interface by ifIndex, ifName, ifDescr or ifAlias (case-insensitive).
+// ifIndex finds an interface by ifIndex, ifName, ifDescr or ifAlias (case-insensitive, with or
+// without a namespace prefix: "eth1" finds the ER605's "default/eth1").
 // On a miss it returns the names it saw, so the message helps pick the right one.
 func ifIndex(g *gosnmp.GoSNMP, want string) (string, []string, error) {
 	if _, err := strconv.Atoi(want); err == nil {
@@ -231,7 +232,7 @@ func ifIndex(g *gosnmp.GoSNMP, want string) (string, []string, error) {
 				continue
 			}
 			name := strings.TrimSpace(string(b))
-			if strings.EqualFold(name, want) {
+			if ifNameEq(name, want) {
 				return p.Name[strings.LastIndex(p.Name, ".")+1:], nil, nil
 			}
 			if name != "" && col != oidIfAlias && !slices.Contains(seen, name) {
@@ -446,7 +447,7 @@ func ifNameMatches(vals map[string]gosnmp.SnmpPDU, want, idx string) bool {
 		return true
 	}
 	for _, col := range []string{oidIfName, oidIfDescr, oidIfAlias} {
-		if b, ok := vals[col+"."+idx].Value.([]byte); ok && strings.EqualFold(strings.TrimSpace(string(b)), want) {
+		if b, ok := vals[col+"."+idx].Value.([]byte); ok && ifNameEq(string(b), want) {
 			return true
 		}
 	}

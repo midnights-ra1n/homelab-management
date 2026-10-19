@@ -195,6 +195,7 @@ L'état global est le pire état parmi les hôtes et les sondes actives.
 | `GET` | [`/monitors/{id}/results`](#get-apiv1monitorsidresultsrange24h) | `monitors:read` | Latence, valeurs et dernières vérifications |
 | `GET` | [`/bandwidth`](#get-apiv1bandwidthrange24h) | `monitors:read` | Bande passante et état des interfaces (sondes SNMP) |
 | `GET` | [`/bandwidth/live`](#get-apiv1bandwidthlive) | `monitors:read` | Débits lus à l'instant sur les équipements |
+| `GET` | [`/snmp/devices`](#get-apiv1snmpdevices) | `monitors:read` | Équipements SNMP et toutes leurs interfaces (découverte) |
 | `PUT` | [`/monitors/{id}/maintenance`](#put-apiv1monitorsidmaintenance) | `maintenance:write` | Maintenance d'une sonde |
 | `GET` | [`/updates`](#get-apiv1updates) | `updates:read` | Mises à jour en attente |
 | `GET` | [`/disks`](#get-apiv1disks) | `smart:read` | Santé SMART des disques |
@@ -497,9 +498,61 @@ Scope `monitors:read`. Débit actuel de chaque sonde SNMP `in` / `out`, lu **à 
 ```
 
 - `at` : instant de la lecture, en **millisecondes** Unix.
-- `mbps` : débit moyen depuis la lecture précédente, en Mbit/s ; `null` en cas d'erreur (`error` l'explique). La première lecture part du dernier relevé de la sonde.
+- `mbps` : débit moyen entre les deux derniers changements du compteur de l'équipement, en Mbit/s. Tant que l'équipement n'a pas rafraîchi son compteur (l'ER605 ne le fait que toutes les 10 à 20 s), la valeur précédente est répétée au lieu de 0 ; au-delà de 30 s sans changement, le débit est réellement nul. `null` à la toute première lecture ou en cas d'erreur (`error` l'explique). La première lecture part du dernier relevé de la sonde.
+- Les sondes `in` et `out` d'un même équipement sont lues dans **une seule requête SNMP**, donc au même instant.
 - **Lecture partagée** : le hub n'interroge pas les équipements plus d'une fois toutes les 1,5 seconde, quel que soit le nombre de pages ou d'apps ouvertes ; un appel plus rapproché reçoit la même lecture (même `at`).
 - Les relevés en temps réel ne sont pas enregistrés : l'historique reste celui des sondes (`/bandwidth`).
+
+### `GET /api/v1/snmp/devices`
+
+Scope `monitors:read`. Lit **à l'instant** chaque équipement interrogé par au moins une sonde SNMP, avec les identifiants enregistrés dans ses sondes, et renvoie toutes ses interfaces. C'est ce que montre le bouton *Découvrir les interfaces* du formulaire des sondes. `?target=192.168.50.1` limite la lecture à un équipement. La lecture parcourt plusieurs tables SNMP (quelques centaines de millisecondes à quelques secondes) : ne l'appelez pas en boucle, utilisez `/bandwidth` pour les débits.
+
+```json
+{
+  "devices": [
+    {
+      "target": "192.168.50.1",
+      "sys_name": "ER605",
+      "sys_descr": "Linux …",
+      "uptime_s": 1209600,
+      "interfaces": [
+        {
+          "index": 3, "name": "", "descr": "default/eth1", "alias": "",
+          "status": "active", "up": true, "speed_mbps": 1000,
+          "in_octets": 1834000000000, "out_octets": 92000000000,
+          "addresses": ["203.0.113.24"], "default_route": true,
+          "role": "wan", "hint": "Entrant = téléchargement (Internet vers le réseau local), Sortant = envoi vers Internet.",
+          "probes": [{ "id": 12, "name": "WAN ↓", "mode": "in" }, { "id": 13, "name": "WAN ↑", "mode": "out" }]
+        },
+        {
+          "index": 22, "name": "", "descr": "default/wg1", "alias": "",
+          "status": "active", "up": true, "speed_mbps": null,
+          "in_octets": 48000000, "out_octets": 51000000,
+          "addresses": ["10.8.0.1"], "default_route": false,
+          "role": "vpn", "hint": "Entrant = reçu du pair par le tunnel, Sortant = envoyé vers lui. …",
+          "probes": []
+        }
+      ]
+    }
+  ]
+}
+```
+
+| Champ | Remarque |
+|---|---|
+| `error` | présent si l'équipement n'a pas pu être lu (`interfaces` est alors vide) ; la réponse reste `200` |
+| `index` | `ifIndex` ; utilisable dans `config.interface`, mais préférez le nom, retrouvé même après une renumérotation |
+| `name`, `descr`, `alias` | `ifName`, `ifDescr`, `ifAlias` ; vides si l'équipement ne les publie pas. L'ER605 préfixe ses noms par `default/`, facultatif dans `config.interface` |
+| `status`, `up` | `ifOperStatus` en français ; `up` vaut `true` si l'interface est active |
+| `speed_mbps` | `ifHighSpeed`, sinon `ifSpeed` ; `null` si inconnue (souvent le cas des tunnels) |
+| `in_octets`, `out_octets` | octets reçus / envoyés **depuis le démarrage de l'équipement** (64 bits si disponibles) |
+| `addresses` | adresses IPv4 de l'interface (`ipAdEntIfIndex`) |
+| `default_route` | la route par défaut de l'équipement sort par cette interface (`ipCidrRouteTable`, `inetCidrRouteTable` ou `ipRouteTable`) : c'est le WAN |
+| `role` | rôle **deviné** à partir de la route et du nom Linux : `wan`, `lan` (VLAN `inf.N`, `br…`), `vpn` (`wg…`, `tun…`, `l2tp…`), `system` (tunnels et modèles du noyau), `loopback`, ou `""` si inconnu. Les interfaces sont triées par rôle (WAN d'abord) puis par numéro |
+| `hint` | ce que signifient Entrant et Sortant sur cette interface, en français |
+| `probes` | sondes qui lisent déjà cette interface (`mode` : `in`, `out`, `ifstatus`) |
+
+Le [guide SNMP](SNMP.md) explique comment configurer l'équipement (TP-Link Omada ER605 en exemple), choisir l'interface et le sens, et interpréter les mesures.
 
 ### `PUT /api/v1/monitors/{id}/maintenance`
 
@@ -839,4 +892,4 @@ Le préfixe `/api/v1` est stable. Des champs peuvent être **ajoutés** aux rép
 
 | Date | Changement |
 |---|---|
-| 2026-10 | Routes `GET /bandwidth` et `GET /bandwidth/live` (scope `monitors:read`). Routes `GET /widgets`, `POST` / `DELETE /devices`, `GET` / `PUT /preferences` ; scopes `push:write`, `preferences:read`, `preferences:write`. Champ `ping` des hôtes ; un hôte dont l'agent est arrêté mais qui répond au ping passe en `minor_outage` au lieu de `major_outage`. Sondes SNMP : `snmp_mode` et `interface` (débit et état d'interface). Bande passante : `speed_mbps`, `days`, `today_octets`, `month_octets`, `daily_octets` ; `peak_mbps` devient la plus forte mesure de la période. Sondes SNMP : `max_percent`, `idle_minutes`. |
+| 2026-10 | Routes `GET /bandwidth` et `GET /bandwidth/live` (scope `monitors:read`). Routes `GET /widgets`, `POST` / `DELETE /devices`, `GET` / `PUT /preferences` ; scopes `push:write`, `preferences:read`, `preferences:write`. Champ `ping` des hôtes ; un hôte dont l'agent est arrêté mais qui répond au ping passe en `minor_outage` au lieu de `major_outage`. Sondes SNMP : `snmp_mode` et `interface` (débit et état d'interface). Route `GET /snmp/devices`. Bande passante : `speed_mbps`, `days`, `today_octets`, `month_octets`, `daily_octets` ; `peak_mbps` devient la plus forte mesure de la période. Sondes SNMP : `max_percent`, `idle_minutes`. |

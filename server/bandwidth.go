@@ -219,8 +219,7 @@ func (s *Server) liveBandwidth(ctx context.Context) (*liveView, error) {
 	// SNMPv3 does its engine discovery once.
 	groups := map[string][]int{}
 	for i := range mons {
-		c := &mons[i].Config
-		k := strings.Join([]string{strings.ToLower(mons[i].Target), c.SNMPVersion, c.Community, c.SNMPUser, c.AuthProto, c.AuthPass, c.PrivProto, c.PrivPass}, "\x00")
+		k := snmpDeviceKey(&mons[i])
 		groups[k] = append(groups[k], i)
 	}
 	reads := make([]ifReading, len(mons))

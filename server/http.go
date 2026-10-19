@@ -75,6 +75,9 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/monitors/{id}/results", auth(s.handleMonitorResults))
 	mux.HandleFunc("GET /api/bandwidth", auth(s.handleBandwidth))
 	mux.HandleFunc("GET /api/bandwidth/live", auth(s.handleLiveBandwidth))
+	mux.HandleFunc("GET /api/snmp/devices", auth(s.handleSNMPDevices))
+	// Read-only (no journal entry): it queries a device with the form's credentials.
+	mux.HandleFunc("POST /api/snmp/discover", auth(s.handleSNMPDiscover))
 
 	mux.HandleFunc("GET /api/settings", auth(s.handleGetSettings))
 	mux.HandleFunc("PUT /api/settings", auth(s.handlePutSettings))

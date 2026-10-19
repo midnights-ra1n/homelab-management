@@ -67,6 +67,7 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/monitors/{id}/results", t("monitors:read", s.handleMonitorResults))
 	mux.HandleFunc("GET /api/v1/bandwidth", t("monitors:read", s.handleBandwidth))
 	mux.HandleFunc("GET /api/v1/bandwidth/live", t("monitors:read", s.handleLiveBandwidth))
+	mux.HandleFunc("GET /api/v1/snmp/devices", t("monitors:read", s.handleSNMPDevices))
 	mux.HandleFunc("PUT /api/v1/monitors/{id}/maintenance", t("maintenance:write", s.apiMonitorMaintenance))
 	mux.HandleFunc("GET /api/v1/updates", t("updates:read", s.apiUpdates))
 	mux.HandleFunc("GET /api/v1/disks", t("smart:read", s.handleDisks))

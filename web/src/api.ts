@@ -95,6 +95,13 @@ export const fmtMbps = (v: number | null | undefined) => (v == null ? "—" : `$
 /** Octets in SI units (To, Go, Mo, Ko), like the rates. */
 export const fmtOctets = (o: number | null | undefined) =>
   o == null ? "—" : o >= 1e12 ? `${fmtNum(o / 1e12, 2)} To` : o >= 1e9 ? `${fmtNum(o / 1e9, 2)} Go` : o >= 1e6 ? `${fmtNum(o / 1e6, o < 1e7 ? 2 : 1)} Mo` : o >= 1e3 ? `${fmtNum(o / 1e3, 0)} Ko` : `${fmtNum(o, 0)} o`;
+/** One interface found by SNMP discovery (POST /api/snmp/discover, GET /api/snmp/devices). */
+export interface SnmpIface {
+  index: number; name: string; descr: string; alias: string; status: string; up: boolean; speed_mbps: number | null;
+  in_octets: number | null; out_octets: number | null; addresses: string[]; default_route: boolean;
+  role: "wan" | "lan" | "vpn" | "loopback" | "system" | ""; hint: string; probes: { id: number; name: string; mode: string }[];
+}
+export interface SnmpDevice { target: string; sys_name: string; sys_descr: string; uptime_s: number; interfaces: SnmpIface[]; error?: string }
 export type HostSeries = Record<"t" | "cpu" | "mem" | "swap" | "disk" | "net_rx" | "net_tx" | "load1" | "temp" | "cpu_temp", (number | null)[]>;
 
 export class ApiError extends Error {

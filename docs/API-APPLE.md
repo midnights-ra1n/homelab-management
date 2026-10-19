@@ -553,6 +553,51 @@ public struct BandwidthView: Codable, Sendable {
 }
 ```
 
+```swift
+/// GET /snmp/devices : équipements SNMP et leurs interfaces (lecture à la demande, pas en boucle).
+public struct SNMPDevices: Codable, Sendable {
+    public let devices: [Device]
+
+    public struct Device: Codable, Sendable, Hashable {
+        public let target, sysName, sysDescr: String
+        public let uptimeS: Int64
+        public let interfaces: [Interface]
+        /// Présent si l'équipement n'a pas pu être lu.
+        public let error: String?
+        enum CodingKeys: String, CodingKey {
+            case target, interfaces, error
+            case sysName = "sys_name", sysDescr = "sys_descr", uptimeS = "uptime_s"
+        }
+    }
+
+    public struct Interface: Codable, Sendable, Hashable, Identifiable {
+        public var id: Int { index }
+        public let index: Int
+        public let name, descr, alias, status: String
+        public let up: Bool
+        public let speedMbps: Double?
+        /// Depuis le démarrage de l'équipement.
+        public let inOctets, outOctets: UInt64?
+        public let addresses: [String]
+        public let defaultRoute: Bool
+        /// "wan", "lan", "vpn", "system", "loopback" ou "" : deviné, pour aider à choisir.
+        public let role: String
+        /// Signification d'Entrant / Sortant sur cette interface, en français.
+        public let hint: String
+        public let probes: [Probe]
+        enum CodingKeys: String, CodingKey {
+            case index, name, descr, alias, status, up, addresses, role, hint, probes
+            case speedMbps = "speed_mbps", inOctets = "in_octets", outOctets = "out_octets", defaultRoute = "default_route"
+        }
+    }
+
+    public struct Probe: Codable, Sendable, Hashable {
+        public let id: Int
+        public let name, mode: String
+    }
+}
+```
+
 Avec Swift Charts, tracez `zip(view.t, link.in?.series ?? [])` en `LineMark`, en ignorant les valeurs `nil`, et `zip(view.days, link.in?.dailyOctets ?? [])` en `BarMark` pour le volume par jour. Pour afficher des octets comme l'interface web, `ByteCountFormatter` avec `countStyle = .decimal` (1 Mo = 10⁶ octets) ; un débit en octets par seconde vaut `mbps × 125_000`.
 
 **Temps réel** : `GET /bandwidth/live` renvoie le débit lu à l'instant ; interrogez-le toutes les 2 secondes tant que l'écran est visible (`.task` + `Task.sleep`), et gardez une fenêtre glissante des 150 dernières valeurs (5 minutes). Ne l'utilisez pas dans un widget : WidgetKit ne rafraîchit pas à cette cadence.

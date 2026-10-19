@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, LayoutGrid, List, Pencil, Plus, Radar, ShieldAlert, Timer, Trash2 } from "lucide-react";
-import { api, certDays, savePrefs, fmtAgo, fmtDate, fmtMs, fmtNum, statusLabel, type Monitor, type MonitorInput, type MonitorType, type Series } from "../api";
+import { api, certDays, fmtOctets, type SnmpDevice, type SnmpIface, savePrefs, fmtAgo, fmtDate, fmtMs, fmtNum, statusLabel, type Monitor, type MonitorInput, type MonitorType, type Series } from "../api";
 import {
   Alert, Badge, Button, Card, Chart, Dialog, EmptyState, Field, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, StatusBadge,
   StatusIcon, Switch, Tag, UptimeBars, cn, fmtLatency, formatPct, inputClass, kindTone, navigate, statusKind, usePoll, useTitle, useToast,
@@ -134,7 +134,7 @@ export function MonitorsPage() {
 
 type CfgSetter = <K extends keyof MonitorInput["config"]>(k: K, v: MonitorInput["config"][K]) => void;
 
-function SnmpFields({ m, cfg, editing }: { m: MonitorInput; cfg: CfgSetter; editing: boolean }) {
+function SnmpFields({ m, cfg, editing, id }: { m: MonitorInput; cfg: CfgSetter; editing: boolean; id?: number }) {
   const c = m.config;
   const row = "flex flex-wrap items-end gap-3 [&>.mm-field]:min-w-40 [&>.mm-field]:flex-1";
   const secret = (k: "community" | "auth_pass" | "priv_pass", label: string) => (
@@ -167,6 +167,7 @@ function SnmpFields({ m, cfg, editing }: { m: MonitorInput; cfg: CfgSetter; edit
           </>
         )}
       </div>
+      <SnmpDiscovery m={m} cfg={cfg} id={id} />
       {(c.snmp_mode === "in" || c.snmp_mode === "out") && (
         <Field label="Seuil d'utilisation du lien en % (facultatif)" htmlFor="m-pct" hint="Ex. 90 : alerte quand le débit dépasse 90 % de la vitesse de l'interface annoncée par l'équipement">
           <input id="m-pct" className={`${inputClass} tabular-nums`} type="number" min={1} max={100} step="any" value={c.max_percent ?? ""} onChange={(e) => cfg("max_percent", e.target.value === "" ? undefined : Number(e.target.value))} />
@@ -181,7 +182,8 @@ function SnmpFields({ m, cfg, editing }: { m: MonitorInput; cfg: CfgSetter; edit
         <p className="mm-help -mt-3">
           Routeur TP-Link Omada (ER605…) : activez SNMP sur le routeur (Outils système → SNMP en mode autonome, Paramètres → Services → SNMP dans le contrôleur Omada). Le débit est calculé entre deux contrôles et le volume de données
           est compté à chaque relevé : gardez un intervalle d'au moins 60 s, ce routeur ne rafraîchit ses compteurs que toutes les 10 à 20 s. Pour WireGuard, choisissez « État d'une interface » avec l'interface VPN (wg1…)
-          et un délai sans trafic reçu, avec un keepalive activé côté pair. Si le nom est inconnu, le message de la sonde liste les interfaces vues.
+          et un délai sans trafic reçu, avec un keepalive activé côté pair. Sur l'ER605, le WAN est l'interface qui porte la route par défaut (souvent default/eth1, où Entrant = téléchargement),
+          les inf.N sont les VLAN du LAN (sens inversé) ; le préfixe « default/ » est facultatif. Guide complet : docs/SNMP.md.
         </p>
       )}
       {(c.snmp_version ?? "2c") !== "3" ? (
@@ -213,6 +215,75 @@ function SnmpFields({ m, cfg, editing }: { m: MonitorInput; cfg: CfgSetter; edit
       {(c.snmp_version ?? "2c") !== "3" && <p className="mm-help -mt-3">v1/v2c transmettent la communauté en clair : préfère SNMPv3 avec authentification et chiffrement.</p>}
       {c.snmp_version === "3" && !c.priv_proto && <p className="mm-help -mt-3">Sans chiffrement, les requêtes sont authentifiées mais lisibles sur le réseau : choisis AES si l'équipement le permet.</p>}
     </>
+  );
+}
+
+const ROLES: Record<SnmpIface["role"], [string, "accent" | "purple" | "blue" | "muted"]> = {
+  wan: ["WAN", "accent"], vpn: ["VPN", "purple"], lan: ["LAN", "blue"], system: ["Système", "muted"], loopback: ["Boucle locale", "muted"], "": ["Autre", "muted"],
+};
+
+/** Lists the device's interfaces with the form's credentials, to pick the interface and the measure. */
+function SnmpDiscovery({ m, cfg, id }: { m: MonitorInput; cfg: CfgSetter; id?: number }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [dev, setDev] = useState<SnmpDevice | null>(null);
+  const [all, setAll] = useState(false);
+  const run = async () => {
+    setBusy(true); setError("");
+    try { setDev(await api.post<SnmpDevice>("/api/snmp/discover", { id, target: m.target, config: m.config })); } catch (e) { setError((e as Error).message); setDev(null); }
+    setBusy(false);
+  };
+  const use = (f: SnmpIface, mode: "in" | "out" | "ifstatus") => {
+    cfg("interface", f.name || f.descr);
+    cfg("snmp_mode", mode);
+    if (mode === "ifstatus" && f.role === "vpn" && !m.config.idle_minutes) cfg("idle_minutes", 3);
+  };
+  const shown = dev?.interfaces.filter((f) => all || (f.role !== "system" && f.role !== "loopback")) ?? [];
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="secondary" icon={<Radar size={16} />} loading={busy} disabled={!m.target} onClick={run}>Découvrir les interfaces</Button>
+        <p className="mm-help">Lit les interfaces de l'équipement avec ces identifiants, pour choisir l'interface et le sens.</p>
+      </div>
+      {error && <Alert kind="error" title="Découverte impossible">{error}</Alert>}
+      {dev && (
+        <div className="grid gap-2">
+          <p className="text-xs text-meta">
+            {dev.sys_name || dev.target}{dev.sys_descr && ` · ${dev.sys_descr}`} · {dev.interfaces.length} interfaces ·{" "}
+            <button type="button" className="underline" onClick={() => setAll(!all)}>{all ? "masquer les interfaces système" : "afficher les interfaces système"}</button>
+          </p>
+          <div className="mm-table-wrap">
+            <table className="mm-table">
+              <thead><tr><th scope="col">Interface</th><th scope="col">Rôle probable</th><th scope="col">État</th><th scope="col" className="mm-col-num">Reçu / envoyé</th><th scope="col">Utiliser pour</th></tr></thead>
+              <tbody>{shown.map((f) => (
+                <tr key={f.index}>
+                  <td>
+                    <p className="font-mono text-sm text-h1">{f.descr || f.name}</p>
+                    <p className="text-xs text-meta">n° {f.index}{f.name && f.name !== f.descr && ` · ${f.name}`}{f.alias && ` · ${f.alias}`}{f.addresses.length > 0 && ` · ${f.addresses.join(", ")}`}</p>
+                  </td>
+                  <td>
+                    <Badge tone={ROLES[f.role][1]}>{ROLES[f.role][0]}{f.default_route && " · route par défaut"}</Badge>
+                    {f.hint && <p className="mt-1 max-w-80 text-xs text-meta">{f.hint}</p>}
+                  </td>
+                  <td className="text-sm">{f.status || "—"}{f.speed_mbps != null && <span className="text-meta"> · {fmtNum(f.speed_mbps, 0)} Mbit/s</span>}</td>
+                  <td className="mm-col-num font-mono text-xs">{fmtOctets(f.in_octets)} / {fmtOctets(f.out_octets)}
+                    {f.probes.length > 0 && <p className="text-meta">déjà suivi : {f.probes.map((p) => p.name).join(", ")}</p>}
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button size="sm" variant="secondary" onClick={() => use(f, "in")}>Entrant</Button>
+                      <Button size="sm" variant="secondary" onClick={() => use(f, "out")}>Sortant</Button>
+                      <Button size="sm" variant="secondary" onClick={() => use(f, "ifstatus")}>État</Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <p className="mm-help">« Reçu / envoyé » : total depuis le démarrage de l'équipement. Une sonde lit un seul sens : crée une sonde « Entrant » et une sonde « Sortant » sur la même interface pour avoir les deux.</p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -294,7 +365,7 @@ function MonitorDialog({ monitor, onClose }: { monitor?: Monitor; onClose: (chan
             <Field label="Réponse attendue (facultatif)" htmlFor="m-exp"><input id="m-exp" className={`${inputClass} font-mono`} value={m.config.expected ?? ""} onChange={(e) => cfg("expected", e.target.value)} /></Field>
           </div>
         )}
-        {m.type === "snmp" && <SnmpFields m={m} cfg={cfg} editing={!!monitor} />}
+        {m.type === "snmp" && <SnmpFields m={m} cfg={cfg} editing={!!monitor} id={monitor?.id} />}
         {m.type === "meross" && (
           <Field label="Canal (multiprise)" htmlFor="m-ch" hint="0 pour une prise simple">
             <input id="m-ch" className={`${inputClass} tabular-nums`} type="number" min={0} max={8} placeholder="0" value={m.config.channel ?? ""} onChange={(e) => cfg("channel", num(e.target.value))} />
