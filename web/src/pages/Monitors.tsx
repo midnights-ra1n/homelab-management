@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, LayoutGrid, List, Pencil, Plus, Radar, ShieldAlert, Timer, Trash2 } from "lucide-react";
-import { api, certDays, fmtAgo, fmtDate, fmtMs, fmtNum, statusLabel, type Monitor, type MonitorInput, type MonitorType, type Series } from "../api";
+import { api, certDays, savePrefs, fmtAgo, fmtDate, fmtMs, fmtNum, statusLabel, type Monitor, type MonitorInput, type MonitorType, type Series } from "../api";
 import {
   Alert, Badge, Button, Card, Chart, Dialog, EmptyState, Field, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, StatusBadge,
   StatusIcon, Switch, Tag, UptimeBars, cn, fmtLatency, formatPct, inputClass, kindTone, navigate, statusKind, usePoll, useTitle, useToast,
@@ -41,7 +41,7 @@ export function MonitorsPage() {
   const { data, error, refresh } = usePoll(() => api.get<Monitor[]>("/api/monitors"), 15000);
   const [editing, setEditing] = useState<Monitor | "new">();
   const [view, setView] = useState<"cards" | "table">(() => (localStorage.getItem("hlm-view-monitors") as "table") || "cards");
-  const changeView = (v: "cards" | "table") => { setView(v); try { localStorage.setItem("hlm-view-monitors", v); } catch { /* private mode */ } };
+  const changeView = (v: "cards" | "table") => { setView(v); savePrefs({ monitors_view: v }); try { localStorage.setItem("hlm-view-monitors", v); } catch { /* private mode */ } };
   const active = data?.filter((m) => m.enabled) ?? [];
   const ok = active.filter((m) => m.status === "operational").length;
   const certs = data?.filter((m) => certDays(m) != null) ?? [];
@@ -151,9 +151,39 @@ function SnmpFields({ m, cfg, editing }: { m: MonitorInput; cfg: CfgSetter; edit
             <option value="1">v1</option><option value="2c">v2c</option><option value="3">v3 (recommandé)</option>
           </select>
         </Field>
-        <Field label="OID" htmlFor="m-oid" hint="Ex. 1.3.6.1.2.1.1.3.0 (uptime)"><input id="m-oid" className={`${inputClass} font-mono`} value={c.oid ?? ""} onChange={(e) => cfg("oid", e.target.value)} /></Field>
-        <Field label="Unité (facultatif)" htmlFor="m-unit"><input id="m-unit" className={inputClass} placeholder="°C, %, W…" value={c.unit ?? ""} onChange={(e) => cfg("unit", e.target.value)} /></Field>
+        <Field label="Mesure" htmlFor="m-mode">
+          <select id="m-mode" className={inputClass} value={c.snmp_mode ?? ""} onChange={(e) => cfg("snmp_mode", e.target.value as "in")}>
+            {Object.entries(SNMP_MODES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Field>
+        {c.snmp_mode ? (
+          <Field label="Interface" htmlFor="m-if" hint="Nom (ifName, ifDescr ou alias) ou numéro ifIndex">
+            <input id="m-if" className={`${inputClass} font-mono`} placeholder="WAN1, wg0…" value={c.interface ?? ""} onChange={(e) => cfg("interface", e.target.value)} />
+          </Field>
+        ) : (
+          <>
+            <Field label="OID" htmlFor="m-oid" hint="Ex. 1.3.6.1.2.1.1.3.0 (uptime)"><input id="m-oid" className={`${inputClass} font-mono`} value={c.oid ?? ""} onChange={(e) => cfg("oid", e.target.value)} /></Field>
+            <Field label="Unité (facultatif)" htmlFor="m-unit"><input id="m-unit" className={inputClass} placeholder="°C, %, W…" value={c.unit ?? ""} onChange={(e) => cfg("unit", e.target.value)} /></Field>
+          </>
+        )}
       </div>
+      {(c.snmp_mode === "in" || c.snmp_mode === "out") && (
+        <Field label="Seuil d'utilisation du lien en % (facultatif)" htmlFor="m-pct" hint="Ex. 90 : alerte quand le débit dépasse 90 % de la vitesse de l'interface annoncée par l'équipement">
+          <input id="m-pct" className={`${inputClass} tabular-nums`} type="number" min={1} max={100} step="any" value={c.max_percent ?? ""} onChange={(e) => cfg("max_percent", e.target.value === "" ? undefined : Number(e.target.value))} />
+        </Field>
+      )}
+      {c.snmp_mode === "ifstatus" && (
+        <Field label="Alerte si rien n'est reçu depuis (minutes, facultatif)" htmlFor="m-idle" hint="Pour WireGuard : une interface active ne dit pas si le tunnel fonctionne, le trafic reçu (keepalive) oui. Ex. 3 avec un keepalive de 25 s">
+          <input id="m-idle" className={`${inputClass} tabular-nums`} type="number" min={1} max={1440} value={c.idle_minutes ?? ""} onChange={(e) => cfg("idle_minutes", e.target.value === "" ? undefined : Number(e.target.value))} />
+        </Field>
+      )}
+      {c.snmp_mode && (
+        <p className="mm-help -mt-3">
+          Routeur TP-Link Omada (ER605…) : activez SNMP sur le routeur (Outils système → SNMP en mode autonome, Paramètres → Services → SNMP dans le contrôleur Omada). Le débit est calculé entre deux contrôles et le volume de données
+          est compté à chaque relevé : gardez un intervalle d'au moins 60 s, ce routeur ne rafraîchit ses compteurs que toutes les 10 à 20 s. Pour WireGuard, choisissez « État d'une interface » avec l'interface VPN (wg1…)
+          et un délai sans trafic reçu, avec un keepalive activé côté pair. Si le nom est inconnu, le message de la sonde liste les interfaces vues.
+        </p>
+      )}
       {(c.snmp_version ?? "2c") !== "3" ? (
         <div className={row}>
           {secret("community", "Communauté")}
@@ -181,9 +211,12 @@ function SnmpFields({ m, cfg, editing }: { m: MonitorInput; cfg: CfgSetter; edit
         </>
       )}
       {(c.snmp_version ?? "2c") !== "3" && <p className="mm-help -mt-3">v1/v2c transmettent la communauté en clair : préfère SNMPv3 avec authentification et chiffrement.</p>}
+      {c.snmp_version === "3" && !c.priv_proto && <p className="mm-help -mt-3">Sans chiffrement, les requêtes sont authentifiées mais lisibles sur le réseau : choisis AES si l'équipement le permet.</p>}
     </>
   );
 }
+
+const SNMP_MODES = { "": "Valeur d'un OID", in: "Débit entrant d'une interface", out: "Débit sortant d'une interface", ifstatus: "État d'une interface (VPN WireGuard…)" };
 
 const blank: MonitorInput = { name: "", type: "http", target: "", interval_s: 60, timeout_s: 10, config: {}, enabled: true, maintenance: false, public: false };
 
@@ -267,12 +300,12 @@ function MonitorDialog({ monitor, onClose }: { monitor?: Monitor; onClose: (chan
             <input id="m-ch" className={`${inputClass} tabular-nums`} type="number" min={0} max={8} placeholder="0" value={m.config.channel ?? ""} onChange={(e) => cfg("channel", num(e.target.value))} />
           </Field>
         )}
-        {(m.type === "snmp" || m.type === "meross") && (
+        {(m.type === "meross" || (m.type === "snmp" && m.config.snmp_mode !== "ifstatus")) && (
           <div className="flex flex-wrap items-end gap-3 [&>.mm-field]:min-w-40 [&>.mm-field]:flex-1">
-            <Field label={`Seuil haut${m.type === "meross" ? " (W)" : ""} (facultatif)`} htmlFor="m-max" hint={m.type === "meross" ? "Alerte si la consommation le dépasse" : "Alerte au-dessus"}>
+            <Field label={`Seuil haut${m.type === "meross" ? " (W)" : m.config.snmp_mode ? " (Mbit/s)" : ""} (facultatif)`} htmlFor="m-max" hint={m.type === "meross" ? "Alerte si la consommation le dépasse" : "Alerte au-dessus"}>
               <input id="m-max" className={`${inputClass} tabular-nums`} type="number" step="any" value={m.config.max_value ?? ""} onChange={(e) => cfg("max_value", num(e.target.value))} />
             </Field>
-            <Field label={`Seuil bas${m.type === "meross" ? " (W)" : ""} (facultatif)`} htmlFor="m-min" hint={m.type === "meross" ? "Ex. appareil éteint par erreur" : "Alerte en dessous"}>
+            <Field label={`Seuil bas${m.type === "meross" ? " (W)" : m.config.snmp_mode ? " (Mbit/s)" : ""} (facultatif)`} htmlFor="m-min" hint={m.type === "meross" ? "Ex. appareil éteint par erreur" : "Alerte en dessous"}>
               <input id="m-min" className={`${inputClass} tabular-nums`} type="number" step="any" value={m.config.min_value ?? ""} onChange={(e) => cfg("min_value", num(e.target.value))} />
             </Field>
           </div>

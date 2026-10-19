@@ -1,6 +1,6 @@
 ---
 # ansible-playbook uninstall.yml --limit <hosts>
-- name: Remove the Homelab Monitoring agent
+- name: Remove the Midnights Monitoring agent
   hosts: monitored
   become: true
   roles:

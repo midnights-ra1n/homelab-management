@@ -9,6 +9,10 @@ export const statusLabel: Record<Status, string> = {
   unknown: "En attente",
 };
 
+/** Preferences shared with the iOS / macOS app (merged per key by the server). */
+export interface Preferences { theme?: "auto" | "light" | "dark"; monitors_view?: "cards" | "table"; [k: string]: unknown }
+export const savePrefs = (p: Preferences) => { api.put("/api/preferences", p).catch(() => { /* offline: kept locally */ }); };
+
 export interface HostInfo {
   hostname?: string; os?: string; kernel?: string; arch?: string; cpu_model?: string;
   cpu_cores?: number; mem_total?: number; agent_version?: string; boot_time?: number;
@@ -29,7 +33,13 @@ export interface Host {
   id: number; name: string; status: Status; last_seen: number; maintenance: boolean; public: boolean;
   connected: boolean; info: HostInfo; latest: HostLatest; updates: HostUpdates | null; created_at: number;
   action: HostAction | null; agent_latest: string; agent_outdated: boolean; docker: DockerSnapshot | null;
+  /** Agent silent: did the host answer ping? null when not tried. */
+  ping: boolean | null;
 }
+
+/** Host status wording: tells a stopped agent apart from a machine that is down. */
+export const hostStatusLabel = (h: Pick<Host, "status" | "ping">) =>
+  h.ping === true ? "Agent injoignable · hôte en ligne" : h.ping === false ? "Hors ligne · injoignable" : statusLabel[h.status];
 export type ImageUpdate = "up_to_date" | "available" | "unknown" | "local" | "pinned";
 export interface DockerContainer {
   id: string; name: string; image: string; state: string; health: string; started_at: string; restart_count: number;
@@ -47,6 +57,7 @@ export interface MonitorConfig {
   method?: string; expected_status?: string; keyword?: string; ignore_tls?: boolean; check_ssl?: boolean; degraded_ms?: number;
   dns_server?: string; record_type?: string; expected?: string; warn_days?: number; failure_threshold?: number;
   min_value?: number; max_value?: number; unit?: string; oid?: string; snmp_version?: "1" | "2c" | "3";
+  snmp_mode?: "" | "in" | "out" | "ifstatus"; interface?: string; max_percent?: number; idle_minutes?: number;
   /** Secrets are write-only: the API never returns them, an empty value keeps the saved one. */
   community?: string; snmp_user?: string; auth_proto?: string; auth_pass?: string; priv_proto?: string; priv_pass?: string; channel?: number;
 }
@@ -65,7 +76,25 @@ export function certDays(m: Monitor) {
 export type MonitorInput = Pick<Monitor, "name" | "type" | "target" | "interval_s" | "timeout_s" | "config" | "enabled" | "maintenance" | "public">;
 
 export interface Series { t: number[]; latency: (number | null)[]; value?: (number | null)[]; worst: Status[]; name?: string }
-export interface Overview { status: Status; hosts: Host[]; monitors: Monitor[]; latency: Series[] }
+export interface Overview { status: Status; hosts: Host[]; monitors: Monitor[]; latency: Series[]; bandwidth: Bandwidth }
+
+/** SNMP interface probes grouped by device and interface (GET /api/bandwidth), shared with the management role. */
+export interface BandwidthSide {
+  monitor_id: number; name: string; status: Status; message: string;
+  current_mbps: number | null; avg_mbps: number | null; peak_mbps: number | null; series: (number | null)[];
+  /** Traffic volume in octets: since local midnight, since the 1st of the month, per day aligned on Bandwidth.days. */
+  today_octets: number; month_octets: number; daily_octets: number[];
+}
+export interface BandwidthLink {
+  target: string; interface: string; status: Status; speed_mbps: number | null;
+  in: BandwidthSide | null; out: BandwidthSide | null; state: { monitor_id: number; name: string; status: Status; message: string } | null;
+}
+export interface Bandwidth { range: string; t: number[]; days: number[]; links: BandwidthLink[] }
+/** Takes Mbit/s (the API unit) and shows bytes per second: Go/s, Mo/s, Ko/s, o/s (SI, 1 Mo = 10⁶ octets). */
+export const fmtMbps = (v: number | null | undefined) => (v == null ? "—" : `${fmtOctets(v * 125_000)}/s`);
+/** Octets in SI units (To, Go, Mo, Ko), like the rates. */
+export const fmtOctets = (o: number | null | undefined) =>
+  o == null ? "—" : o >= 1e12 ? `${fmtNum(o / 1e12, 2)} To` : o >= 1e9 ? `${fmtNum(o / 1e9, 2)} Go` : o >= 1e6 ? `${fmtNum(o / 1e6, o < 1e7 ? 2 : 1)} Mo` : o >= 1e3 ? `${fmtNum(o / 1e3, 0)} Ko` : `${fmtNum(o, 0)} o`;
 export type HostSeries = Record<"t" | "cpu" | "mem" | "swap" | "disk" | "net_rx" | "net_tx" | "load1" | "temp" | "cpu_temp", (number | null)[]>;
 
 export class ApiError extends Error {

@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -153,6 +155,7 @@ type Host struct {
 	Updates     *agentUpdates   `json:"updates"`
 	Action      *hostAction     `json:"action"`         // last dashboard action (updates, agent update)
 	Docker      *dockerSnapshot `json:"docker"`         // nil when the host has no Docker
+	Ping        *bool           `json:"ping"`           // agent silent: does the host still answer ICMP? nil when not tried
 	AgentLatest string          `json:"agent_latest"`   // latest published agent release, "" if unknown
 	Outdated    bool            `json:"agent_outdated"` // agent older than AgentLatest
 	CreatedAt   int64           `json:"created_at"`
@@ -195,6 +198,67 @@ func (s *Server) agentInterval() int {
 	return n
 }
 
+func (s *Server) agentStale(h *Host) bool {
+	return h.LastSeen > 0 && time.Since(time.Unix(h.LastSeen, 0)) > time.Duration(3*s.agentInterval()+15)*time.Second
+}
+
+// hostMessage explains a host status in notifications.
+func hostMessage(h *Host) string {
+	switch {
+	case h.Status == StatusMinor && h.Ping != nil:
+		return "Agent injoignable, l'hôte répond au ping"
+	case h.Status == StatusMajor && h.Ping != nil:
+		return "Hôte injoignable : ni l'agent ni le ping ne répondent"
+	case h.Status == StatusMajor:
+		return "Agent injoignable"
+	}
+	return ""
+}
+
+// pingHost pings the addresses the agent reported. usable is false when none could be tried
+// (no IPv4 address, or ICMP not allowed): the status then relies on the agent alone.
+func pingHost(ctx context.Context, info json.RawMessage) (up, usable bool) {
+	var ai agentInfo
+	json.Unmarshal(info, &ai)
+	for _, a := range ai.IPs {
+		ip := net.ParseIP(a.Address)
+		if ip == nil || ip.To4() == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() ||
+			strings.HasPrefix(a.Iface, "docker") || strings.HasPrefix(a.Iface, "br-") || strings.HasPrefix(a.Iface, "veth") {
+			continue
+		}
+		u, ok := ping(ctx, a.Address, 2*time.Second)
+		if u {
+			return true, true
+		}
+		usable = usable || ok
+	}
+	return false, usable
+}
+
+// refreshPings pings the hosts whose agent went silent, concurrently, and forgets the others.
+func (s *Server) refreshPings(ctx context.Context, hosts []Host) {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 16)
+	for _, h := range hosts {
+		if h.Maintenance || !s.agentStale(&h) {
+			s.pings.Delete(h.ID)
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if up, usable := pingHost(ctx, h.Info); usable {
+				s.pings.Store(h.ID, up)
+			} else {
+				s.pings.Delete(h.ID)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
 func (s *Server) hostStatus(h *Host) string {
 	if h.Maintenance {
 		return StatusMaintenance
@@ -202,7 +266,15 @@ func (s *Server) hostStatus(h *Host) string {
 	if h.LastSeen == 0 {
 		return StatusUnknown
 	}
-	if time.Since(time.Unix(h.LastSeen, 0)) > time.Duration(3*s.agentInterval()+15)*time.Second {
+	if s.agentStale(h) {
+		// Agent silent but the host answers ping: partial outage, the machine itself is up.
+		if v, ok := s.pings.Load(h.ID); ok {
+			up := v.(bool)
+			h.Ping = &up
+			if up {
+				return StatusMinor
+			}
+		}
 		return StatusMajor
 	}
 	var m agentMetrics
@@ -686,9 +758,11 @@ func (s *Server) watchHosts(ctx context.Context) {
 	for {
 		hosts, err := s.loadHosts("")
 		if err == nil {
+			s.refreshPings(ctx, hosts)
 			for _, h := range hosts {
+				h.Status = s.hostStatus(&h)
 				if p, seen := prev[h.ID]; seen && p != h.Status && p != StatusUnknown && h.Status != StatusUnknown {
-					s.notifier.add(Event{Kind: "Hôte", Name: h.Name, From: p, To: h.Status, At: time.Now()})
+					s.notifier.add(Event{Kind: "Hôte", Name: h.Name, From: p, To: h.Status, Message: hostMessage(&h), At: time.Now()})
 				}
 				prev[h.ID] = h.Status
 			}

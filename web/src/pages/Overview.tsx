@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpRight, Columns2, Eye, EyeOff, LayoutGrid, PackageCheck, Radar, RotateCcw, Server, ShieldAlert, Square, Timer } from "lucide-react";
-import { api, certDays, fmtMs, pct, statusLabel, type Overview, type Status } from "../api";
+import { api, certDays, hostStatusLabel, fmtMs, pct, statusLabel, type Overview, type Status } from "../api";
 import { updateTotals } from "./Updates";
 import { incidents } from "./Incidents";
 import { AgentVersion } from "./AgentVersion";
+import { BandwidthEmpty } from "./Bandwidth";
+import { BandwidthChart, BandwidthFigures } from "../shared/bandwidth";
 import { AlertBanner } from "../layout";
 import {
   Alert, Badge, Button, ButtonLink, Card, CardBody, CardHeader, EmptyState, IconButton, Link, Meter, STAT_GRID, SectionTitle, Skeleton, Stat,
   StatusBadge, StatusIcon, UptimeBars, cn, fmtLatency, formatPct, kindTone, statusKind, usePoll, useToast,
 } from "../ui";
 
-type WidgetId = "kpis" | "problems" | "latency" | "updates" | "uptime" | "hosts";
+type WidgetId = "kpis" | "problems" | "latency" | "updates" | "uptime" | "bandwidth" | "hosts";
 interface Widget { id: WidgetId; visible: boolean; full: boolean }
 
 const WIDGETS: Record<WidgetId, string> = {
@@ -19,6 +21,7 @@ const WIDGETS: Record<WidgetId, string> = {
   latency: "Latence moyenne (24 h)",
   updates: "Mises à jour",
   uptime: "Disponibilité sur 90 jours",
+  bandwidth: "Bande passante",
   hosts: "Ressources des hôtes",
 };
 const DEFAULT_LAYOUT: Widget[] = [
@@ -27,6 +30,7 @@ const DEFAULT_LAYOUT: Widget[] = [
   { id: "problems", visible: true, full: false },
   { id: "updates", visible: true, full: false },
   { id: "uptime", visible: true, full: true },
+  { id: "bandwidth", visible: true, full: true },
   { id: "hosts", visible: true, full: true },
 ];
 
@@ -239,6 +243,27 @@ function WidgetView({ id, data }: { id: WidgetId; data: Overview }) {
           )}
         </section>
       );
+    case "bandwidth":
+      return (
+        <section>
+          <SectionTitle actions={details("/bandwidth", "Bande passante")}>Bande passante (24 h)</SectionTitle>
+          {data.bandwidth.links.length === 0 ? <BandwidthEmpty /> : (
+            <ul className="grid gap-3 lg:grid-cols-2">
+              {data.bandwidth.links.map((l) => (
+                <li key={`${l.target}|${l.interface}`} className="grid gap-3 rounded-xl border border-line-subtle bg-box p-4">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <StatusIcon status={l.status} size={18} />
+                    <Link to="/bandwidth" className="min-w-0 flex-1 truncate font-mono font-medium text-h1 no-underline hover:text-accent-text">{l.interface}</Link>
+                    <span className="shrink-0 truncate font-mono text-xs text-meta">{l.target}</span>
+                  </div>
+                  <BandwidthFigures l={l} compact />
+                  {(l.in || l.out) && <BandwidthChart t={data.bandwidth.t} l={l} height={120} />}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      );
     case "hosts":
       return (
         <section>
@@ -263,7 +288,7 @@ function WidgetView({ id, data }: { id: WidgetId; data: Overview }) {
                         <Meter size="sm" label="RAM" value={pct(h.latest.mem_used, h.latest.mem_total)} />
                         <Meter size="sm" label="Disque" value={pct(h.latest.disk_used, h.latest.disk_total)} />
                       </div>
-                    ) : <p className="text-xs text-meta">Aucune donnée récente de l'agent.</p>}
+                    ) : <p className="text-xs text-meta">{h.ping == null ? "Aucune donnée récente de l'agent." : `${hostStatusLabel(h)}.`}</p>}
                   </li>
                 );
               })}

@@ -71,7 +71,7 @@ func (s *Server) decomSteps(id int64) []decomStep {
 	}
 	if a["hlm_host_id"] != nil {
 		steps = append(steps, decomStep{Key: "monitoring", Auto: true, Label: "Retirer l'hôte du monitoring",
-			Hint: "Supprime l'hôte dans Homelab Monitoring (jeton avec le scope hosts:write). Désinstallez ensuite l'agent : sudo /opt/hlm-agent/uninstall.sh, apt remove hlm-agent ou hlm_agent_state: absent avec Ansible."})
+			Hint: "Supprime l'hôte dans Midnights Monitoring (jeton avec le scope hosts:write). Désinstallez ensuite l'agent : sudo /opt/hlm-agent/uninstall.sh, apt remove hlm-agent ou hlm_agent_state: absent avec Ansible."})
 	} else {
 		steps = append(steps, decomStep{Key: "agent", Label: "Désinstaller l'agent de monitoring s'il est présent"})
 	}

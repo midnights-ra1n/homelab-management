@@ -9,3 +9,4 @@ server/data/
 *.db-wal
 *.db-shm
 dist/
+server/data-*/

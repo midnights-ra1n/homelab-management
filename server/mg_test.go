@@ -22,7 +22,7 @@ func TestManagementLegacyCompat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{mg: &mgState{key: key}}
+	s := &Server{key: key, mg: &mgState{}}
 	plain, err := s.decrypt("v1.BwcHBwcHBwcHBwcH.wlfkKEL4f0gr+E29gS9ziQ==.zmyokFssIb4wj2V1gbXKOglQr1CCJLoTwA==")
 	if err != nil || plain != `{"token_secret":"s3cr3t"}` {
 		t.Fatalf("decrypt Node secret: %q %v", plain, err)

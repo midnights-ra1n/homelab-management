@@ -56,7 +56,9 @@ type Server struct {
 
 	agentsMu sync.Mutex
 	agents   map[int64]*agentConn
+	pings    sync.Map // host id → bool, ICMP result for hosts whose agent is silent
 
+	key []byte   // AES-256-GCM key for stored secrets (DATA_DIR/secret.key or APP_SECRET)
 	mg  *mgState // management role only
 	csp string
 }
@@ -189,7 +191,11 @@ func (s *Server) initMonitoring() error {
 		db.Close()
 		return err
 	}
+	if s.key, err = loadSecretKey(s.cfg.DataDir); err != nil {
+		db.Close()
+		return err
+	}
 	s.db, s.priv, s.pub = db, priv, priv.Public().(ed25519.PublicKey)
 	s.notifier = newNotifier(s)
-	return nil
+	return s.sealMonitorSecrets()
 }

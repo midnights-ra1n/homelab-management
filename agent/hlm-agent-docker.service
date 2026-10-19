@@ -1,5 +1,5 @@
 [Unit]
-Description=Homelab monitoring agent: Docker containers snapshot
+Description=Midnights Monitoring agent: Docker containers snapshot
 Documentation=https://github.com/midnights-ra1n/homelab-management
 After=docker.service
 

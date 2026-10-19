@@ -19,14 +19,14 @@ export function machineKeys(...values: (string | null | undefined)[]) {
   });
 }
 
-/** Monitoring summary of the dashboard, from the Homelab Monitoring integrations. */
+/** Monitoring summary of the dashboard, from the Midnights Monitoring integrations. */
 export const monitoringSummary = () => resource("monitoring-summary", async () => summarize(await fetchHlm()));
 
 export function summarize(hlm: Source<HlmData>[]) {
     const hosts = hlm.flatMap((s) => s.data?.hosts ?? []);
     const systems = hosts.map((h) => ({
       name: h.name,
-      source: "Homelab Monitoring",
+      source: "Midnights Monitoring",
       status: h.status === "major_outage" ? "down" : h.status === "unknown" ? "pending" : "up",
       cpu: h.latest?.cpu ?? null,
       mem: pctOf(h.latest?.mem_used, h.latest?.mem_total),
@@ -36,6 +36,9 @@ export function summarize(hlm: Source<HlmData>[]) {
     const soon = Date.now() + 21 * 86_400_000;
     return {
       configured: hlm.length,
+      /** Hosts and enabled probes followed: 0 means there is nothing to report on, not that all is well. */
+      monitored: systems.length + probes.length,
+      bandwidth: hlm.flatMap((s) => (s.data?.bandwidth?.links ?? []).map((l) => ({ ...l, t: s.data!.bandwidth!.t, source: s.name, url: s.url }))),
       errors: hlm.filter((s) => !s.ok).map((s) => ({ name: s.name, error: s.error! })),
       systems: {
         total: systems.length,

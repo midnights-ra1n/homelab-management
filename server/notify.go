@@ -79,7 +79,11 @@ func (n *Notifier) flush() {
 	evs := n.pending
 	n.pending, n.timer = nil, nil
 	n.mu.Unlock()
-	if len(evs) == 0 || n.s.getSetting("smtp_enabled", "false") != "true" {
+	if len(evs) == 0 {
+		return
+	}
+	n.s.push(evs)
+	if n.s.getSetting("smtp_enabled", "false") != "true" {
 		return
 	}
 	if err := n.s.sendAlert(evs); err != nil {

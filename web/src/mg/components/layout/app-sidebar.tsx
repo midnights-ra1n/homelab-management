@@ -82,7 +82,7 @@ function SideHead() {
   );
 }
 
-/** Shortcut to the monitoring instance (first Homelab Monitoring integration). */
+/** Shortcut to the monitoring instance (first Midnights Monitoring integration). */
 export function MonitoringLink() {
   const { monitoringUrl } = useSession();
   if (!monitoringUrl) return null;

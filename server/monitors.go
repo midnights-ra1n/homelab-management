@@ -63,7 +63,11 @@ type MonitorConfig struct {
 	MinValue    *float64 `json:"min_value,omitempty"`
 	MaxValue    *float64 `json:"max_value,omitempty"`
 	Unit        string   `json:"unit,omitempty"`         // snmp: shown after the value
-	OID         string   `json:"oid,omitempty"`          // snmp
+	OID         string   `json:"oid,omitempty"`          // snmp, when snmp_mode is empty
+	SNMPMode    string   `json:"snmp_mode,omitempty"`    // snmp: "" (one OID), in / out (interface throughput), ifstatus
+	Interface   string   `json:"interface,omitempty"`    // snmp in/out/ifstatus: interface name or ifIndex
+	MaxPercent  *float64 `json:"max_percent,omitempty"`  // snmp in/out: degraded above this share of the link speed
+	IdleMinutes int      `json:"idle_minutes,omitempty"` // snmp ifstatus: down when nothing was received for this long (WireGuard)
 	SNMPVersion string   `json:"snmp_version,omitempty"` // snmp: 1, 2c or 3
 	Community   string   `json:"community,omitempty"`    // snmp v1/v2c, secret
 	SNMPUser    string   `json:"snmp_user,omitempty"`    // snmp v3
@@ -74,7 +78,7 @@ type MonitorConfig struct {
 	Channel     int      `json:"channel,omitempty"`      // meross: socket of a power strip
 }
 
-// MarshalJSON hides the secrets from every API response and export; stored() keeps them for the database.
+// MarshalJSON hides the secrets from every API response and export; storedConfig keeps them, encrypted, for the database.
 func (c MonitorConfig) MarshalJSON() ([]byte, error) {
 	type plain MonitorConfig
 	p := plain(c)
@@ -82,10 +86,52 @@ func (c MonitorConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
 
-func (c MonitorConfig) stored() string {
+func (s *Server) storedConfig(c MonitorConfig) string {
 	type plain MonitorConfig
+	for _, p := range []*string{&c.Community, &c.AuthPass, &c.PrivPass} {
+		if *p != "" {
+			*p = s.encrypt(*p)
+		}
+	}
 	b, _ := json.Marshal(plain(c))
 	return string(b)
+}
+
+// openSecrets decrypts the secrets of a stored config. clear reports one still stored in clear
+// (before encryption was added); an unreadable one (secret.key replaced) is emptied.
+func (s *Server) openSecrets(c *MonitorConfig) (clear, unreadable bool) {
+	for _, p := range []*string{&c.Community, &c.AuthPass, &c.PrivPass} {
+		if *p == "" {
+			continue
+		}
+		if plain, err := s.decrypt(*p); err == nil {
+			*p = plain
+		} else if strings.HasPrefix(*p, "v1.") && strings.Count(*p, ".") == 3 {
+			*p, unreadable = "", true
+		} else {
+			clear = true
+		}
+	}
+	return clear, unreadable
+}
+
+// sealMonitorSecrets encrypts the SNMP secrets saved in clear by older versions, at startup.
+func (s *Server) sealMonitorSecrets() error {
+	mons, err := s.loadMonitors(`WHERE type='snmp'`)
+	if err != nil {
+		return err
+	}
+	for _, m := range mons {
+		if m.secretsClear {
+			if _, err := s.db.Exec(`UPDATE monitors SET config=? WHERE id=?`, s.storedConfig(m.Config), m.ID); err != nil {
+				return err
+			}
+		}
+		if m.secretsLost {
+			slog.Warn("SNMP secrets unreadable, re-enter them in the probe (secret.key or APP_SECRET changed?)", "monitor", m.Name)
+		}
+	}
+	return nil
 }
 
 // keepSecrets fills the secrets left empty in an edit form with the saved ones.
@@ -120,6 +166,8 @@ type Monitor struct {
 	Days        []Day         `json:"days,omitempty"`
 
 	certAlertedFor int64 // NotAfter of the certificate already reported, so each certificate warns once
+	secretsClear   bool  // loaded from a config whose secrets were not encrypted yet
+	secretsLost    bool  // encrypted with another key
 }
 
 type Day struct {
@@ -294,6 +342,7 @@ type checkResult struct {
 	message    string
 	certExpiry *time.Time
 	value      *float64 // snmp reading, or watts for meross
+	octets     uint64   // snmp in/out: bytes counted since the previous reading, for the traffic volume
 }
 
 func ms(d time.Duration) *float64 {
@@ -303,9 +352,9 @@ func ms(d time.Duration) *float64 {
 
 func slowOrOK(c *MonitorConfig, lat *float64, okMsg string) checkResult {
 	if c.DegradedMs > 0 && *lat > float64(c.DegradedMs) {
-		return checkResult{StatusDegraded, lat, fmt.Sprintf("Réponse lente : %.0f ms (seuil %d ms)", *lat, c.DegradedMs), nil, nil}
+		return checkResult{StatusDegraded, lat, fmt.Sprintf("Réponse lente : %.0f ms (seuil %d ms)", *lat, c.DegradedMs), nil, nil, 0}
 	}
-	return checkResult{StatusOperational, lat, okMsg, nil, nil}
+	return checkResult{StatusOperational, lat, okMsg, nil, nil, 0}
 }
 
 func runCheck(ctx context.Context, m *Monitor) checkResult {
@@ -318,7 +367,7 @@ func runCheck(ctx context.Context, m *Monitor) checkResult {
 		start := time.Now()
 		conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", m.Target)
 		if err != nil {
-			return checkResult{StatusMajor, nil, "Connexion impossible : " + err.Error(), nil, nil}
+			return checkResult{StatusMajor, nil, "Connexion impossible : " + err.Error(), nil, nil, 0}
 		}
 		conn.Close()
 		return slowOrOK(&m.Config, ms(time.Since(start)), "Port ouvert")
@@ -329,7 +378,7 @@ func runCheck(ctx context.Context, m *Monitor) checkResult {
 	case "snmp":
 		return checkSNMP(ctx, m)
 	}
-	return checkResult{StatusUnknown, nil, "Type inconnu", nil, nil}
+	return checkResult{StatusUnknown, nil, "Type inconnu", nil, nil, 0}
 }
 
 func checkHTTP(ctx context.Context, m *Monitor) checkResult {
@@ -345,13 +394,13 @@ func checkHTTP(ctx context.Context, m *Monitor) checkResult {
 	}}
 	req, err := http.NewRequestWithContext(ctx, m.Config.Method, m.Target, nil)
 	if err != nil {
-		return checkResult{StatusMajor, nil, err.Error(), nil, nil}
+		return checkResult{StatusMajor, nil, err.Error(), nil, nil, 0}
 	}
 	req.Header.Set("User-Agent", "hlm-monitor/"+version)
 	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
-		return checkResult{StatusMajor, nil, "Requête échouée : " + err.Error(), nil, nil}
+		return checkResult{StatusMajor, nil, "Requête échouée : " + err.Error(), nil, nil, 0}
 	}
 	defer resp.Body.Close()
 	lat := ms(time.Since(start))
@@ -361,17 +410,17 @@ func checkHTTP(ctx context.Context, m *Monitor) checkResult {
 		cert = &na
 		// Reachable only with ignore_tls: an expired certificate is still an outage.
 		if time.Until(na) <= 0 {
-			return checkResult{StatusMajor, lat, "Certificat expiré le " + na.In(localTZ()).Format("02/01/2006"), cert, nil}
+			return checkResult{StatusMajor, lat, "Certificat expiré le " + na.In(localTZ()).Format("02/01/2006"), cert, nil, 0}
 		}
 	}
 	match, _ := statusMatcher(m.Config.ExpectedStatus)
 	if !match(resp.StatusCode) {
-		return checkResult{StatusMinor, lat, fmt.Sprintf("Code HTTP %d inattendu (attendu %s)", resp.StatusCode, m.Config.ExpectedStatus), cert, nil}
+		return checkResult{StatusMinor, lat, fmt.Sprintf("Code HTTP %d inattendu (attendu %s)", resp.StatusCode, m.Config.ExpectedStatus), cert, nil, 0}
 	}
 	if m.Config.Keyword != "" {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		if !strings.Contains(string(body), m.Config.Keyword) {
-			return checkResult{StatusMinor, lat, "Mot-clé absent de la réponse", cert, nil}
+			return checkResult{StatusMinor, lat, "Mot-clé absent de la réponse", cert, nil, 0}
 		}
 	}
 	res := slowOrOK(&m.Config, lat, fmt.Sprintf("HTTP %d", resp.StatusCode))
@@ -424,10 +473,10 @@ func checkDNS(ctx context.Context, m *Monitor) checkResult {
 	}
 	lat := ms(time.Since(start))
 	if err != nil {
-		return checkResult{StatusMajor, nil, "Résolution échouée : " + err.Error(), nil, nil}
+		return checkResult{StatusMajor, nil, "Résolution échouée : " + err.Error(), nil, nil, 0}
 	}
 	if len(answers) == 0 {
-		return checkResult{StatusMinor, lat, "Aucune réponse", nil, nil}
+		return checkResult{StatusMinor, lat, "Aucune réponse", nil, nil, 0}
 	}
 	if exp := m.Config.Expected; exp != "" {
 		found := false
@@ -437,7 +486,7 @@ func checkDNS(ctx context.Context, m *Monitor) checkResult {
 			}
 		}
 		if !found {
-			return checkResult{StatusMinor, lat, "Réponse inattendue : " + strings.Join(answers, ", "), nil, nil}
+			return checkResult{StatusMinor, lat, "Réponse inattendue : " + strings.Join(answers, ", "), nil, nil, 0}
 		}
 	}
 	return slowOrOK(&m.Config, lat, strings.Join(answers, ", "))
@@ -454,21 +503,21 @@ func checkSSL(ctx context.Context, m *Monitor) checkResult {
 	d := &tls.Dialer{Config: &tls.Config{ServerName: host}}
 	conn, err := d.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return checkResult{StatusMajor, nil, "Certificat invalide ou injoignable : " + err.Error(), nil, nil}
+		return checkResult{StatusMajor, nil, "Certificat invalide ou injoignable : " + err.Error(), nil, nil, 0}
 	}
 	defer conn.Close()
 	lat := ms(time.Since(start))
 	certs := conn.(*tls.Conn).ConnectionState().PeerCertificates
 	if len(certs) == 0 {
-		return checkResult{StatusMajor, lat, "Aucun certificat présenté", nil, nil}
+		return checkResult{StatusMajor, lat, "Aucun certificat présenté", nil, nil, 0}
 	}
 	na := certs[0].NotAfter
 	expiry := na.In(localTZ()).Format("02/01/2006")
 	if time.Until(na) <= 0 {
-		return checkResult{StatusMajor, lat, "Certificat expiré le " + expiry, &na, nil}
+		return checkResult{StatusMajor, lat, "Certificat expiré le " + expiry, &na, nil, 0}
 	}
 	// Expiring soon is not an outage: it stays operational and triggers a one-off e-mail warning.
-	return checkResult{StatusOperational, lat, fmt.Sprintf("Valide jusqu'au %s (%d jours)", expiry, daysLeft(na)), &na, nil}
+	return checkResult{StatusOperational, lat, fmt.Sprintf("Valide jusqu'au %s (%d jours)", expiry, daysLeft(na)), &na, nil, 0}
 }
 
 func daysLeft(t time.Time) int { return int(time.Until(t).Hours() / 24) }
@@ -569,6 +618,13 @@ func (s *Server) recordResult(m *Monitor, res checkResult, eff string) error {
 		m.ID, now.Unix()/86400*86400, up, statusRank(stored), latSum, latN, energy); err != nil {
 		return err
 	}
+	if res.octets > 0 {
+		// shortcut: a reading spanning the top of an hour counts in the new hour; at most one interval off.
+		if _, err := tx.Exec(`INSERT INTO traffic_hourly(monitor_id,hour,octets) VALUES(?,?,?)
+			ON CONFLICT(monitor_id,hour) DO UPDATE SET octets=octets+excluded.octets`, m.ID, now.Unix()/3600*3600, int64(res.octets)); err != nil {
+			return err
+		}
+	}
 	var certUnix *int64
 	warnCert := false
 	if res.certExpiry != nil {
@@ -611,6 +667,7 @@ func (s *Server) loadMonitors(where string, args ...any) ([]Monitor, error) {
 			return nil, err
 		}
 		json.Unmarshal([]byte(cfg), &m.Config)
+		m.secretsClear, m.secretsLost = s.openSecrets(&m.Config)
 		out = append(out, m)
 	}
 	return out, rows.Err()
@@ -717,7 +774,7 @@ func (in monitorInput) toMonitor() (Monitor, string) {
 
 func (s *Server) insertMonitor(m *Monitor) (int64, error) {
 	res, err := s.db.Exec(`INSERT INTO monitors(name,type,target,interval_s,timeout_s,config,enabled,maintenance,public,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`,
-		m.Name, m.Type, m.Target, m.IntervalS, m.TimeoutS, m.Config.stored(), m.Enabled, m.Maintenance, m.Public, time.Now().Unix())
+		m.Name, m.Type, m.Target, m.IntervalS, m.TimeoutS, s.storedConfig(m.Config), m.Enabled, m.Maintenance, m.Public, time.Now().Unix())
 	if err != nil {
 		return 0, err
 	}
@@ -764,7 +821,7 @@ func (s *Server) handleUpdateMonitor(w http.ResponseWriter, r *http.Request) {
 	}
 	// Reset last_check so the new settings are checked right away.
 	res, err := s.db.Exec(`UPDATE monitors SET name=?,type=?,target=?,interval_s=?,timeout_s=?,config=?,enabled=?,maintenance=?,public=?,last_check=0 WHERE id=?`,
-		m.Name, m.Type, m.Target, m.IntervalS, m.TimeoutS, m.Config.stored(), m.Enabled, m.Maintenance, m.Public, id)
+		m.Name, m.Type, m.Target, m.IntervalS, m.TimeoutS, s.storedConfig(m.Config), m.Enabled, m.Maintenance, m.Public, id)
 	if err != nil {
 		serverErr(w, err)
 		return

@@ -299,6 +299,7 @@ func (s *Server) retentionQueries() []retentionQuery {
 		retentionQuery{`DELETE FROM monitor_results WHERE ts<?`, days("retention_results_days") * 1000},
 		retentionQuery{`DELETE FROM monitor_daily WHERE day<?`, days("retention_daily_days")},
 		retentionQuery{`DELETE FROM host_daily WHERE day<?`, days("retention_daily_days")},
+		retentionQuery{`DELETE FROM traffic_hourly WHERE hour<?`, days("retention_daily_days")},
 	)
 }
 
@@ -363,5 +364,10 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		sr["name"] = m.Name
 		series = append(series, sr)
 	}
-	writeJSON(w, 200, map[string]any{"status": overallStatus(statuses), "hosts": withoutPackages(hosts), "monitors": mons, "latency": series})
+	bw, err := s.bandwidth(24*time.Hour, "24h")
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"status": overallStatus(statuses), "hosts": withoutPackages(hosts), "monitors": mons, "latency": series, "bandwidth": bw})
 }

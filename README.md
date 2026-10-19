@@ -1,4 +1,4 @@
-# Homelab Management
+# Midnights Management
 
 Dépôt : [midnights-ra1n/homelab-management](https://github.com/midnights-ra1n/homelab-management). Il remplace aussi [homelab-monitoring](https://github.com/midnights-ra1n/homelab-monitoring), désormais archivé. Le serveur, son paquet et son image s'appellent `homelab-tools`.
 
@@ -27,7 +27,7 @@ L'interface est en français.
 - Les agents ne parlent **qu'au monitoring**.
 - La gestion lit l'API du monitoring avec un jeton (scopes `hosts:read`, `monitors:read`, et `hosts:write` pour le décommissionnement) : tableau de bord, alertes, page *Monitoring* et **synchronisation de l'inventaire**.
 - Les intégrations **Proxmox** (Paramètres → Intégrations) restent **indépendantes** de l'inventaire et du monitoring. Elles centralisent plusieurs nœuds autonomes sans créer de cluster, donc sans problème de quorum.
-- Intégrations disponibles : Proxmox VE, Homelab Monitoring et Webmin. Beszel, Maintenant et PatchMon ont été retirés.
+- Intégrations disponibles : Proxmox VE, Midnights Monitoring et Webmin. Beszel, Maintenant et PatchMon ont été retirés.
 
 ## Inventaire et monitoring
 
@@ -111,7 +111,7 @@ Image : `ghcr.io/midnights-ra1n/homelab-management`, distroless, non-root, syst�
 | `HLT_PUBLIC_URL` | — | Adresse publique (commandes d'installation de l'agent, contrôle d'origine) |
 | `HLT_TRUSTED_PROXIES` | — | CIDR des reverse proxies autorisés à transmettre `X-Forwarded-*` |
 | `HLT_INSTALL` | `deb` / `docker` (fixée par le paquet ou l'image) | Mode de mise à jour proposé dans les paramètres |
-| `APP_SECRET` | `DATA_DIR/secret.key` | Clé de chiffrement des secrets d'intégration (gestion) |
+| `APP_SECRET` | `DATA_DIR/secret.key` | Clé de chiffrement (AES-256-GCM) des secrets : intégrations et clés SSH (gestion), communautés et mots de passe SNMP (monitoring). Sauvegardez `secret.key` avec la base : sans elle, les secrets ne sont plus lisibles et sont à ressaisir |
 
 Les anciennes variables `HLM_*` de homelab-monitoring sont encore lues.
 
@@ -126,7 +126,7 @@ Premier démarrage : ouvrez l'interface et créez le compte administrateur (12 c
   - garde les comptes (le mot de passe est rehaché en Argon2id à la première connexion) et les passkeys ; les sessions sont réinitialisées, il faut se reconnecter.
 
   Les sauvegardes JSON de homelab-management (*Paramètres → Sauvegarde & restauration*) se restaurent aussi.
-- Pour relier la gestion au monitoring : dans le monitoring, *Paramètres → API*, activez l'API et créez un jeton `hosts:read`, `monitors:read` et `hosts:write`. Dans la gestion, *Paramètres → Intégrations → Homelab Monitoring*, renseignez l'URL et ce jeton.
+- Pour relier la gestion au monitoring : dans le monitoring, *Paramètres → API*, activez l'API et créez un jeton `hosts:read`, `monitors:read` et `hosts:write`. Dans la gestion, *Paramètres → Intégrations → Midnights Monitoring*, renseignez l'URL et ce jeton.
 
 ## Installer l'agent
 
@@ -136,7 +136,7 @@ Premier démarrage : ouvrez l'interface et créez le compte administrateur (12 c
 | Paquet `hlm-agent_<version>_<arch>.deb` | bouton *Mettre à jour l'agent*, Ansible ou nouveau paquet |
 | Ansible : rôle `deploy/ansible/roles/hlm_agent` (`hlm_install_method: binary` ou `deb`) | selon la méthode |
 
-Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). API du monitoring : [docs/API.md](docs/API.md).
+Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). API du monitoring : [docs/API.md](docs/API.md) ; app iOS / macOS (notifications push, widgets, préférences) : [docs/API-APPLE.md](docs/API-APPLE.md).
 
 ## Développement
 

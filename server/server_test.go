@@ -29,7 +29,7 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{cfg: Config{DataDir: dir, Role: RoleMonitoring}, db: db, priv: priv, pub: priv.Public().(ed25519.PublicKey),
+	s := &Server{cfg: Config{DataDir: dir, Role: RoleMonitoring}, db: db, priv: priv, key: make([]byte, 32), pub: priv.Public().(ed25519.PublicKey),
 		limiter: newRateLimiter(100, time.Minute), agents: map[int64]*agentConn{}}
 	s.notifier = newNotifier(s)
 	if err := s.initSetup(); err != nil {

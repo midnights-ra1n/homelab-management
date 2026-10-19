@@ -13,6 +13,7 @@ import { LinkTabs } from "@/components/ui/tabs";
 import { Alert } from "@/components/ui/alert";
 import { ASSET_KIND_META } from "@/lib/constants";
 import { VpnSection } from "@/features/network/vpn-section";
+import { TrafficSection } from "@/features/network/traffic-section";
 import { FirewallSection } from "@/features/network/firewall-section";
 import { Simulator } from "@/features/network/simulator";
 import { Diagnostics } from "@/features/network/diagnostics";
@@ -40,7 +41,7 @@ export default function NetworkPage({ searchParams }: PageProps<"/[lang]/reseau"
     <>
       <PageHeader
         title={tr("Réseau")}
-        description={tr("Adressage, tunnels VPN, pare-feu, noms de domaine et simulation de flux avant la mise en prod.")}
+        description={tr("Adressage, trafic en temps réel, tunnels VPN, pare-feu, noms de domaine et simulation de flux avant la mise en prod.")}
       />
       <Suspense fallback={<Skeleton className="h-[32rem] rounded-2xl" />}>
         <Ipam searchParams={searchParams} />
@@ -66,6 +67,7 @@ function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau">["sea
       className="mb-8"
       items={[
         { value: "adressage", label: tr("Adressage"), href: "/reseau" },
+        { value: "trafic", label: tr("Trafic"), href: "/reseau?onglet=trafic" },
         { value: "vpn", label: "VPN", href: "/reseau?onglet=vpn" },
         { value: "pare-feu", label: "Pare-feu", href: "/reseau?onglet=pare-feu" },
         { value: "domaines", label: tr("Domaines"), href: "/reseau?onglet=domaines" },
@@ -89,6 +91,11 @@ function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau">["sea
     return (
       <div>
         {tabs}
+        {tab === "trafic" && (
+          <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
+            <TrafficSection />
+          </Suspense>
+        )}
         {tab === "vpn" && <VpnSection tunnels={tunnels} assets={assets.map((a) => ({ id: a.id, display_name: a.display_name }))} />}
         {tab === "domaines" && <DomainSection domains={use(listDomains())} assets={assets.map((a) => ({ id: a.id, display_name: a.display_name }))} />}
         {tab === "pare-feu" && <FirewallSection rules={use(listRules())} policy={use(defaultFirewallPolicy())} options={fwOptions} />}

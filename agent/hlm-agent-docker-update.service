@@ -1,5 +1,5 @@
 [Unit]
-Description=Homelab monitoring agent: update a Docker Compose container
+Description=Midnights Monitoring agent: update a Docker Compose container
 Documentation=https://github.com/midnights-ra1n/homelab-management
 After=docker.service network-online.target
 

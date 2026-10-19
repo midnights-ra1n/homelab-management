@@ -59,7 +59,7 @@ func (s *Server) staticHandler() http.Handler {
 // managementShell rewrites the app shell and the PWA manifest for the management role:
 // its own name, description and icons (public/mg), so both installed apps stay distinct.
 var managementShell = strings.NewReplacer(
-	"Homelab Monitoring", "Homelab Management",
+	"Midnights Monitoring", "Midnights Management",
 	"Supervision du homelab : hôtes, sondes et page de statut.", "Gestion du homelab : inventaire, réseau, déploiements, Proxmox.",
 	`"/icon`, `"/mg/icon`, `"/apple-touch-icon.png"`, `"/mg/apple-touch-icon.png"`,
 )

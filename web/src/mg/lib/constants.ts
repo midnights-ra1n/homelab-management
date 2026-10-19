@@ -30,7 +30,7 @@ export const ASSET_STATUS_META: Record<AssetStatus, { label: string; tone: Tone 
 /** Origine de l'état détecté automatiquement (colonne assets.status_source). */
 export const STATUS_SOURCE_LABEL: Record<string, string> = {
   ping: "ping",
-  hlm: "Homelab Monitoring",
+  hlm: "Midnights Monitoring",
 };
 
 export const DEPLOYMENT_KINDS = ["physical", "vm", "lxc", "docker", "application", "other"] as const;
@@ -132,7 +132,7 @@ export const INTEGRATION_META: Record<
     urlPlaceholder: "https://192.168.1.20:10000",
   },
   hlm: {
-    label: "Homelab Monitoring",
+    label: "Midnights Monitoring",
     description: "Ton instance de monitoring : hôtes équipés de l'agent, sondes et mises à jour. Les agents alimentent aussi l'inventaire.",
     icon: "/icons/homelab-monitoring.svg",
     urlPlaceholder: "https://monitoring.lan",

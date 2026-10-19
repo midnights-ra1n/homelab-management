@@ -6,6 +6,8 @@ import {
   inputClass, useToast,
 } from "../ui";
 
+interface Device { token: string; name: string; sandbox: boolean; api_token: string; created_at: number; last_push_at: number; last_error: string }
+
 interface Token { id: number; name: string; prefix: string; scopes: string[]; expires_at: number | null; created_at: number; last_used_at: number }
 
 const EXPIRY: [string, string, number | null][] = [
@@ -20,7 +22,13 @@ export function ApiSection({ draft, setDraft, save, busy }: {
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState<Token>();
   const toast = useToast();
-  const load = () => api.get<{ tokens: Token[]; scopes: Record<string, string> }>("/api/tokens").then((r) => { setTokens(r.tokens); setScopes(r.scopes); });
+  const [devices, setDevices] = useState<{ push_enabled: boolean; devices: Device[] }>();
+  const load = () => {
+    api.get<{ tokens: Token[]; scopes: Record<string, string> }>("/api/tokens").then((r) => { setTokens(r.tokens); setScopes(r.scopes); });
+    api.get<{ push_enabled: boolean; devices: Device[] }>("/api/devices").then(setDevices);
+  };
+  const testPush = () => api.post<{ push_enabled: boolean; devices: Device[] }>("/api/devices/test", {})
+    .then((r) => { setDevices(r); toast("Notification de test envoyée"); }, (e: Error) => toast(e.message));
   useEffect(() => { load(); }, []);
   const enabled = draft.api_enabled === "true";
 
@@ -61,6 +69,34 @@ export function ApiSection({ draft, setDraft, save, busy }: {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+        <Card flush title="Appareils (notifications push)" sub={devices?.push_enabled ? `${devices.devices.length} appareil(s)` : "APNs non configuré"}
+          actions={devices?.push_enabled && devices.devices.length > 0 && <Button variant="secondary" size="sm" onClick={testPush}>Envoyer un test</Button>}>
+          {!devices?.push_enabled && (
+            <p className="px-5 pt-4 text-sm text-body">
+              Pour les notifications de l'app iOS et macOS, définissez <code>HLT_APNS_KEY</code> (clé .p8), <code>HLT_APNS_KEY_ID</code>, <code>HLT_APNS_TEAM_ID</code> et <code>HLT_APNS_TOPIC</code> (identifiant de l'app), puis redémarrez le serveur.
+            </p>
+          )}
+          {!devices?.devices.length ? <p className="px-5 py-8 text-center text-sm text-meta">Aucun appareil. L'app s'inscrit avec un jeton ayant le scope push:write (<a href="https://github.com/midnights-ra1n/homelab-management/blob/stable/docs/API-APPLE.md" target="_blank" rel="noopener">guide iOS / macOS</a>).</p> : (
+            <div className="mm-table-wrap">
+              <table className="mm-table min-w-[40rem]">
+                <thead><tr><th scope="col">Appareil</th><th scope="col">Jeton d'API</th><th scope="col">Dernier envoi</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+                <tbody>
+                  {devices.devices.map((d) => (
+                    <tr key={d.token}>
+                      <td className="mm-col-strong">
+                        <span className="block">{d.name}{d.sandbox && <Tag>développement</Tag>}</span>
+                        <span className="block font-mono text-xs font-normal text-meta">{d.token.slice(0, 12)}…</span>
+                      </td>
+                      <td className="mm-col-muted">{d.api_token || "—"}</td>
+                      <td className="mm-col-muted">{d.last_error ? <Badge tone="red" dot>{d.last_error}</Badge> : d.last_push_at ? fmtAgo(d.last_push_at) : "Jamais"}</td>
+                      <td className="w-px"><IconButton label={`Retirer ${d.name}`} icon={<Trash2 size={15} />} onClick={() => api.del(`/api/devices/${d.token}`).then(() => { toast("Appareil retiré"); load(); })} /></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

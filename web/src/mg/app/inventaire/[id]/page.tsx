@@ -466,7 +466,7 @@ function LiveMonitoring({ asset }: { asset: Asset }) {
         {linked.error && <p className="text-sm text-red">{linked.error}</p>}
         {!agent && !linked.linked && (
           <p className="text-sm text-meta">
-            {tr("Aucun hôte Homelab Monitoring ne correspond au nom d'hôte, au nom ou à l'IP de cet élément. Installez l'agent sur la machine : elle sera reliée automatiquement.")}
+            {tr("Aucun hôte Midnights Monitoring ne correspond au nom d'hôte, au nom ou à l'IP de cet élément. Installez l'agent sur la machine : elle sera reliée automatiquement.")}
           </p>
         )}
         {agent && (

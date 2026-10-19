@@ -24,6 +24,12 @@ services:
       HLT_PUBLIC_URL: "https://monitoring.example.fr"
       # Reverse proxies allowed to set X-Forwarded-For / X-Forwarded-Proto.
       HLT_TRUSTED_PROXIES: "172.16.0.0/12"
+      # Push notifications for the iOS / macOS app (docs/API-APPLE.md), with the key mounted below.
+      # HLT_APNS_KEY: /run/secrets/apns.p8
+      # HLT_APNS_KEY_ID: "ABC123DEFG"
+      # HLT_APNS_TEAM_ID: "TEAM123456"
+      # HLT_APNS_TOPIC: "fr.midnights.monitoring"
+    # volumes: add - ./AuthKey_ABC123DEFG.p8:/run/secrets/apns.p8:ro (readable by uid 65532, the nonroot user)
     deploy:
       resources:
         limits: { memory: 256M, cpus: "1.0" }

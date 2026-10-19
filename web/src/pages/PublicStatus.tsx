@@ -122,7 +122,7 @@ export function PublicStatusPage() {
       {!data && !error && <Skeleton className="h-72" />}
       {data && <StatusView page={data} />}
       <footer className="mt-12 flex items-center justify-center gap-2 font-mono text-xs text-meta">
-        <span className="[&_svg]:h-4"><Logo compact /></span>Homelab Monitoring
+        <span className="[&_svg]:h-4"><Logo compact /></span>Midnights Monitoring
       </footer>
     </div>
   );

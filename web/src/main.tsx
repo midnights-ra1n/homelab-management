@@ -1,8 +1,8 @@
 import { lazy, StrictMode, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { api } from "./api";
-import { Alert, Toaster, navigate, setAppName, usePath, useTitle } from "./ui";
+import { api, type Preferences } from "./api";
+import { Alert, Toaster, navigate, setAppName, setTheme, usePath, useTitle } from "./ui";
 import { AppShell } from "./layout";
 import { AuthPage } from "./pages/Auth";
 import { OverviewPage } from "./pages/Overview";
@@ -16,6 +16,7 @@ import { ContainersPage } from "./pages/Containers";
 import { ReportsPage } from "./pages/Reports";
 import { IncidentsPage } from "./pages/Incidents";
 import { EnergyPage } from "./pages/Energy";
+import { BandwidthPage } from "./pages/Bandwidth";
 import { LogsPage } from "./shared/system";
 
 const ManagementApp = lazy(() => import("./mg/App"));
@@ -33,7 +34,7 @@ function App() {
   // Detail pages (/hosts/3, /monitors/7) set their own title from the item's name; the public page uses its own title.
   const PAGE_TITLES: Record<string, string> = {
     "": "Vue d'ensemble", hosts: "Hôtes", monitors: "Sondes", incidents: "Incidents", updates: "Mises à jour", disks: "Disques",
-    containers: "Conteneurs", reports: "Rapports", energy: "Énergie", "status-page": "Page de statut", settings: "Paramètres", logs: "Journaux",
+    containers: "Conteneurs", reports: "Rapports", energy: "Énergie", bandwidth: "Bande passante", "status-page": "Page de statut", settings: "Paramètres", logs: "Journaux",
   };
   if (auth) setAppName(auth.role);
   // The management interface sets its own titles once signed in.
@@ -41,6 +42,14 @@ function App() {
 
   const loadAuth = () => api.get<AuthState>("/api/auth/state").then(setAuth, () => setAuth(undefined));
   useEffect(() => { loadAuth(); }, []);
+  // Preferences edited in the iOS / macOS app apply here too.
+  useEffect(() => {
+    if (!auth?.authenticated || auth.role === "management") return;
+    api.get<Preferences>("/api/preferences").then((p) => {
+      if ((p.theme === "auto" || p.theme === "light" || p.theme === "dark") && p.theme !== (document.documentElement.dataset.theme ?? "auto")) setTheme(p.theme);
+      if (p.monitors_view === "cards" || p.monitors_view === "table") try { localStorage.setItem("hlm-view-monitors", p.monitors_view); } catch { /* private mode */ }
+    }, () => { /* keep local choices */ });
+  }, [auth?.authenticated, auth?.role]);
   useEffect(() => {
     const on = () => setAuth((a) => (a ? { ...a, authenticated: false } : a));
     window.addEventListener("hlm:unauthorized", on);
@@ -72,6 +81,7 @@ function App() {
   else if (seg[0] === "containers") page = <ContainersPage />;
   else if (seg[0] === "reports") page = <ReportsPage />;
   else if (seg[0] === "energy") page = <EnergyPage />;
+  else if (seg[0] === "bandwidth") page = <BandwidthPage />;
   else if (seg[0] === "status-page") page = <StatusEditorPage />;
   else if (seg[0] === "settings") page = <SettingsPage version={auth.version} />;
   else if (seg[0] === "logs") page = <LogsPage entityHref={(e) => (e.entity_id && (e.entity_type === "host" || e.entity_type === "monitor") ? `/${e.entity_type}s/${e.entity_id}` : undefined)} />;

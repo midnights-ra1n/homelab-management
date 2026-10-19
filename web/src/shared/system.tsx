@@ -324,7 +324,7 @@ interface Logs { items: LogItem[]; entities: string[]; retention_days: number; m
 
 const ENTITY_LABEL: Record<string, string> = {
   account: "Compte", settings: "Paramètres", database: "Base de données", system: "Système", host: "Hôtes", monitor: "Sondes",
-  token: "Jetons", report: "Rapports", status: "Page de statut", asset: "Inventaire", vlan: "VLAN", subnet: "Sous-réseaux",
+  token: "Jetons", device: "Appareils", report: "Rapports", status: "Page de statut", asset: "Inventaire", vlan: "VLAN", subnet: "Sous-réseaux",
   ip: "Adresses IP", vpn: "VPN", firewall: "Pare-feu", domain: "Domaines", deployment: "Déploiements", task: "Tâches",
   shortcut: "Applications", integration: "Intégrations", proxmox: "Proxmox",
 };

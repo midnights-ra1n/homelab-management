@@ -134,7 +134,7 @@ export type AssetMonitoring = {
   host?: import("../integrations/hlm").HlmHost;
   error?: string;
 };
-/** Monitoring host linked to the item by the agent sync (live data from Homelab Monitoring). */
+/** Monitoring host linked to the item by the agent sync (live data from Midnights Monitoring). */
 export const assetMonitoring = (id: number) => get<AssetMonitoring>(`/api/mg/assets/${id}/monitoring`);
 
 export type AgentState = {

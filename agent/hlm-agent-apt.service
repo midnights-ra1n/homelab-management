@@ -1,5 +1,5 @@
 [Unit]
-Description=Homelab monitoring agent: run a requested apt action
+Description=Midnights Monitoring agent: run a requested apt action
 Documentation=https://github.com/midnights-ra1n/homelab-management
 After=network-online.target
 

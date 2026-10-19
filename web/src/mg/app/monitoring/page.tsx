@@ -15,7 +15,7 @@ export default function MonitoringPage() {
     <>
       <PageHeader
         title={tr("Supervision centralisée")}
-        description={tr("Résumé de Homelab Monitoring : hôtes équipés de l'agent, sondes et mises à jour. Le détail reste dans le tableau de bord du monitoring.")}
+        description={tr("Résumé de Midnights Monitoring : hôtes équipés de l'agent, sondes et mises à jour. Le détail reste dans le tableau de bord du monitoring.")}
         actions={
           <>
             {monitoringUrl && (
@@ -48,7 +48,7 @@ function Sections() {
         <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-dashed border-line px-5 py-5 sm:flex-row sm:items-center sm:px-6">
           <p className="text-sm text-body">
             {tr("Connecte ")}
-            <span className="text-h1">Homelab Monitoring</span>{" "}
+            <span className="text-h1">Midnights Monitoring</span>{" "}
             {tr("(URL + jeton d'API) pour suivre les hôtes, les sondes, les certificats et les mises à jour, et relier les agents à l'inventaire.")}
           </p>
           <ButtonLink href="/parametres#integrations" variant="secondary" size="sm" icon={<Settings size={14} />}>
@@ -58,7 +58,7 @@ function Sections() {
       )}
       {configured && (
         <>
-          <Suspense fallback={<SectionSkeleton title="Homelab Monitoring" />}>
+          <Suspense fallback={<SectionSkeleton title="Midnights Monitoring" />}>
             <HlmOverview />
           </Suspense>
           <Suspense fallback={<SectionSkeleton title={tr("Mises à jour")} />}>

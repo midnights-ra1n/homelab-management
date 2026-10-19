@@ -8,12 +8,13 @@ import { Meter } from "@/components/ui/meter";
 import { SectionTitle } from "@/components/ui/page-header";
 import { Stat } from "@/components/ui/stat";
 import { hlmKind, StatusIcon, statusTone, type StatusKind } from "@/components/status-icon";
-import { fetchHlm, fetchProxmox, machineKeys } from "@/lib/integrations";
+import { fetchHlm, fetchProxmox, machineKeys, summarize } from "@/lib/integrations";
 import { pctOf, probeKind, type HlmMonitor } from "@/lib/integrations/hlm";
 import { collectAlerts } from "@/lib/monitor/alerts";
 import { formatPct } from "@/lib/monitor/format";
 import { cn, daysUntil } from "@/lib/utils";
 import { UptimeBars } from "./charts";
+import { BandwidthChart, BandwidthFigures } from "../../../shared/bandwidth";
 import { getT } from "@/i18n/server";
 
 const SOON_DAYS = 21;
@@ -24,19 +25,30 @@ const RANK: Record<StatusKind, number> = { down: 0, warn: 1, pending: 2, mainten
 
 /* Bandeau d'état global ------------------------------------------------------ */
 
-/** État de toute l'infrastructure suivie par Homelab Monitoring + lien vers sa page de statut. */
+/** État de toute l'infrastructure suivie par Midnights Monitoring + lien vers sa page de statut. */
 export function StatusHero() {
   const tr = use(getT());
-  const [{ alerts }, hlm] = [use(collectAlerts(tr)), use(fetchHlm())];
+  const [{ m, alerts }, hlm] = [use(collectAlerts(tr)), use(fetchHlm())];
   const red = alerts.filter((a) => a.tone === "red");
-  const kind: StatusKind = red.length ? "down" : alerts.length ? "warn" : "ok";
+  // Nothing followed (no integration, or no probe nor host yet): neutral, never "all is well".
+  const empty = !alerts.length && m.monitored === 0;
+  const kind: StatusKind = red.length ? "down" : alerts.length ? "warn" : empty ? "pending" : "ok";
   const tone = statusTone(kind);
   const title =
     kind === "down"
       ? tr("{n} problème(s) en cours", { n: red.length })
       : kind === "warn"
         ? tr("Opérationnel, {n} point(s) à surveiller", { n: alerts.length })
-        : tr("Tous les services sont opérationnels");
+        : !empty
+          ? tr("Tous les services sont opérationnels")
+          : m.configured
+            ? tr("Rien n'est encore surveillé")
+            : tr("Supervision non configurée");
+  const quiet = !empty
+    ? tr("Aucune alerte sur les sondes, les hôtes, les conteneurs et les mises à jour.")
+    : m.configured
+      ? tr("Ajoute des sondes ou installe l'agent sur tes hôtes dans Midnights Monitoring : leur état apparaîtra ici.")
+      : tr("Aucune sonde ni aucun hôte n'est suivi : connecte Midnights Monitoring pour voir l'état de l'infrastructure.");
   return (
     <div
       className="flex flex-col gap-5 rounded-xl border px-5 py-5 sm:px-6 md:flex-row md:items-center md:justify-between"
@@ -60,7 +72,7 @@ export function StatusHero() {
               {alerts.length > 4 && <li className="text-xs text-meta">{tr("+ {n} autre(s)", { n: alerts.length - 4 })}</li>}
             </ul>
           ) : (
-            <p className="text-sm text-body">{tr("Aucune alerte sur les sondes, les hôtes, les conteneurs et les mises à jour.")}</p>
+            <p className="text-sm text-body">{quiet}</p>
           )}
         </div>
       </div>
@@ -77,7 +89,7 @@ export function StatusHero() {
   );
 }
 
-/* Homelab Monitoring : résumé ---------------------------------------------- */
+/* Midnights Monitoring : résumé ---------------------------------------------- */
 
 function uptime90(m: HlmMonitor) {
   const known = (m.days ?? []).filter((d) => d.uptime !== null);
@@ -105,6 +117,7 @@ export function HlmOverview() {
   const uptimes = activeProbes.map(uptime90).filter((u): u is number => u !== null);
   const certs = probes.filter((m) => m.cert_expires_at);
   const expiring = certs.filter((m) => certDaysLeft(m)! < SOON_DAYS);
+  const bandwidth = summarize(sources).bandwidth;
 
   return (
     <section aria-labelledby="hlm-title" className="grid gap-5">
@@ -126,7 +139,7 @@ export function HlmOverview() {
           )
         }
       >
-        Homelab Monitoring
+        Midnights Monitoring
       </SectionTitle>
       {sources
         .filter((s) => !s.ok)
@@ -212,11 +225,32 @@ export function HlmOverview() {
         </Link>
       )}
 
+      {bandwidth.length > 0 && (
+        <div className="grid gap-3">
+          <p className="mm-label-caps">{tr("Bande passante (24 h)")}</p>
+          <ul className="grid gap-3 lg:grid-cols-2">
+            {bandwidth.map((l) => (
+              <li key={`${l.url}|${l.target}|${l.interface}`} className="grid gap-3 rounded-xl border border-line-subtle bg-box p-4">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <StatusIcon kind={hlmKind(l.status)} size={18} />
+                  <a href={`${l.url}/bandwidth`} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-mono font-medium text-h1 no-underline hover:text-accent-text">
+                    {l.interface}
+                  </a>
+                  <span className="shrink-0 truncate font-mono text-xs text-meta">{sources.length > 1 ? `${l.source} · ${l.target}` : l.target}</span>
+                </div>
+                <BandwidthFigures l={l} compact />
+                {(l.in || l.out) && <BandwidthChart t={l.t} l={l} height={120} />}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {hosts.length > 0 && (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {hosts.slice(0, MAX_HOSTS).map((h) => {
             const node = machineKeys(h.name, h.info?.hostname).map((k) => nodes.get(k)).find(Boolean);
-            const live = h.kind !== "down" && h.last_seen > 0 && h.latest;
+            const live = h.kind !== "down" && h.ping == null && h.last_seen > 0 && h.latest;
             return (
               <li key={h.key} className="grid gap-3 rounded-xl border border-line-subtle bg-box p-4">
                 <div className="flex min-w-0 items-center gap-2.5">
@@ -238,7 +272,9 @@ export function HlmOverview() {
                     <Meter size="sm" label={tr("Disque")} value={pctOf(h.latest!.disk_used, h.latest!.disk_total)} />
                   </div>
                 ) : (
-                  <p className="text-xs text-meta">{tr("Aucune donnée récente de l'agent.")}</p>
+                  <p className="text-xs text-meta">
+                    {h.ping === true ? tr("Agent injoignable · hôte en ligne.") : h.ping === false ? tr("Hors ligne · injoignable.") : tr("Aucune donnée récente de l'agent.")}
+                  </p>
                 )}
               </li>
             );
@@ -259,7 +295,7 @@ export function HlmOverview() {
 
 /* Mises à jour : résumé ----------------------------------------------------- */
 
-/** Mises à jour relevées par les agents de Homelab Monitoring. */
+/** Mises à jour relevées par les agents de Midnights Monitoring. */
 export function UpdatesSummary() {
   const tr = use(getT());
   const hlm = use(fetchHlm());
@@ -269,7 +305,7 @@ export function UpdatesSummary() {
       .map((h) => ({
         key: `h${s.id}:${h.id}`,
         name: h.name,
-        source: hlm.length > 1 ? s.name : "Homelab Monitoring",
+        source: hlm.length > 1 ? s.name : "Midnights Monitoring",
         pending: h.updates!.pending,
         security: h.updates!.security,
         reboot: h.updates!.reboot_required,
@@ -289,7 +325,7 @@ export function UpdatesSummary() {
           <div className="flex flex-wrap justify-end gap-1">
             {hlm.map((s) => (
               <ButtonLink key={s.id} href={`${s.url}/updates`} target="_blank" rel="noreferrer" variant="ghost" size="sm" icon={<ExternalLink size={13} />}>
-                {hlm.length > 1 ? s.name : "Homelab Monitoring"}
+                {hlm.length > 1 ? s.name : "Midnights Monitoring"}
               </ButtonLink>
             ))}
           </div>

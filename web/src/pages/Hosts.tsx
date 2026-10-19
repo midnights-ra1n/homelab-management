@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, Cpu, HardDrive, KeyRound, MemoryStick, Plus, Server, Thermometer, Trash2, Users } from "lucide-react";
-import { api, fmtAgo, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostSeries, type Install } from "../api";
+import { api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostSeries, type Install } from "../api";
 import {
   Alert, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Link, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
   Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, usePoll, useTitle, useToast,
@@ -44,7 +44,7 @@ export function HostsPage() {
                       <span className="mm-list__meta block truncate font-mono">CPU {fmtPct(h.latest.cpu)} · RAM {fmtPct(pct(h.latest.mem_used, h.latest.mem_total))}</span>
                     </span>
                   </span>
-                  <StatusBadge status={h.status} />
+                  <StatusBadge status={h.status} label={hostStatusLabel(h)} />
                 </Link>
               </li>
             ))}
@@ -64,7 +64,7 @@ export function HostsPage() {
                         </span>
                       </Link>
                     </td>
-                    <td><StatusBadge status={h.status} /></td>
+                    <td><StatusBadge status={h.status} label={hostStatusLabel(h)} /></td>
                     <td className="mm-col-muted max-w-56 truncate">{h.info.os || "—"}</td>
                     <td className="mm-col-num font-mono text-xs">{fmtPct(h.latest.cpu)}</td>
                     <td className="mm-col-num font-mono text-xs">{fmtPct(pct(h.latest.mem_used, h.latest.mem_total))}</td>
@@ -130,7 +130,7 @@ export function HostDetailPage({ id }: { id: number }) {
       <PageHeader
         crumbs={<><Link to="/hosts" className="text-meta no-underline hover:text-accent-text">Hôtes</Link><ChevronRight size={14} aria-hidden /><span className="text-h2">{h.name}</span></>}
         title={<span className="flex items-center gap-3"><StatusIcon status={h.status} size={26} />{h.name}</span>}
-        description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} />{h.info.os && <Tag>{h.info.os}</Tag>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
+        description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.info.os && <Tag>{h.info.os}</Tag>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
         actions={<>
           <Switch label="Maintenance" checked={h.maintenance} onChange={(v) => update({ maintenance: v })} />
           <Button variant="secondary" icon={<KeyRound size={16} />} onClick={() => api.post<{ install: Install }>(`/api/hosts/${id}/token`).then((r) => setInstall(r.install))}>Régénérer le jeton</Button>

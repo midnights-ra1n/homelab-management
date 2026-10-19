@@ -1,24 +1,81 @@
-# API Homelab Monitoring — v1
+# API Midnights Monitoring — v1
 
-API REST intégrée au hub, pour exposer les données de supervision à un autre outil (par exemple un tableau de bord de gestion du homelab). Elle est servie par le même conteneur, sur le même port, sous le préfixe `/api/v1`.
+API REST intégrée au hub Midnights Monitoring. Elle expose les données de supervision (hôtes, sondes, mises à jour, disques, conteneurs, rapports, énergie) à d'autres outils : Midnights Management, un script, une app iOS / macOS, un tableau de bord. Elle est servie par le même conteneur, sur le même port, sous le préfixe `/api/v1`.
 
 - **Désactivée par défaut.** Activez-la dans *Réglages → API*. Tant qu'elle est désactivée, toutes les routes répondent `404`.
 - **Authentification par jeton uniquement.** Le cookie de session du tableau de bord n'est jamais accepté sur `/api/v1`.
-- **Lecture seule**, à l'exception de la mise en maintenance (scope `maintenance:write`).
-- Réponses en JSON UTF-8, horodatages en **secondes Unix** (sauf mention contraire).
+- **Surtout en lecture.** Les écritures se limitent à la maintenance, à l'inscription d'hôtes, aux appareils pour les notifications push et aux préférences partagées, chacune derrière son propre scope.
+- **JSON UTF-8**, horodatages en **secondes Unix** (sauf mention contraire, voir [Conventions](#conventions)).
+- Seul le rôle **monitoring** expose cette API. Midnights Management (rôle gestion) la consomme mais n'en publie pas.
+
+> **Vous développez une app iOS, iPadOS ou macOS ?** Lisez ensuite le [guide Apple](API-APPLE.md) : modèles `Codable` complets, client Swift, notifications push, widgets interactifs et synchronisation des préférences.
 
 ## Sommaire
 
-1. [Jetons](#jetons)
-2. [Authentification](#authentification)
-3. [Scopes](#scopes)
-4. [Erreurs et limites](#erreurs-et-limites)
-5. [Appels depuis un navigateur (CORS)](#appels-depuis-un-navigateur-cors)
-6. [Valeurs d'état](#valeurs-détat)
-7. [Routes](#routes)
-8. [Exemples d'intégration](#exemples-dintégration)
-9. [Sécurité](#sécurité)
-10. [Versionnement](#versionnement)
+1. [Démarrage rapide](#démarrage-rapide)
+2. [Conventions](#conventions)
+3. [Jetons](#jetons)
+4. [Authentification](#authentification)
+5. [Scopes](#scopes)
+6. [Erreurs et limites](#erreurs-et-limites)
+7. [Appels depuis un navigateur (CORS)](#appels-depuis-un-navigateur-cors)
+8. [Valeurs d'état](#valeurs-détat)
+9. [Index des routes](#index-des-routes)
+10. [Routes](#routes)
+11. [Applications Apple (iOS, macOS)](#applications-apple-ios-macos)
+12. [Exemples d'intégration](#exemples-dintégration)
+13. [Sécurité](#sécurité)
+14. [Versionnement](#versionnement)
+15. [Historique](#historique)
+
+## Démarrage rapide
+
+1. Dans le monitoring, *Réglages → API* : activez l'API et enregistrez.
+2. *Créer un jeton* : donnez-lui un nom (celui de l'outil), une expiration et le scope `status:read`. Copiez le jeton : il ne sera plus affiché.
+3. Appelez la route d'état :
+
+```sh
+export HLM_URL=https://monitoring.example.fr HLM_TOKEN=hlm_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+curl -fsS -H "Authorization: Bearer $HLM_TOKEN" "$HLM_URL/api/v1/status"
+```
+
+```json
+{ "status": "operational", "hosts": { "total": 5, "by_status": { "operational": 5 } }, "monitors": { "total": 12, "by_status": { "operational": 12 } }, "time": 1792046280 }
+```
+
+4. Ajoutez ensuite au jeton (ou à un nouveau jeton) les scopes dont votre outil a besoin, et seulement ceux-là.
+
+## Conventions
+
+**URL de base.** `https://<hub>/api/v1`. Derrière un reverse proxy, c'est l'adresse publique du hub (celle de `HLT_PUBLIC_URL` si elle est définie).
+
+**Corps des requêtes.** JSON, avec l'en-tête `Content-Type: application/json` (sinon `415`). Les champs inconnus sont refusés (`400`) : n'envoyez que les champs documentés. Taille maximale 4 Mo (16 Ko pour les préférences), au-delà `413`.
+
+**Réponses.** Toujours du JSON, sauf `204 No Content` (corps vide). Les listes sont renvoyées en entier, sans pagination : elles restent petites (quelques dizaines d'éléments dans un homelab). Les listes renvoyées par une route (`/hosts`, `/monitors`…) valent `[]` quand elles sont vides ; une liste imbriquée peut être absente ou `null` : prévoyez les deux.
+
+**Noms de champs.** `snake_case`. Attention aux conversions automatiques en `camelCase` (Swift `convertFromSnakeCase`, certains réglages Kotlin ou TypeScript) : elles réécrivent aussi les clés des **dictionnaires** (`by_status`, préférences), qui sont des données et pas des noms de champs. Déclarez plutôt la correspondance champ par champ (`CodingKeys` en Swift, voir le [guide Apple](API-APPLE.md#modèles-codable)).
+
+**Valeurs absentes.** Un champ documenté comme facultatif peut être absent **ou** `null` : traitez les deux de la même façon. Une mesure inconnue vaut `null`, jamais `0`.
+
+**Horodatages et unités.**
+
+| Donnée | Format |
+|---|---|
+| Horodatages (`last_seen`, `created_at`, `time`, `t[]`, `day`, `at`…) | secondes Unix, UTC |
+| `last_check` (sondes), `recent[].ts` (résultats) | **millisecondes** Unix |
+| `started_at` (conteneurs) | texte ISO 8601 |
+| Jours (`days[].day`, `reports/energy.days[]`) | minuit **UTC** du jour, en secondes |
+| Octets (mémoire, disques, `mem_used`…) | entiers, en octets |
+| Débits réseau des hôtes (`net_rx`, `net_tx`) | octets par seconde |
+| Débits SNMP (`snmp_mode` `in` / `out`) | Mbit/s |
+| Pourcentages (`cpu`, `mem`, `wear_used_pct`) | 0 à 100 |
+| Disponibilité (`uptime`, `availability`) | 0 à 1 |
+| Puissance / énergie | W / Wh |
+| Températures | °C |
+
+**Textes.** Les messages (`message`, `summary`, `reasons`, erreurs) sont en français et destinés à être affichés tels quels. Ne les analysez pas : utilisez les champs structurés (`status`, `health`…).
+
+**Identifiants.** Entiers positifs, stables tant que l'élément existe. Après une suppression, le même numéro peut être réattribué à un nouvel élément : ne gardez pas d'identifiant en cache sans vérifier le nom.
 
 ## Jetons
 
@@ -50,16 +107,19 @@ En HTTP (sans reverse proxy HTTPS), le jeton circule en clair : réservez cet us
 
 | Scope | Routes |
 |---|---|
-| `status:read` | `GET /api/v1/status` |
+| `status:read` | `GET /api/v1/status`, `GET /api/v1/widgets` |
 | `hosts:read` | `GET /api/v1/hosts`, `GET /api/v1/hosts/{id}` |
 | `hosts:write` | `POST /api/v1/hosts` (enregistrement d'un hôte depuis un outil d'automatisation), `DELETE /api/v1/hosts/{id}` (décommissionnement depuis la gestion) |
 | `metrics:read` | `GET /api/v1/hosts/{id}/metrics` |
-| `monitors:read` | `GET /api/v1/monitors`, `GET /api/v1/monitors/{id}`, `GET /api/v1/monitors/{id}/results` |
+| `monitors:read` | `GET /api/v1/monitors`, `GET /api/v1/monitors/{id}`, `GET /api/v1/monitors/{id}/results`, `GET /api/v1/bandwidth`, `GET /api/v1/bandwidth/live` |
 | `updates:read` | `GET /api/v1/updates` |
 | `smart:read` | `GET /api/v1/disks` |
 | `docker:read` | `GET /api/v1/containers` |
 | `reports:read` | `GET /api/v1/reports/monthly`, `GET /api/v1/reports/energy` |
 | `maintenance:write` | `PUT /api/v1/hosts/{id}/maintenance`, `PUT /api/v1/monitors/{id}/maintenance` |
+| `push:write` | `POST /api/v1/devices`, `DELETE /api/v1/devices/{token}` (notifications push de l'app iOS / macOS) |
+| `preferences:read` | `GET /api/v1/preferences` |
+| `preferences:write` | `PUT /api/v1/preferences` |
 
 Donnez à chaque jeton le minimum nécessaire. Un tableau de bord qui n'affiche que l'état global n'a besoin que de `status:read`.
 
@@ -75,12 +135,19 @@ Les erreurs ont toujours la forme :
 |---|---|
 | `200` | Succès |
 | `204` | Succès sans contenu (pré-vol CORS) |
+| `201` | Créé |
 | `400` | Paramètre ou corps invalide (le message énonce la règle attendue) |
 | `401` | Jeton absent, invalide, révoqué ou expiré |
 | `403` | Jeton valide sans le scope requis |
 | `404` | Ressource inconnue, ou API désactivée |
+| `409` | Conflit : nom déjà pris, action déjà en cours, agent non connecté |
+| `413` | Corps trop volumineux |
+| `415` | En-tête `Content-Type: application/json` manquant |
 | `429` | Trop de requêtes. Respectez l'en-tête `Retry-After` (secondes) |
 | `500` | Erreur interne (détail dans les journaux du hub) |
+| `502` | L'agent n'a pas pu être joint pour transmettre une action |
+
+**Bonnes pratiques côté client.** Réessayez seulement les `429` (après `Retry-After`), les `502` et les erreurs réseau, avec un délai croissant. Ne réessayez pas les `4xx` : la requête ne passera pas mieux. Sur `401`, demandez un nouveau jeton à l'utilisateur.
 
 - **600 requêtes par minute et par jeton.**
 - Les jetons invalides sont aussi limités par adresse IP (protection contre la recherche de jetons).
@@ -104,11 +171,42 @@ Utilisées par les hôtes, les sondes et l'état global (de la meilleure à la p
 | `operational` | Opérationnel |
 | `maintenance` | Maintenance |
 | `degraded` | Performances dégradées (réponse lente, disque ou mémoire ≥ 95 %) |
-| `minor_outage` | Panne partielle (service joignable mais réponse incorrecte) |
-| `major_outage` | Panne majeure (injoignable, agent silencieux, certificat expiré) |
+| `minor_outage` | Panne partielle (service joignable mais réponse incorrecte ; hôte dont l'agent est injoignable mais qui répond au ping) |
+| `major_outage` | Panne majeure (injoignable : ni agent ni ping, certificat expiré) |
 | `unknown` | Pas encore vérifié |
 
 L'état global est le pire état parmi les hôtes et les sondes actives.
+
+## Index des routes
+
+| Méthode | Chemin | Scope | Rôle |
+|---|---|---|---|
+| `GET` | [`/status`](#get-apiv1status) | `status:read` | État global et comptes par état |
+| `GET` | [`/widgets`](#get-apiv1widgets) | `status:read` | Résumé compact pour widgets : état, problèmes, puissance |
+| `GET` | [`/hosts`](#get-apiv1hosts) | `hosts:read` | Hôtes et dernières mesures |
+| `POST` | [`/hosts`](#post-apiv1hosts) | `hosts:write` | Inscrire un hôte, obtenir la commande d'installation de l'agent |
+| `GET` | [`/hosts/{id}`](#get-apiv1hostsid) | `hosts:read` | Un hôte, avec la liste des paquets |
+| `DELETE` | [`/hosts/{id}`](#delete-apiv1hostsid) | `hosts:write` | Supprimer un hôte |
+| `POST` | [`/hosts/{id}/agent-update`](#post-apiv1hostsidagent-update) | `hosts:write` | Demander la mise à jour de l'agent |
+| `GET` | [`/hosts/{id}/metrics`](#get-apiv1hostsidmetricsrange24h) | `metrics:read` | Historique des métriques |
+| `PUT` | [`/hosts/{id}/maintenance`](#put-apiv1hostsidmaintenance) | `maintenance:write` | Maintenance d'un hôte |
+| `GET` | [`/monitors`](#get-apiv1monitors) | `monitors:read` | Sondes et disponibilité sur 90 jours |
+| `GET` | [`/monitors/{id}`](#get-apiv1monitorsid) | `monitors:read` | Une sonde |
+| `GET` | [`/monitors/{id}/results`](#get-apiv1monitorsidresultsrange24h) | `monitors:read` | Latence, valeurs et dernières vérifications |
+| `GET` | [`/bandwidth`](#get-apiv1bandwidthrange24h) | `monitors:read` | Bande passante et état des interfaces (sondes SNMP) |
+| `GET` | [`/bandwidth/live`](#get-apiv1bandwidthlive) | `monitors:read` | Débits lus à l'instant sur les équipements |
+| `PUT` | [`/monitors/{id}/maintenance`](#put-apiv1monitorsidmaintenance) | `maintenance:write` | Maintenance d'une sonde |
+| `GET` | [`/updates`](#get-apiv1updates) | `updates:read` | Mises à jour en attente |
+| `GET` | [`/disks`](#get-apiv1disks) | `smart:read` | Santé SMART des disques |
+| `GET` | [`/containers`](#get-apiv1containers) | `docker:read` | Conteneurs Docker |
+| `GET` | [`/reports/monthly`](#get-apiv1reportsmonthlymonth2026-09) | `reports:read` | Rapport mensuel |
+| `GET` | [`/reports/energy`](#get-apiv1reportsenergydays30) | `reports:read` | Consommation électrique |
+| `POST` | [`/devices`](#post-apiv1devices) | `push:write` | Inscrire un appareil Apple aux notifications push |
+| `DELETE` | [`/devices/{token}`](#post-apiv1devices) | `push:write` | Désinscrire un appareil |
+| `GET` | [`/preferences`](#get-apiv1preferences-et-put-apiv1preferences) | `preferences:read` | Préférences partagées avec le web |
+| `PUT` | [`/preferences`](#get-apiv1preferences-et-put-apiv1preferences) | `preferences:write` | Modifier des préférences (fusion par clé) |
+
+Chemins relatifs à `/api/v1`. `OPTIONS` répond aux pré-vols CORS sur toutes les routes.
 
 ## Routes
 
@@ -170,6 +268,11 @@ Scope `hosts:read`. Liste des hôtes équipés de l'agent, triée par nom. Ajout
 | `last_seen` | dernière mesure reçue ; `0` si l'agent ne s'est jamais connecté |
 | `connected` | l'agent a une connexion ouverte en ce moment |
 | `updates` | `null` tant que l'agent n'a rien remonté (ou système sans apt) |
+| `info` | inventaire relevé par l'agent au démarrage. En plus des champs ci-dessus : `os_version`, `cpu_threads`, `cpu_physical`, `cpu_sockets`, `virtualization` (`kvm`, `vmware`, `microsoft`, `xen`, `oracle`, `lxc`, `docker`… ou vide sur une machine physique), `manufacturer`, `model`, `serial`, `install` (`deb` ou `script`), `ips[]` (`iface`, `address`, `prefix`, `mac`), `nics[]` (`name`, `mac`, `speed_mbps`), `disks[]` (`name`, `model`, `size_bytes`, `rotational`, `kind`). Tous facultatifs |
+| `action` | dernière action lancée depuis le tableau de bord ou l'API : `action` (`check_updates`, `apply_updates`, `update_agent`, `update_container`), `target`, `state` (`pending`, `running`, `done`, `failed`), `message`, `at` ; `null` si aucune |
+| `docker` | conteneurs de l'hôte (format de [`/containers`](#get-apiv1containers)), `null` sans Docker |
+| `agent_latest`, `agent_outdated` | dernière version publiée de l'agent (vide si inconnue) et `true` si l'agent de l'hôte est plus ancien |
+| `ping` | agent silencieux : `true` si l'hôte répond encore au ping (état `minor_outage`, « agent injoignable, hôte en ligne »), `false` s'il ne répond pas (`major_outage`, « hors ligne ») ; `null` quand l'agent répond ou que le ping n'a pas pu être tenté (pas d'IPv4, ICMP non autorisé) |
 
 ### `DELETE /api/v1/hosts/{id}`
 
@@ -218,6 +321,13 @@ Scope `hosts:read`. Un hôte, au même format, avec `updates.packages` :
 ```
 
 `404` si l'hôte n'existe pas.
+
+### `POST /api/v1/hosts/{id}/agent-update`
+
+Scope `hosts:write`. Demande à l'agent de se mettre à jour vers la dernière version publiée. Pas de corps. Réponse `200` : l'hôte au format de `GET /hosts/{id}`, avec `action.state` à `pending`. Suivez la progression en relisant l'hôte (`action.state` passe à `running` puis `done` ou `failed`).
+
+- `409` si l'agent n'est pas connecté, ou si une action est déjà en cours sur l'hôte.
+- `502` si l'agent n'a pas pu recevoir la demande.
 
 ### `GET /api/v1/hosts/{id}/metrics?range=24h`
 
@@ -288,7 +398,7 @@ Scope `monitors:read`. Toutes les sondes, avec la disponibilité des 90 derniers
 | Champ | Remarque |
 |---|---|
 | `type` | `http`, `tcp`, `dns`, `ssl`, `snmp` ou `meross` (prise connectée) |
-| `config` | dépend du type : `method`, `expected_status`, `keyword`, `ignore_tls`, `check_ssl`, `degraded_ms`, `dns_server`, `record_type`, `expected`, `warn_days`, `failure_threshold` ; `snmp` : `oid`, `snmp_version`, `snmp_user`, `auth_proto`, `priv_proto`, `unit` ; `meross` : `channel` ; `snmp` et `meross` : `min_value`, `max_value` (seuils, au-delà l'état passe à `degraded`). Les secrets SNMP (`community`, `auth_pass`, `priv_pass`) ne sont jamais renvoyés |
+| `config` | dépend du type : `method`, `expected_status`, `keyword`, `ignore_tls`, `check_ssl`, `degraded_ms`, `dns_server`, `record_type`, `expected`, `warn_days`, `failure_threshold` ; `snmp` : `snmp_mode` (vide : un `oid` ; `in` / `out` : débit d'une interface en Mbit/s ; `ifstatus` : état d'une interface, par exemple un tunnel WireGuard), `interface`, `max_percent` (`in` / `out` : état `degraded` au-delà de ce pourcentage de la vitesse du lien), `idle_minutes` (`ifstatus` : panne si rien n'a été reçu sur l'interface depuis ce nombre de minutes, pour détecter un tunnel WireGuard coupé), `oid`, `snmp_version`, `snmp_user`, `auth_proto`, `priv_proto`, `unit` ; `meross` : `channel` ; `snmp` et `meross` : `min_value`, `max_value` (seuils, au-delà l'état passe à `degraded`). Les secrets SNMP (`community`, `auth_pass`, `priv_pass`) ne sont jamais renvoyés |
 | `message` | pour `meross`, la mesure lisible (`120,5 W · 230,1 V · 0,54 A`) ; pour `snmp`, la valeur lue |
 | `last_check` | **millisecondes** Unix |
 | `latency_ms` | dernière latence, `null` en cas d'échec |
@@ -316,6 +426,80 @@ Scope `monitors:read`. Latence et valeur moyennes par tranche (environ 300 point
 ```
 
 `t` en secondes, `recent[].ts` en millisecondes.
+
+### `GET /api/v1/bandwidth?range=24h`
+
+Scope `monitors:read`. Les sondes SNMP qui lisent une interface (`snmp_mode` `in`, `out` ou `ifstatus`), regroupées par équipement (`target`) et nom d'interface (sans tenir compte de la casse). C'est la vue affichée par la page *Bande passante* et les tableaux de bord du monitoring et de la gestion. `range` : `1h`, `6h`, `24h` (défaut), `7d`, `30d`, `90d`. Seules les sondes actives sont prises en compte.
+
+```json
+{
+  "range": "24h",
+  "t": [1791960000, 1791960720],
+  "days": [1789336800, 1789423200],
+  "links": [
+    {
+      "target": "192.168.0.1",
+      "interface": "WAN1",
+      "status": "operational",
+      "speed_mbps": 1000,
+      "in":  { "monitor_id": 12, "name": "WAN entrant", "status": "operational", "message": "84,2 Mbit/s · 8,4 % du lien (1 000 Mbit/s)", "current_mbps": 84.2, "avg_mbps": 31.5, "peak_mbps": 412.0, "series": [12.4, null],
+               "today_octets": 18400000000, "month_octets": 412000000000, "daily_octets": [10200000000, 18400000000] },
+      "out": { "monitor_id": 13, "name": "WAN sortant", "status": "operational", "message": "6,1 Mbit/s · 0,6 % du lien (1 000 Mbit/s)", "current_mbps": 6.1, "avg_mbps": 4.8, "peak_mbps": 38.9, "series": [3.2, null],
+               "today_octets": 1300000000, "month_octets": 27500000000, "daily_octets": [900000000, 1300000000] },
+      "state": null
+    },
+    {
+      "target": "192.168.0.1",
+      "interface": "wg0",
+      "status": "operational",
+      "speed_mbps": null,
+      "in": null,
+      "out": null,
+      "state": { "monitor_id": 14, "name": "WireGuard", "status": "operational", "message": "Interface wg0 active" }
+    }
+  ]
+}
+```
+
+| Champ | Remarque |
+|---|---|
+| `t` | début de chaque tranche (environ 120 points, 1 minute au minimum), secondes Unix ; `in.series` et `out.series` sont alignés dessus |
+| `days` | les 31 derniers minuits **dans le fuseau horaire du hub** (Configuration), secondes Unix ; `daily_octets` est aligné dessus, le dernier élément est aujourd'hui |
+| `status` | pire état parmi les sondes de l'interface |
+| `speed_mbps` | vitesse de l'interface annoncée par l'équipement (`ifHighSpeed`, sinon `ifSpeed`), `null` tant qu'elle n'a pas été lue depuis le démarrage du hub ou si l'équipement ne la donne pas |
+| `in`, `out` | sondes de débit entrant / sortant, `null` s'il n'y en a pas ; débits en **Mbit/s** (l'interface web les affiche en octets par seconde : `Mbit/s × 125 000`) |
+| `current_mbps` | dernière mesure ; `avg_mbps` : moyenne sur la période ; `peak_mbps` : plus forte mesure de la période (un relevé, c'est-à-dire le débit moyen entre deux contrôles) |
+| `series[]` | moyenne par tranche, `null` sans mesure |
+| `today_octets`, `month_octets` | volume de données en **octets** depuis minuit et depuis le 1er du mois (heure locale du hub). Compté exactement à partir des compteurs de l'équipement à chaque contrôle, puis cumulé par heure ; conservé selon la rétention des agrégats quotidiens (365 jours par défaut) |
+| `daily_octets[]` | volume par jour, aligné sur `days` |
+| `state` | sonde d'état de l'interface (`ifstatus`), par exemple un tunnel WireGuard, sinon `null` |
+
+Créez deux sondes SNMP sur la même interface (mesures « Débit entrant » et « Débit sortant ») pour obtenir les deux sens sur une même ligne.
+
+Précision des mesures :
+
+- un relevé est le débit **moyen entre deux contrôles** ; si l'équipement n'a pas encore rafraîchi son compteur (l'ER605 ne le fait que toutes les 10 à 20 s), la sonde attend le rafraîchissement suivant au lieu d'enregistrer 0 ;
+- les compteurs 64 bits (`ifHCInOctets`) sont utilisés en v2c/v3, les compteurs 32 bits en v1 ou si l'équipement n'a pas mieux ; un passage par zéro d'un compteur 32 bits est compté s'il reste plausible pour la vitesse du lien, sinon il est traité comme un redémarrage ;
+- chaque lecture vérifie que le numéro d'interface désigne toujours la même interface (nom relu en même temps) ; après une renumérotation (redémarrage du routeur, tunnel recréé), elle est retrouvée immédiatement.
+
+### `GET /api/v1/bandwidth/live`
+
+Scope `monitors:read`. Débit actuel de chaque sonde SNMP `in` / `out`, lu **à l'instant** sur l'équipement (sans attendre l'intervalle de la sonde). Pour un affichage en temps réel, appelez cette route toutes les 2 secondes et tracez les valeurs successives ; associez-les aux interfaces de `/bandwidth` par `monitor_id`.
+
+```json
+{
+  "at": 1792046281523,
+  "samples": [
+    { "monitor_id": 12, "mode": "in", "mbps": 84.2 },
+    { "monitor_id": 13, "mode": "out", "mbps": null, "error": "Connexion SNMP impossible : …" }
+  ]
+}
+```
+
+- `at` : instant de la lecture, en **millisecondes** Unix.
+- `mbps` : débit moyen depuis la lecture précédente, en Mbit/s ; `null` en cas d'erreur (`error` l'explique). La première lecture part du dernier relevé de la sonde.
+- **Lecture partagée** : le hub n'interroge pas les équipements plus d'une fois toutes les 1,5 seconde, quel que soit le nombre de pages ou d'apps ouvertes ; un appel plus rapproché reçoit la même lecture (même `at`).
+- Les relevés en temps réel ne sont pas enregistrés : l'historique reste celui des sondes (`/bandwidth`).
 
 ### `PUT /api/v1/monitors/{id}/maintenance`
 
@@ -476,6 +660,109 @@ Scope `reports:read`. Consommation des prises Meross sur les `days` derniers jou
 - Les moyennes ne comptent que les jours mesurés ; semaine = moyenne journalière × 7, mois = × 30,44.
 - L'énergie est estimée à partir de la puissance relevée à chaque vérification (puissance × intervalle) : un intervalle court donne une estimation plus fine.
 
+### `GET /api/v1/widgets`
+
+Scope `status:read`. Un seul appel pour les widgets de l'écran d'accueil : le résumé de `/status`, les éléments en difficulté et la consommation des prises connectées.
+
+```json
+{
+  "status": "minor_outage",
+  "hosts": { "total": 5, "by_status": { "operational": 4, "minor_outage": 1 } },
+  "monitors": { "total": 12, "by_status": { "operational": 12 } },
+  "problems": [
+    { "kind": "host", "id": 2, "name": "nas", "status": "minor_outage", "message": "Agent injoignable, l'hôte répond au ping" }
+  ],
+  "power": { "plugs": 3, "now_w": 182.4, "avg_24h_w": 171.9 },
+  "time": 1792046280
+}
+```
+
+- `problems` : au plus 10 éléments dont l'état est `degraded` ou pire (`kind` vaut `host` ou `monitor`).
+- `power.now_w` : somme des dernières mesures des prises actives ; `avg_24h_w` : somme des moyennes sur 24 h ; `null` sans mesure.
+
+### `POST /api/v1/devices`
+
+Scope `push:write`. Inscrit un appareil aux notifications push (APNs). À appeler à chaque lancement de l'app avec le `deviceToken` reçu par `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)` : l'appel est idempotent.
+
+```json
+{ "token": "a1b2…(hexadécimal)", "name": "iPhone de Midnights", "sandbox": false }
+```
+
+| Champ | Obligatoire | Règle |
+|---|---|---|
+| `token` | oui | `deviceToken` en hexadécimal (32 à 100 octets, majuscules acceptées, enregistré en minuscules) |
+| `name` | oui | 1 à 100 caractères, affiché dans *Réglages → API → Appareils* |
+| `sandbox` | non (`false`) | `true` pour une app lancée depuis Xcode (environnement APNs de développement), `false` pour TestFlight et l'App Store |
+
+- Un jeton déjà inscrit est mis à jour (nom, environnement, jeton d'API rattaché) : pas de doublon.
+- Réponse `201` : `{ "token": "a1b2…", "push_enabled": true }`. `push_enabled` est `false` tant que le serveur n'a pas de clé APNs.
+- L'appareil est rattaché au jeton d'API : révoquer le jeton désinscrit l'appareil. Un appareil désinstallé (réponse `410` d'Apple) est retiré automatiquement.
+
+`DELETE /api/v1/devices/{token}` désinscrit l'appareil (`204`, y compris s'il n'était pas inscrit). À appeler quand l'utilisateur se déconnecte de l'app ou désactive les notifications.
+
+**Configuration du serveur** (variables d'environnement, puis redémarrage) :
+
+| Variable | Valeur |
+|---|---|
+| `HLT_APNS_KEY` | chemin du fichier `.p8` (Certificates, Identifiers & Profiles → Keys, service *Apple Push Notifications*) |
+| `HLT_APNS_KEY_ID` | identifiant de la clé (10 caractères) |
+| `HLT_APNS_TEAM_ID` | identifiant de l'équipe |
+| `HLT_APNS_TOPIC` | identifiant (bundle id) de l'app, ex. `fr.midnights.monitoring` |
+
+La page *Réglages → API → Appareils* liste les appareils, la dernière erreur d'envoi, et envoie une notification de test.
+
+**Contenu des notifications.** Les changements d'état d'une même fenêtre de regroupement (comme pour les e-mails) produisent une seule notification :
+
+```json
+{
+  "aps": {
+    "alert": { "title": "nas : Panne partielle", "body": "Agent injoignable, l'hôte répond au ping" },
+    "sound": "default", "thread-id": "midnights-monitoring", "mutable-content": 1, "interruption-level": "time-sensitive"
+  },
+  "events": [
+    { "kind": "Hôte", "name": "nas", "from": "operational", "to": "minor_outage", "message": "Agent injoignable, l'hôte répond au ping", "at": 1792046280 }
+  ]
+}
+```
+
+| Champ de `events[]` | Valeurs |
+|---|---|
+| `kind` | `Hôte`, `Sonde`, `Certificat SSL`, `Disque`, `Mises à jour`, `Redémarrage`, `Image Docker`, `Test` (bouton de test). Texte français, utilisable comme libellé |
+| `name` | nom de l'hôte, de la sonde ou du disque concerné |
+| `from`, `to` | états avant / après (voir [Valeurs d'état](#valeurs-détat)) pour `Hôte` et `Sonde` ; absents pour les avertissements (certificat, disque, mises à jour…) |
+| `message` | détail lisible, facultatif |
+| `at` | moment du changement, secondes Unix |
+
+Une notification compte au plus 4 lignes dans `body` ; `events` contient toujours tous les changements.
+
+`interruption-level` vaut `time-sensitive` quand au moins un élément passe en panne (ajoutez la capacité *Time Sensitive Notifications* à l'app), `active` sinon. `events` permet à l'app (ou à une *Notification Service Extension*) d'ouvrir le bon écran et de recharger les widgets (`WidgetCenter.shared.reloadAllTimelines()`).
+
+### `GET /api/v1/preferences` et `PUT /api/v1/preferences`
+
+Scopes `preferences:read` / `preferences:write`. Préférences partagées entre l'interface web et les apps : un objet JSON libre (16 Ko au plus). `PUT` **fusionne** les clés envoyées (une valeur `null` supprime la clé) et renvoie l'objet complet, si bien que deux appareils qui modifient des clés différentes ne s'écrasent pas.
+
+```json
+{ "theme": "dark", "monitors_view": "table", "ios.widget.kind": "power" }
+```
+
+| Clé | Lue par le web | Valeurs |
+|---|---|---|
+| `theme` | oui | `auto`, `light`, `dark` |
+| `monitors_view` | oui | `cards`, `table` |
+| autres | non | libres : préfixez les clés propres à l'app (`ios.…`) |
+
+- Clés : 1 à 64 caractères ; valeurs : tout JSON (texte, nombre, booléen, objet, tableau).
+- `GET` renvoie `{}` tant que rien n'a été enregistré.
+- `400` si une clé est invalide ou si le résultat dépasse 16 Ko ; rien n'est alors enregistré.
+- La fusion porte sur les clés de premier niveau : envoyer `{"ios.widgets": {"kind": "power"}}` remplace tout l'objet `ios.widgets`.
+- Pas de contrôle de version : la dernière écriture d'une clé l'emporte.
+
+Le web relit les préférences à chaque ouverture et enregistre chaque changement de thème ou de vue.
+
+## Applications Apple (iOS, macOS)
+
+Les routes `/widgets`, `/devices` et `/preferences` ont été conçues pour l'app native. Le [guide Apple](API-APPLE.md) décrit l'ensemble : configuration d'Xcode et du serveur, modèles `Codable` de toutes les réponses, client Swift (`async`/`await`), stockage du jeton dans le trousseau, notifications push, widgets interactifs, App Intents et synchronisation des préférences.
+
 ## Exemples d'intégration
 
 ### Shell
@@ -547,3 +834,9 @@ for host in r.json():
 ## Versionnement
 
 Le préfixe `/api/v1` est stable. Des champs peuvent être **ajoutés** aux réponses sans changer de version : ignorez les champs inconnus. Toute suppression ou modification incompatible fera l'objet d'un préfixe `/api/v2`, avec `v1` maintenu en parallèle.
+
+## Historique
+
+| Date | Changement |
+|---|---|
+| 2026-10 | Routes `GET /bandwidth` et `GET /bandwidth/live` (scope `monitors:read`). Routes `GET /widgets`, `POST` / `DELETE /devices`, `GET` / `PUT /preferences` ; scopes `push:write`, `preferences:read`, `preferences:write`. Champ `ping` des hôtes ; un hôte dont l'agent est arrêté mais qui répond au ping passe en `minor_outage` au lieu de `major_outage`. Sondes SNMP : `snmp_mode` et `interface` (débit et état d'interface). Bande passante : `speed_mbps`, `days`, `today_octets`, `month_octets`, `daily_octets` ; `peak_mbps` devient la plus forte mesure de la période. Sondes SNMP : `max_percent`, `idle_minutes`. |

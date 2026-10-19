@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cache, Suspense, use } from "react";
+import { BandwidthFigures } from "../../shared/bandwidth";
 import { Activity, AlertTriangle, ArrowUpRight, Boxes, ClipboardList, Cpu, HardDrive, MemoryStick, Network, Plus, Rocket, Server, ShieldAlert, Zap, PackageCheck } from "lucide-react";
 import { assetCounts, hardwareTotals, storageTotalGb } from "@/lib/data/assets";
 import { deploymentCounts, listDeployments } from "@/lib/data/deployments";
@@ -137,7 +138,7 @@ function Dashboard() {
             <NotConfigured
               overline={tr("Monitoring")}
               title={tr("Aucune instance de monitoring")}
-              text={tr("Connecte Homelab Monitoring : sondes, pannes, certificats et mises à jour remonteront ici.")}
+              text={tr("Connecte Midnights Monitoring : sondes, pannes, certificats et mises à jour remonteront ici.")}
               icon={<Activity size={20} />}
               href="/parametres#integrations"
               cta={tr("Connecter une intégration")}
@@ -232,7 +233,7 @@ function MonitoringWidget() {
     <Card className="h-full">
       <CardHeader
         overline={tr("Monitoring")}
-        title={alerts.length ? tr("{n} point(s) d'attention", { n: alerts.length }) : tr("Tout est au vert")}
+        title={alerts.length ? tr("{n} point(s) d'attention", { n: alerts.length }) : m.monitored ? tr("Tout est au vert") : tr("Rien n'est encore surveillé")}
         actions={
           <ButtonLink href="/monitoring" variant="ghost" size="sm" icon={<ArrowUpRight size={14} />}>
             {tr("Détails")}</ButtonLink>
@@ -254,7 +255,17 @@ function MonitoringWidget() {
             </div>
           ))}
         </dl>
-        {alerts.length === 0 ? (
+        {m.bandwidth.slice(0, 2).map((l) => (
+          <div key={`${l.url}|${l.target}|${l.interface}`} className="grid gap-2">
+            <p className="flex min-w-0 items-center gap-2 text-xs text-meta">
+              <span className="font-mono text-h2">{l.interface}</span> · {tr("bande passante")}
+            </p>
+            <BandwidthFigures l={l} compact />
+          </div>
+        ))}
+        {alerts.length === 0 && m.monitored === 0 ? (
+          <p className="text-sm text-meta">{tr("Ajoute des sondes ou installe l'agent sur tes hôtes dans Midnights Monitoring : leur état apparaîtra ici.")}</p>
+        ) : alerts.length === 0 ? (
           <p className="flex items-center gap-2 text-sm text-green">
             <span aria-hidden="true">✓</span> {tr("Aucune alerte en cours.")}{m.patches.updates > 0 && <span className="text-meta"> · {m.patches.updates} {tr("mise(s) à jour disponibles")}</span>}
           </p>

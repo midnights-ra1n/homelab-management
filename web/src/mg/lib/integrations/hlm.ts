@@ -1,3 +1,5 @@
+import type { Bandwidth } from "../../../api";
+
 
 export type HlmStatus = "operational" | "maintenance" | "degraded" | "minor_outage" | "major_outage" | "unknown";
 
@@ -8,6 +10,8 @@ export type HlmHost = {
   last_seen: number;
   maintenance: boolean;
   connected: boolean;
+  /** Agent silent: did the host answer ping? null when not tried. */
+  ping?: boolean | null;
   info?: { hostname?: string; os?: string; kernel?: string; cpu_model?: string; cpu_cores?: number; boot_time?: number } | null;
   latest?: {
     cpu?: number;
@@ -37,7 +41,8 @@ export type HlmMonitor = {
   days?: { day: number; uptime: number | null; worst: HlmStatus }[]; // 90 jours, minuit UTC, uptime 0–1
 };
 
-export type HlmData = { hosts: HlmHost[]; monitors: HlmMonitor[] };
+/** Same bandwidth view as the monitoring dashboards; absent with an older hub. */
+export type HlmData = { hosts: HlmHost[]; monitors: HlmMonitor[]; bandwidth?: Bandwidth | null };
 
 /** Libellé court du type de sonde (HTTPS distingué de HTTP par la cible). */
 export const probeKind = (m: Pick<HlmMonitor, "type" | "target">) =>

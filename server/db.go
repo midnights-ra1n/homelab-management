@@ -110,6 +110,21 @@ var migrations = []string{
 	ALTER TABLE monitor_daily ADD COLUMN energy_wh REAL NOT NULL DEFAULT 0;`,
 	activityTable,
 	passkeysTable,
+	// Native apps: devices registered for push notifications, removed with their API token.
+	`CREATE TABLE push_devices(
+		token TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		sandbox INTEGER NOT NULL DEFAULT 0,
+		api_token_id INTEGER REFERENCES api_tokens(id) ON DELETE CASCADE,
+		created_at INTEGER NOT NULL,
+		last_push_at INTEGER NOT NULL DEFAULT 0,
+		last_error TEXT NOT NULL DEFAULT '');`,
+	// Traffic volume of the SNMP in/out probes, per hour so days and months follow the local timezone.
+	`CREATE TABLE traffic_hourly(
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		hour INTEGER NOT NULL,
+		octets INTEGER NOT NULL,
+		PRIMARY KEY(monitor_id, hour)) WITHOUT ROWID;`,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's

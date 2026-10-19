@@ -101,7 +101,7 @@ export function AssetForm({
       </Fieldset>
 
       {/* Identité */}
-      <Fieldset id="identite" legend={tr("Identité")} description={tr("Nom affiché dans Homelab Management et nom d'hôte réel de la machine.")}>
+      <Fieldset id="identite" legend={tr("Identité")} description={tr("Nom affiché dans Midnights Management et nom d'hôte réel de la machine.")}>
         <div className="grid gap-5 md:grid-cols-2">
           <TextField
             label={tr("Nom d'affichage")}

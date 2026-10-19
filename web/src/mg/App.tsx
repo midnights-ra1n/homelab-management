@@ -68,7 +68,7 @@ export default function ManagementApp({ session }: { session: Session }) {
 
   const route = match(path);
   useEffect(() => {
-    document.title = route ? `${route.title} · Homelab Management` : "Homelab Management";
+    document.title = route ? `${route.title} · Midnights Management` : "Midnights Management";
   }, [route?.title]);
 
   const searchParams = Object.fromEntries(search.entries());

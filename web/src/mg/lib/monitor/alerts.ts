@@ -6,7 +6,7 @@ import { formatDate } from "../utils";
 
 export type MonitorAlert = { tone: "red" | "yellow"; text: string; href: string };
 
-/** Current alerts from Homelab Monitoring, outages first. */
+/** Current alerts from Midnights Monitoring, outages first. */
 export const collectAlerts = (tr: Translate) => resource("alerts", async () => alertsOf(await monitoringSummary(), tr));
 
 /** Alerts of a fresh read of the monitoring integrations (the alert strip polls it). */

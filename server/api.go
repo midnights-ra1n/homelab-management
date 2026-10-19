@@ -27,6 +27,9 @@ var apiScopes = map[string]string{
 	"docker:read":       "Conteneurs Docker et mises à jour d'images",
 	"reports:read":      "Rapports mensuels",
 	"maintenance:write": "Activer ou désactiver la maintenance d'un hôte ou d'une sonde",
+	"push:write":        "Enregistrer un iPhone, iPad ou Mac pour les notifications push",
+	"preferences:read":  "Lire les préférences partagées avec l'interface web",
+	"preferences:write": "Modifier les préférences partagées avec l'interface web",
 }
 
 const tokenPrefix = "hlm_"
@@ -62,18 +65,30 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/monitors", t("monitors:read", s.handleListMonitors))
 	mux.HandleFunc("GET /api/v1/monitors/{id}", t("monitors:read", s.handleGetMonitor))
 	mux.HandleFunc("GET /api/v1/monitors/{id}/results", t("monitors:read", s.handleMonitorResults))
+	mux.HandleFunc("GET /api/v1/bandwidth", t("monitors:read", s.handleBandwidth))
+	mux.HandleFunc("GET /api/v1/bandwidth/live", t("monitors:read", s.handleLiveBandwidth))
 	mux.HandleFunc("PUT /api/v1/monitors/{id}/maintenance", t("maintenance:write", s.apiMonitorMaintenance))
 	mux.HandleFunc("GET /api/v1/updates", t("updates:read", s.apiUpdates))
 	mux.HandleFunc("GET /api/v1/disks", t("smart:read", s.handleDisks))
 	mux.HandleFunc("GET /api/v1/containers", t("docker:read", s.handleContainers))
 	mux.HandleFunc("GET /api/v1/reports/monthly", t("reports:read", s.handleMonthlyReport))
 	mux.HandleFunc("GET /api/v1/reports/energy", t("reports:read", s.handleEnergyReport))
+	mux.HandleFunc("GET /api/v1/widgets", t("status:read", s.apiWidgets))
+	mux.HandleFunc("POST /api/v1/devices", t("push:write", s.apiRegisterDevice))
+	mux.HandleFunc("DELETE /api/v1/devices/{token}", t("push:write", s.handleDeleteDevice))
+	mux.HandleFunc("GET /api/v1/preferences", t("preferences:read", s.handleGetPreferences))
+	mux.HandleFunc("PUT /api/v1/preferences", t("preferences:write", s.handlePutPreferences))
 	mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, r *http.Request) { writeErr(w, 404, "Route inconnue") })
 
 	auth := s.requireAuth
 	mux.HandleFunc("GET /api/tokens", auth(s.handleListTokens))
 	mux.HandleFunc("POST /api/tokens", auth(s.handleCreateToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", auth(s.handleDeleteToken))
+	mux.HandleFunc("GET /api/devices", auth(s.handleListDevices))
+	mux.HandleFunc("POST /api/devices/test", auth(s.handleTestPush))
+	mux.HandleFunc("DELETE /api/devices/{token}", auth(s.handleDeleteDevice))
+	mux.HandleFunc("GET /api/preferences", auth(s.handleGetPreferences))
+	mux.HandleFunc("PUT /api/preferences", auth(s.handlePutPreferences))
 }
 
 // corsAllowed reports whether a browser on this origin may call the API (setting api_cors_origins).
@@ -154,15 +169,23 @@ func (s *Server) requireToken(scope string, h http.HandlerFunc) http.HandlerFunc
 }
 
 func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
-	hosts, err := s.loadHosts("")
+	sum, _, _, err := s.statusSummary()
 	if err != nil {
 		serverErr(w, err)
 		return
 	}
+	writeJSON(w, 200, sum)
+}
+
+// statusSummary counts hosts and enabled monitors by status (/status and /widgets).
+func (s *Server) statusSummary() (map[string]any, []Host, []Monitor, error) {
+	hosts, err := s.loadHosts("")
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	mons, err := s.loadMonitors("WHERE enabled=1")
 	if err != nil {
-		serverErr(w, err)
-		return
+		return nil, nil, nil, err
 	}
 	count := func(statuses []string) map[string]int {
 		c := map[string]int{}
@@ -178,12 +201,12 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 	for _, m := range mons {
 		ms = append(ms, m.Status)
 	}
-	writeJSON(w, 200, map[string]any{
+	return map[string]any{
 		"status":   overallStatus(append(slices.Clone(hs), ms...)),
 		"hosts":    map[string]any{"total": len(hosts), "by_status": count(hs)},
 		"monitors": map[string]any{"total": len(mons), "by_status": count(ms)},
 		"time":     time.Now().Unix(),
-	})
+	}, hosts, mons, nil
 }
 
 func (s *Server) apiUpdates(w http.ResponseWriter, r *http.Request) {

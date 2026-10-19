@@ -1,5 +1,5 @@
 #!/bin/sh
-# apt actions requested from the Homelab Monitoring dashboard, run as root by
+# apt actions requested from the Midnights Monitoring dashboard, run as root by
 # hlm-agent-apt.path when the agent drops a request file. Root-owned on purpose, and it
 # accepts exactly three words from the unprivileged agent: "refresh" (apt-get update),
 # "upgrade" (apt-get update + upgrade) and "agentdeb" (install the latest hlm-agent .deb of

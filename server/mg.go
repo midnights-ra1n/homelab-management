@@ -22,7 +22,6 @@ import (
 )
 
 type mgState struct {
-	key     []byte // AES-256-GCM key for integration secrets and SSH private keys
 	uploads string
 
 	vncMu sync.Mutex
@@ -40,7 +39,7 @@ var mgSettingDefs = map[string]string{
 	"timezone":          defaultTimezone,
 	"db_max_mb":         "0",
 	"fw_default_policy": "allow",
-	// Inventory items are created / updated from the hosts of the Homelab Monitoring integrations.
+	// Inventory items are created / updated from the hosts of the Midnights Monitoring integrations.
 	"inventory_sync": "true",
 }
 
@@ -58,7 +57,8 @@ func (s *Server) initManagement() error {
 		return err
 	}
 	s.db = db
-	s.mg = &mgState{key: key, uploads: uploads, vnc: map[string]vncSession{}}
+	s.key = key
+	s.mg = &mgState{uploads: uploads, vnc: map[string]vncSession{}}
 	return nil
 }
 
@@ -91,7 +91,7 @@ func loadSecretKey(dir string) ([]byte, error) {
 
 // encrypt / decrypt use homelab-management's format: v1.<iv>.<tag>.<data>, base64 parts.
 func (s *Server) encrypt(plain string) string {
-	block, _ := aes.NewCipher(s.mg.key)
+	block, _ := aes.NewCipher(s.key)
 	gcm, _ := cipher.NewGCM(block)
 	iv := make([]byte, 12)
 	rand.Read(iv)
@@ -113,7 +113,7 @@ func (s *Server) decrypt(payload string) (string, error) {
 	if err := errors.Join(err1, err2, err3); err != nil || len(iv) != 12 {
 		return "", errors.New("secret illisible")
 	}
-	block, _ := aes.NewCipher(s.mg.key)
+	block, _ := aes.NewCipher(s.key)
 	gcm, _ := cipher.NewGCM(block)
 	out, err := gcm.Open(nil, iv, append(data, tag...), nil)
 	if err != nil {
@@ -122,7 +122,7 @@ func (s *Server) decrypt(payload string) (string, error) {
 	return string(out), nil
 }
 
-// monitoringURL is the address of the first Homelab Monitoring integration, for the
+// monitoringURL is the address of the first Midnights Monitoring integration, for the
 // management UI's shortcut to the monitoring dashboard.
 func (s *Server) monitoringURL() string {
 	if s.cfg.Role != RoleManagement {

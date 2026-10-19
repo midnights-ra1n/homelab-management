@@ -1,6 +1,6 @@
 package main
 
-// Homelab Monitoring integration and inventory sync. The agents only talk to the monitoring
+// Midnights Monitoring integration and inventory sync. The agents only talk to the monitoring
 // server (the VPS); this server reads its /api/v1 with a token (scopes hosts:read, plus
 // monitors:read for the probes and hosts:write for decommissioning) and keeps the inventory
 // in step: each monitored host is linked to an inventory item, created when missing, and
@@ -22,13 +22,14 @@ import (
 )
 
 type hlmData struct {
-	Hosts    []map[string]any `json:"hosts"`
-	Monitors []map[string]any `json:"monitors"`
+	Hosts     []map[string]any `json:"hosts"`
+	Monitors  []map[string]any `json:"monitors"`
+	Bandwidth map[string]any   `json:"bandwidth"` // nil with an older hub or a token without monitors:read
 }
 
 func hlmGet(ctx context.Context, i *integration, path string, out any) error {
 	if i.Config.TokenSecret == "" {
-		return integrationErr("Jeton d'API Homelab Monitoring manquant (hlm_…)")
+		return integrationErr("Jeton d'API Midnights Monitoring manquant (hlm_…)")
 	}
 	return httpJSON(ctx, "GET", i.URL+"/api/v1"+path, map[string]string{"Authorization": "Bearer " + i.Config.TokenSecret},
 		strings.NewReader(""), i.Config.verify(true), 10*time.Second, out)
@@ -46,6 +47,13 @@ func (s *Server) hlmData(ctx context.Context, i *integration) (hlmData, error) {
 			return d, err
 		}
 	}
+	// Same view as the monitoring dashboards; a hub older than this route answers 404.
+	if err := hlmGet(ctx, i, "/bandwidth", &d.Bandwidth); err != nil {
+		var ie *integrationError
+		if !errors.As(err, &ie) || (ie.status != 403 && ie.status != 404) {
+			return d, err
+		}
+	}
 	d.Hosts, d.Monitors = nonNil(d.Hosts), nonNil(d.Monitors)
 	return d, nil
 }
@@ -59,6 +67,21 @@ func (s *Server) mgMonitoring(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	writeJSON(w, 200, collect(ctx, list, s.hlmData))
+}
+
+// mgLiveBandwidth relays the live interface rates of each monitoring hub (polled every few seconds).
+func (s *Server) mgLiveBandwidth(w http.ResponseWriter, r *http.Request) {
+	list, err := s.loadIntegrations(`WHERE type = 'hlm' AND enabled = 1`)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	writeJSON(w, 200, collect(ctx, list, func(ctx context.Context, i *integration) (map[string]any, error) {
+		var v map[string]any
+		return v, hlmGet(ctx, i, "/bandwidth/live", &v)
+	}))
 }
 
 // mgAssetMonitoring returns the monitoring view of a linked asset (host with its latest metrics).

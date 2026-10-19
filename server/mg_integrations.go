@@ -1,6 +1,6 @@
 package main
 
-// Integrations (Proxmox VE, Webmin, Homelab Monitoring) and SSH keys. Secrets are stored
+// Integrations (Proxmox VE, Webmin, Midnights Monitoring) and SSH keys. Secrets are stored
 // encrypted (AES-256-GCM) and never sent to the browser.
 
 import (

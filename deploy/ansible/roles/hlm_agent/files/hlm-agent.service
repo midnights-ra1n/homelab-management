@@ -1,5 +1,5 @@
 [Unit]
-Description=Homelab monitoring agent
+Description=Midnights Monitoring agent
 Documentation=https://github.com/midnights-ra1n/homelab-management
 Wants=network-online.target
 After=network-online.target

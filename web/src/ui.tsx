@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import uPlot from "uplot";
 import { CircleAlert, CircleCheck, CirclePause, Clock, Copy, TriangleAlert, Wrench, X } from "lucide-react";
-import { statusLabel, type Day, type Status } from "./api";
+import { savePrefs, statusLabel, type Day, type Status } from "./api";
 
 export function cn(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
@@ -127,7 +127,7 @@ export function ThemeSwitch({ className }: { className?: string }) {
   return (
     <div role="radiogroup" aria-label="Thème" className={cn("mm-segmented", className)}>
       {options.map(([v, l]) => (
-        <button key={v} type="button" role="radio" aria-checked={theme === v} onClick={() => setTheme(v)} className="mm-segmented__item">{l}</button>
+        <button key={v} type="button" role="radio" aria-checked={theme === v} onClick={() => { setTheme(v); savePrefs({ theme: v }); }} className="mm-segmented__item">{l}</button>
       ))}
     </div>
   );
@@ -372,8 +372,8 @@ export function StatusDot({ tone, ping, className }: { tone: Tone; ping?: boolea
   );
 }
 
-export function StatusBadge({ status }: { status: Status }) {
-  return <Badge tone={STATUS_TONE[status]} dot>{statusLabel[status]}</Badge>;
+export function StatusBadge({ status, label }: { status: Status; label?: string }) {
+  return <Badge tone={STATUS_TONE[status]} dot>{label ?? statusLabel[status]}</Badge>;
 }
 
 export type StatusKind = "ok" | "warn" | "down" | "pending" | "paused" | "maintenance";
@@ -732,8 +732,9 @@ export function Chart({ t, series, format, height = 220, max }: {
       cursor: { x: false, y: false, points: { size: 7 } },
       legend: { show: series.length > 1, live: false },
       plugins: [tooltipPlugin(format)],
-      // Widen a near-empty time range so the axis stays readable with one or two samples.
-      scales: { x: { time: true, range: span < 600 && t.length ? [t[0] - 300, t[t.length - 1] + 300] : undefined }, y: { range: (_u, _min, mx) => [0, max ?? Math.max(mx * 1.1, 1)] } },
+      // Widen a near-empty time range so the axis stays readable with one or two samples, only
+      // backwards: the axis must never run past the last sample, into the future.
+      scales: { x: { time: true, range: span < 600 && t.length ? [t[t.length - 1] - 600, t[t.length - 1]] : undefined }, y: { range: (_u, _min, mx) => [0, max ?? Math.max(mx * 1.1, 1)] } },
       axes: [
         { ...axis, grid: { show: false }, values: fmtTime(span) },
         { ...axis, size: 64, values: (_u, vals) => vals.map((v) => format(v)) },
@@ -799,9 +800,9 @@ export const FIELD_ROW = "grid gap-5 sm:grid-cols-2";
 
 /** Product name of this server's role, for the tab title (set once the role is known). */
 export let appName = "Homelab";
-export const setAppName = (role: string) => (appName = role === "management" ? "Homelab Management" : "Homelab Monitoring");
+export const setAppName = (role: string) => (appName = role === "management" ? "Midnights Management" : "Midnights Monitoring");
 
-/** Browser tab title: "Page name · Homelab Monitoring". */
+/** Browser tab title: "Page name · Midnights Monitoring". */
 export function useTitle(name: string | undefined) {
   useEffect(() => {
     if (name !== undefined) document.title = name ? `${name} · ${appName}` : appName;

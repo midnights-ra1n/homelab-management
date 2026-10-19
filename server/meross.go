@@ -41,7 +41,7 @@ func randHex(n int) string {
 // checkMeross reads the instant power of a plug through its local HTTP API.
 func checkMeross(ctx context.Context, m *Monitor, key string) checkResult {
 	if key == "" {
-		return checkResult{StatusUnknown, nil, "Compte Meross non connecté (Configuration → Meross)", nil, nil}
+		return checkResult{StatusUnknown, nil, "Compte Meross non connecté (Configuration → Meross)", nil, nil, 0}
 	}
 	mid, ts := randHex(16), time.Now().Unix()
 	body, _ := json.Marshal(map[string]any{
@@ -51,14 +51,14 @@ func checkMeross(ctx context.Context, m *Monitor, key string) checkResult {
 	})
 	req, err := http.NewRequestWithContext(ctx, "POST", "http://"+m.Target+"/config", bytes.NewReader(body))
 	if err != nil {
-		return checkResult{StatusMajor, nil, err.Error(), nil, nil}
+		return checkResult{StatusMajor, nil, err.Error(), nil, nil, 0}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
-		return checkResult{StatusMajor, nil, "Prise injoignable : " + err.Error(), nil, nil}
+		return checkResult{StatusMajor, nil, "Prise injoignable : " + err.Error(), nil, nil, 0}
 	}
 	defer resp.Body.Close()
 	lat := ms(time.Since(start))
@@ -72,14 +72,14 @@ func checkMeross(ctx context.Context, m *Monitor, key string) checkResult {
 		} `json:"payload"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&out); err != nil || resp.StatusCode != 200 {
-		return checkResult{StatusMinor, lat, fmt.Sprintf("Réponse illisible de la prise (HTTP %d)", resp.StatusCode), nil, nil}
+		return checkResult{StatusMinor, lat, fmt.Sprintf("Réponse illisible de la prise (HTTP %d)", resp.StatusCode), nil, nil, 0}
 	}
 	if e := out.Payload.Error; e != nil {
-		return checkResult{StatusMinor, lat, fmt.Sprintf("Refus de la prise (%d %s) : clé Meross incorrecte ?", e.Code, e.Detail), nil, nil}
+		return checkResult{StatusMinor, lat, fmt.Sprintf("Refus de la prise (%d %s) : clé Meross incorrecte ?", e.Code, e.Detail), nil, nil, 0}
 	}
 	el := out.Payload.Electricity
 	if el == nil {
-		return checkResult{StatusMinor, lat, "Cette prise ne mesure pas la consommation", nil, nil}
+		return checkResult{StatusMinor, lat, "Cette prise ne mesure pas la consommation", nil, nil, 0}
 	}
 	// The plug reports mW, dV and mA.
 	res := valueResult(&m.Config, lat, el.Power/1000, "W")
