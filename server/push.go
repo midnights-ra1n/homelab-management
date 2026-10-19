@@ -312,10 +312,19 @@ func (s *Server) handleListDevices(w http.ResponseWriter, r *http.Request) {
 
 // apiWidgets is one small call for home screen widgets: overall state, what is down and the power draw.
 func (s *Server) apiWidgets(w http.ResponseWriter, r *http.Request) {
-	sum, hosts, mons, err := s.statusSummary()
+	sum, _, err := s.widgets()
 	if err != nil {
 		serverErr(w, err)
 		return
+	}
+	writeJSON(w, 200, sum)
+}
+
+// widgets is the /widgets payload (also the summary of /overview), with the hosts it was built from.
+func (s *Server) widgets() (map[string]any, []Host, error) {
+	sum, hosts, mons, err := s.statusSummary()
+	if err != nil {
+		return nil, nil, err
 	}
 	type item struct {
 		Kind    string `json:"kind"` // host or monitor
@@ -344,11 +353,10 @@ func (s *Server) apiWidgets(w http.ResponseWriter, r *http.Request) {
 		(SELECT AVG(value) FROM monitor_results WHERE monitor_id=m.id AND ts>=?) AS avg
 		FROM monitors m WHERE m.type='meross' AND m.enabled=1)`, time.Now().Add(-24*time.Hour).UnixMilli()).Scan(&plugs, &now, &avg)
 	if err != nil {
-		serverErr(w, err)
-		return
+		return nil, nil, err
 	}
 	sum["power"] = map[string]any{"plugs": plugs, "now_w": now, "avg_24h_w": avg}
-	writeJSON(w, 200, sum)
+	return sum, hosts, nil
 }
 
 const maxPreferences = 16 << 10

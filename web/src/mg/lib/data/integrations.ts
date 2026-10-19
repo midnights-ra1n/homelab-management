@@ -36,6 +36,8 @@ export type IntegrationPublic = Omit<Integration, "config"> & {
     verify_tls?: boolean;
     has_secret: boolean;
     has_header: boolean;
+    has_password?: boolean;
+    has_token?: boolean;
     ssh_key_id?: number;
     ssh_user?: string;
     ssh_port?: number;

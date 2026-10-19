@@ -2,7 +2,7 @@
 
 API REST intégrée au hub Midnights Monitoring. Elle expose les données de supervision (hôtes, sondes, mises à jour, disques, conteneurs, rapports, énergie) à d'autres outils : Midnights Management, un script, une app iOS / macOS, un tableau de bord. Elle est servie par le même conteneur, sur le même port, sous le préfixe `/api/v1`.
 
-- **Désactivée par défaut.** Activez-la dans *Réglages → API*. Tant qu'elle est désactivée, toutes les routes répondent `404`.
+- **Désactivée par défaut pour les jetons créés à la main.** Activez-la dans *Réglages → API* pour un script ou un outil tiers ; tant qu'elle est désactivée, ces jetons reçoivent `404`. L'app iOS / macOS et Midnights Management n'en ont pas besoin : elles se connectent avec un compte ([`POST /auth/login`](#post-apiv1authlogin)), et leurs jetons fonctionnent API désactivée.
 - **Authentification par jeton uniquement.** Le cookie de session du tableau de bord n'est jamais accepté sur `/api/v1`.
 - **Surtout en lecture.** Les écritures se limitent à la maintenance, à l'inscription d'hôtes, aux appareils pour les notifications push et aux préférences partagées, chacune derrière son propre scope.
 - **JSON UTF-8**, horodatages en **secondes Unix** (sauf mention contraire, voir [Conventions](#conventions)).
@@ -29,6 +29,8 @@ API REST intégrée au hub Midnights Monitoring. Elle expose les données de sup
 15. [Historique](#historique)
 
 ## Démarrage rapide
+
+Pour un script ou un outil tiers. Une app ou Midnights Management se connectent plutôt avec un compte, sans rien activer : voir [`POST /auth/login`](#post-apiv1authlogin).
 
 1. Dans le monitoring, *Réglages → API* : activez l'API et enregistrez.
 2. *Créer un jeton* : donnez-lui un nom (celui de l'outil), une expiration et le scope `status:read`. Copiez le jeton : il ne sera plus affiché.
@@ -89,9 +91,16 @@ Dans *Réglages → API → Créer un jeton* :
 
 Le jeton (`hlm_` suivi de 43 caractères base64url) n'est **affiché qu'une seule fois**. Le hub n'en conserve que l'empreinte SHA-256 ; seul le préfixe (`hlm_AbC123…`) reste visible dans la liste. La liste indique aussi la dernière utilisation (précision d'une minute). La révocation est immédiate.
 
+Les jetons obtenus par [connexion d'un compte](#post-apiv1authlogin) apparaissent dans la même liste avec la mention « Connexion de … », sans expiration, et se révoquent de la même façon.
+
 ## Authentification
 
-Chaque requête porte l'en-tête :
+Deux façons d'obtenir un jeton :
+
+- **Connexion avec un compte** (app iOS / macOS, serveur de gestion) : `POST /api/v1/auth/login` échange l'identifiant et le mot de passe d'un compte du monitoring contre un jeton. Ces jetons fonctionnent **même avec l'API désactivée** dans les réglages : la gestion et l'app n'ont rien à activer, et l'API reste fermée aux jetons créés à la main.
+- **Jeton créé à la main** (*Réglages → API → Créer un jeton*) pour les autres outils (scripts, Ansible, tableaux de bord) : il exige que l'API soit activée.
+
+Chaque requête porte ensuite l'en-tête :
 
 ```http
 Authorization: Bearer hlm_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -139,7 +148,7 @@ Les erreurs ont toujours la forme :
 | `400` | Paramètre ou corps invalide (le message énonce la règle attendue) |
 | `401` | Jeton absent, invalide, révoqué ou expiré |
 | `403` | Jeton valide sans le scope requis |
-| `404` | Ressource inconnue, ou API désactivée |
+| `404` | Ressource inconnue, ou API désactivée (jeton créé à la main) |
 | `409` | Conflit : nom déjà pris, action déjà en cours, agent non connecté |
 | `413` | Corps trop volumineux |
 | `415` | En-tête `Content-Type: application/json` manquant |
@@ -147,7 +156,7 @@ Les erreurs ont toujours la forme :
 | `500` | Erreur interne (détail dans les journaux du hub) |
 | `502` | L'agent n'a pas pu être joint pour transmettre une action |
 
-**Bonnes pratiques côté client.** Réessayez seulement les `429` (après `Retry-After`), les `502` et les erreurs réseau, avec un délai croissant. Ne réessayez pas les `4xx` : la requête ne passera pas mieux. Sur `401`, demandez un nouveau jeton à l'utilisateur.
+**Bonnes pratiques côté client.** Réessayez seulement les `429` (après `Retry-After`), les `502` et les erreurs réseau, avec un délai croissant. Ne réessayez pas les `4xx` : la requête ne passera pas mieux. Sur `401`, demandez un nouveau jeton à l'utilisateur (pour une app : affichez de nouveau l'écran de connexion).
 
 - **600 requêtes par minute et par jeton.**
 - Les jetons invalides sont aussi limités par adresse IP (protection contre la recherche de jetons).
@@ -181,6 +190,9 @@ L'état global est le pire état parmi les hôtes et les sondes actives.
 
 | Méthode | Chemin | Scope | Rôle |
 |---|---|---|---|
+| `POST` | [`/auth/login`](#post-apiv1authlogin) | — | Échanger identifiant et mot de passe contre un jeton |
+| `POST` | [`/auth/logout`](#post-apiv1authlogout) | — | Révoquer le jeton de la requête |
+| `GET` | [`/overview`](#get-apiv1overview) | `status:read`, `hosts:read`, `monitors:read` | Écran d'accueil en un appel : résumé, hôtes, sondes |
 | `GET` | [`/status`](#get-apiv1status) | `status:read` | État global et comptes par état |
 | `GET` | [`/widgets`](#get-apiv1widgets) | `status:read` | Résumé compact pour widgets : état, problèmes, puissance |
 | `GET` | [`/hosts`](#get-apiv1hosts) | `hosts:read` | Hôtes et dernières mesures |
@@ -210,6 +222,37 @@ L'état global est le pire état parmi les hôtes et les sondes actives.
 Chemins relatifs à `/api/v1`. `OPTIONS` répond aux pré-vols CORS sur toutes les routes.
 
 ## Routes
+
+### `POST /api/v1/auth/login`
+
+Sans jeton. Échange le compte contre un jeton d'API rattaché à ce compte, qui apparaît dans *Réglages → API* avec la mention « Connexion de … » et s'y révoque. Fonctionne avec l'API désactivée. Mêmes limites que la connexion web (10 essais par minute et par IP).
+
+```json
+{ "username": "admin", "password": "…", "name": "iPhone de Noé", "scopes": ["status:read", "hosts:read"] }
+```
+
+- `name` : libellé du jeton (1 à 64 caractères), un par appareil ou serveur.
+- `scopes` : facultatif ; sans lui, le jeton a tous les scopes.
+
+Réponse `201` : `{ "token": "hlm_…", "scopes": [ … ] }`. `401` si le compte est inconnu ou le mot de passe faux. Changer le mot de passe du compte révoque tous ses jetons de connexion (et désinscrit leurs appareils des notifications) : l'app et la gestion doivent se reconnecter.
+
+### `POST /api/v1/auth/logout`
+
+Révoque le jeton de la requête, et désinscrit les appareils inscrits avec lui. Réponse `204`.
+
+### `GET /api/v1/overview`
+
+Scopes `status:read`, `hosts:read` et `monitors:read`. L'écran d'accueil de l'app en un seul appel, lu d'un coup : les comptes, les problèmes et les listes concordent toujours, contrairement à trois appels successifs.
+
+```json
+{
+  "summary": { "status": "minor_outage", "hosts": { "total": 5, "by_status": { … } }, "monitors": { … }, "problems": [ … ], "power": { … }, "time": 1792046280 },
+  "hosts": [ /* comme GET /hosts */ ],
+  "monitors": [ /* comme GET /monitors, avec days sur 90 jours */ ]
+}
+```
+
+`summary` est exactement la réponse de [`/widgets`](#get-apiv1widgets). Les widgets et l'extension de notification gardent `/widgets`, bien plus léger.
 
 ### `GET /api/v1/status`
 
@@ -883,7 +926,7 @@ for host in r.json():
 - `/api/v1` n'accepte que les jetons : pas de cookie, donc pas de risque de CSRF depuis un site tiers.
 - Les champs `target` des sondes (adresses internes) sont exposés par `monitors:read` : ne donnez ce scope qu'à des outils de confiance.
 - Préférez des jetons à durée limitée, et révoquez immédiatement un jeton qui aurait fuité.
-- Désactiver l'API dans les réglages coupe instantanément tous les jetons, sans les supprimer.
+- Désactiver l'API dans les réglages coupe instantanément les jetons créés à la main, sans les supprimer. Les jetons obtenus par connexion d'un compte restent valides : révoquez-les un par un, ou changez le mot de passe du compte pour tous les couper.
 
 ## Versionnement
 
@@ -893,4 +936,5 @@ Le préfixe `/api/v1` est stable. Des champs peuvent être **ajoutés** aux rép
 
 | Date | Changement |
 |---|---|
+| 2026-10 | Routes `POST /auth/login`, `POST /auth/logout` (jetons rattachés à un compte, valides avec l'API désactivée) et `GET /overview`. |
 | 2026-10 | Routes `GET /bandwidth` et `GET /bandwidth/live` (scope `monitors:read`). Routes `GET /widgets`, `POST` / `DELETE /devices`, `GET` / `PUT /preferences` ; scopes `push:write`, `preferences:read`, `preferences:write`. Champs `agent_down` et `reachable` des hôtes ; un hôte dont l'agent est arrêté mais qui répond au ping passe en `degraded` au lieu de `major_outage`. Sondes SNMP : `snmp_mode` et `interface` (débit et état d'interface). Route `GET /snmp/devices`. Bande passante : `speed_mbps`, `days`, `today_octets`, `month_octets`, `daily_octets` ; `peak_mbps` devient la plus forte mesure de la période. Sondes SNMP : `max_percent`, `idle_minutes`. |

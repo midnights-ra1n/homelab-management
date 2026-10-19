@@ -235,8 +235,7 @@ func (s *Server) runDecomStep(ctx context.Context, id int64, key string) (string
 		if err != nil {
 			return "", err
 		}
-		err = httpJSON(ctx, "DELETE", fmt.Sprintf("%s/api/v1/hosts/%d", i.URL, host),
-			map[string]string{"Authorization": "Bearer " + i.Config.TokenSecret}, strings.NewReader(""), i.Config.verify(true), 10*time.Second, nil)
+		err = s.hlmCall(ctx, i, "DELETE", fmt.Sprintf("/hosts/%d", host), "", 10*time.Second, nil)
 		var ie *integrationError
 		if err != nil && !(errors.As(err, &ie) && ie.status == 404) { // already gone: fine
 			if ie != nil && ie.status == 403 {

@@ -8,7 +8,7 @@ import {
 
 interface Device { token: string; name: string; sandbox: boolean; api_token: string; created_at: number; last_push_at: number; last_error: string }
 
-interface Token { id: number; name: string; prefix: string; scopes: string[]; expires_at: number | null; created_at: number; last_used_at: number }
+interface Token { id: number; name: string; prefix: string; scopes: string[]; expires_at: number | null; created_at: number; last_used_at: number; user?: string }
 
 const EXPIRY: [string, string, number | null][] = [
   ["30", "30 jours", 30], ["90", "90 jours", 90], ["365", "1 an", 365], ["custom", "Date précise", null], ["never", "Jamais", null],
@@ -40,7 +40,8 @@ export function ApiSection({ draft, setDraft, save, busy }: {
       <div className="grid gap-6">
         <Card>
           <CardBody className="grid gap-5">
-            <p className="text-sm text-body">API REST en lecture (et maintenance) pour intégrer le monitoring à un autre outil, comme homelab-management. Authentification par jeton, limitée aux scopes choisis.</p>
+            <p className="text-sm text-body">API REST en lecture (et maintenance) pour intégrer le monitoring à un autre outil. Authentification par jeton, limitée aux scopes choisis.</p>
+            <p className="text-sm text-body">L'app iOS / macOS et la gestion se connectent avec un identifiant et un mot de passe : elles n'ont pas besoin de l'API publique, qui peut rester désactivée.</p>
             <Switch label="Activer l'API (/api/v1)" checked={enabled} onChange={(c) => setDraft({ ...draft, api_enabled: String(c) })} />
             <Field label="Origines autorisées depuis un navigateur (facultatif)" htmlFor="s-cors" hint="Séparées par des virgules, ex. https://gestion.example.fr. Inutile pour un appel côté serveur.">
               <input id="s-cors" className={`${inputClass} font-mono`} value={draft.api_cors_origins ?? ""} onChange={(e) => setDraft({ ...draft, api_cors_origins: e.target.value })} />
@@ -61,6 +62,7 @@ export function ApiSection({ draft, setDraft, save, busy }: {
                         <td className="mm-col-strong">
                           <span className="block">{t.name}</span>
                           <span className="block font-mono text-xs font-normal text-meta">{t.prefix}…</span>
+                          {t.user && <span className="block text-xs font-normal text-meta">Connexion de {t.user}</span>}
                         </td>
                         <td className="whitespace-normal"><div className="flex max-w-[18rem] flex-wrap gap-1">{t.scopes.map((s) => <Tag key={s}>{s}</Tag>)}</div></td>
                         <td>{t.expires_at == null ? <span className="text-meta">Jamais</span> : expired ? <Badge tone="red" dot>Expiré</Badge> : <span className="font-mono text-xs">{fmtDate(t.expires_at)}</span>}</td>

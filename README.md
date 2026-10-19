@@ -28,13 +28,13 @@ L'interface est en français.
                    ▼                                         ▼
   ┌──────────────────────────────┐   API /api/v1   ┌──────────────────────────┐
   │ homelab-tools  (monitoring)  │◀────────────────│ homelab-tools (gestion)  │
-  │ VPS · hlm.db                 │  jeton hlm_…    │ VM / CT · homelab.db     │
+  │ VPS · hlm.db                 │  compte → jeton │ VM / CT · homelab.db     │
   └──────────────────────────────┘                 └──────────────────────────┘
 ```
 
 - Les agents ne parlent **qu'au monitoring**.
-- La gestion lit l'API du monitoring avec un jeton (scopes `hosts:read`, `monitors:read`, et `hosts:write` pour le décommissionnement) : tableau de bord, alertes, page *Monitoring* et **synchronisation de l'inventaire**.
-- Les intégrations **Proxmox** (Paramètres → Intégrations) restent **indépendantes** de l'inventaire et du monitoring. Elles centralisent plusieurs nœuds autonomes sans créer de cluster, donc sans problème de quorum.
+- La gestion se connecte au monitoring avec un **compte du monitoring** (identifiant et mot de passe, chiffrés côté gestion). Elle obtient elle-même un jeton (scopes `hosts:read`, `hosts:write`, `monitors:read`, `reports:read`), sans que l'API publique du monitoring ait besoin d'être activée : tableau de bord, alertes, page *Monitoring* et **synchronisation de l'inventaire**.
+- Les intégrations **Proxmox** (Paramètres → Intégrations) restent **indépendantes** de l'inventaire et du monitoring. Elles centralisent plusieurs nœuds autonomes sans créer de cluster, donc sans problème de quorum. Chaque nœud se connecte avec un jeton API ou avec un compte (`root@pam`, sans double authentification) ; la migration entre nœuds exige un jeton sur le nœud cible.
 - Intégrations disponibles : Proxmox VE, Midnights Monitoring et Webmin. Beszel, Maintenant et PatchMon ont été retirés.
 
 ## Inventaire et monitoring
@@ -209,7 +209,7 @@ Rechargez *Paramètres* en HTTPS : l'avertissement « HTTPS requis » du serveur
   - garde les comptes (le mot de passe est rehaché en Argon2id à la première connexion) et les passkeys ; les sessions sont réinitialisées, il faut se reconnecter.
 
   Les sauvegardes JSON de homelab-management (*Paramètres → Sauvegarde & restauration*) se restaurent aussi.
-- Pour relier la gestion au monitoring : dans le monitoring, *Paramètres → API*, activez l'API et créez un jeton `hosts:read`, `monitors:read` et `hosts:write`. Dans la gestion, *Paramètres → Intégrations → Midnights Monitoring*, renseignez l'URL et ce jeton.
+- Pour relier la gestion au monitoring : dans la gestion, *Paramètres → Intégrations → Midnights Monitoring*, renseignez l'URL du monitoring, un identifiant et un mot de passe du monitoring. Rien à activer côté monitoring ; l'accès de la gestion apparaît dans *Réglages → API* du monitoring, où il se révoque.
 
 ## Installer l'agent
 

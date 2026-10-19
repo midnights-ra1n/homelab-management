@@ -1,6 +1,6 @@
 package main
 
-// Proxmox VE (REST API with an API token), port of lib/integrations/proxmox.ts. Each
+// Proxmox VE (REST API with an API token or an account's ticket), port of lib/integrations/proxmox.ts. Each
 // integration is an independent node (or cluster), aggregated here without a Proxmox
 // cluster or Datacenter Manager. It stays independent from the inventory and monitoring.
 // Responses are passed through as Proxmox returns them; the web UI holds the types.
@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -29,21 +31,76 @@ var (
 	timeframes     = []string{"hour", "day", "week", "month", "year"}
 )
 
-func pveAuth(i *integration) (string, error) {
+type pveTicket struct {
+	cookie, csrf string
+	expires      time.Time
+}
+
+// pveTickets caches the tickets of account sign-ins, keyed by address and credentials.
+var pveTickets sync.Map
+
+func ticketKey(c *integration) [32]byte {
+	return sha256.Sum256([]byte(c.URL + "\x00" + c.Config.Username + "\x00" + c.Config.Password))
+}
+
+// pveAuth returns the headers authenticating a request: the API token, or the ticket of the
+// account (valid 2 h at Proxmox, renewed after 90 min) with its CSRF token for writes.
+func pveAuth(ctx context.Context, i *integration) (map[string]string, error) {
 	c := i.Config
-	if c.TokenID == "" || c.TokenSecret == "" {
-		return "", integrationErr("Jeton API Proxmox manquant (ID + secret)")
+	if c.TokenID != "" && c.TokenSecret != "" {
+		return map[string]string{"Authorization": "PVEAPIToken=" + c.TokenID + "=" + c.TokenSecret}, nil
 	}
-	return "PVEAPIToken=" + c.TokenID + "=" + c.TokenSecret, nil
+	if c.Username == "" || c.Password == "" {
+		return nil, integrationErr("Identifiants Proxmox manquants (jeton API ou compte)")
+	}
+	key := ticketKey(i)
+	if v, ok := pveTickets.Load(key); ok && time.Now().Before(v.(pveTicket).expires) {
+		t := v.(pveTicket)
+		return map[string]string{"Cookie": "PVEAuthCookie=" + t.cookie, "CSRFPreventionToken": t.csrf}, nil
+	}
+	var res struct {
+		Data struct {
+			Ticket  string `json:"ticket"`
+			CSRF    string `json:"CSRFPreventionToken"`
+			NeedTFA any    `json:"NeedTFA"`
+		} `json:"data"`
+	}
+	form := url.Values{"username": {c.Username}, "password": {c.Password}}
+	err := httpJSON(ctx, "POST", i.URL+"/api2/json/access/ticket", map[string]string{"Content-Type": "application/x-www-form-urlencoded"},
+		strings.NewReader(form.Encode()), c.verify(false), 10*time.Second, &res)
+	var ie *integrationError
+	switch {
+	case errors.As(err, &ie) && ie.status == 401:
+		return nil, integrationErr("Identifiant ou mot de passe Proxmox incorrect (format utilisateur@royaume, ex. root@pam)")
+	case err != nil:
+		return nil, err
+	case res.Data.NeedTFA != nil:
+		return nil, integrationErr("Ce compte Proxmox a la double authentification : utilisez un jeton API")
+	case res.Data.Ticket == "":
+		return nil, integrationErr("Réponse inattendue de Proxmox à la connexion")
+	}
+	t := pveTicket{cookie: res.Data.Ticket, csrf: res.Data.CSRF, expires: time.Now().Add(90 * time.Minute)}
+	pveTickets.Store(key, t)
+	return map[string]string{"Cookie": "PVEAuthCookie=" + t.cookie, "CSRFPreventionToken": t.csrf}, nil
 }
 
 // pve calls /api2/json<path> and decodes the "data" member into out.
 func pve(ctx context.Context, i *integration, method, path string, form url.Values, out any) error {
-	auth, err := pveAuth(i)
+	err := pveOnce(ctx, i, method, path, form, out)
+	var ie *integrationError
+	if i.Config.TokenID == "" && errors.As(err, &ie) && ie.status == 401 {
+		// Ticket refused before its time (Proxmox restarted, password changed): sign in again.
+		pveTickets.Delete(ticketKey(i))
+		err = pveOnce(ctx, i, method, path, form, out)
+	}
+	return err
+}
+
+func pveOnce(ctx context.Context, i *integration, method, path string, form url.Values, out any) error {
+	headers, err := pveAuth(ctx, i)
 	if err != nil {
 		return err
 	}
-	headers := map[string]string{"Authorization": auth}
 	var body *strings.Reader
 	if form != nil {
 		headers["Content-Type"] = "application/x-www-form-urlencoded"
@@ -730,7 +787,7 @@ func (s *Server) mgPveMigrate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if dst.Config.TokenID == "" || dst.Config.TokenSecret == "" {
-		fail("Le nœud cible n'a pas de jeton API configuré")
+		fail("Le nœud cible doit être connecté par jeton API : Proxmox n'accepte que les jetons pour une migration entre nœuds")
 		return
 	}
 	fp, err := certFingerprint(r.Context(), dst.URL)

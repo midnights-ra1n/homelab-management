@@ -37,33 +37,21 @@ Le code vise **iOS 17, iPadOS 17 et macOS 14** au minimum : c'est à partir de c
 ```
 
 - **Une cible partagée `HubKit`** (package Swift local ou framework) contient les modèles, le client et l'accès au trousseau. L'app, l'extension de widgets et l'extension de notification l'importent.
-- **Le hub ne connaît que l'API v1.** L'app n'utilise jamais le cookie de session du tableau de bord : elle s'authentifie avec un jeton d'API, limité à ses scopes.
+- **Le hub ne connaît que l'API v1.** L'app n'utilise jamais le cookie de session du tableau de bord. L'utilisateur se connecte avec son identifiant et son mot de passe du monitoring ; l'app les échange contre un jeton d'API (`POST /auth/login`) et ne garde que ce jeton. L'API publique peut rester désactivée.
 - **Les notifications partent du hub.** À chaque changement d'état (hôte, sonde, certificat, disque…), le hub regroupe les événements de la fenêtre de regroupement, comme pour les e-mails, et envoie **une** notification à chaque appareil inscrit.
 - **Midnights Management** n'expose pas cette API. Les hôtes et l'état vus par l'app sont ceux du monitoring, qui alimente aussi la gestion.
 
 ## Préparer le serveur
 
-### 1. Activer l'API et servir le hub en HTTPS
+### 1. Servir le hub en HTTPS
 
-Dans le monitoring, *Réglages → API* : activez l'API et enregistrez. L'app doit joindre le hub en **HTTPS** depuis l'extérieur (reverse proxy avec un certificat valide) : le jeton circule dans chaque requête, et App Transport Security refuse le HTTP par défaut. Voir [HTTP sur le réseau local](#http-sur-le-réseau-local) pour le cas d'un hub uniquement local.
+L'app doit joindre le hub en **HTTPS** depuis l'extérieur (reverse proxy avec un certificat valide) : le jeton circule dans chaque requête, et App Transport Security refuse le HTTP par défaut. Voir [HTTP sur le réseau local](#http-sur-le-réseau-local) pour le cas d'un hub uniquement local.
 
-### 2. Créer le jeton de l'app
+Inutile d'activer l'API dans *Réglages → API* : l'app se connecte avec un compte, et les jetons ainsi obtenus fonctionnent avec l'API désactivée.
 
-*Réglages → API → Créer un jeton*. Un jeton par installation de l'app : on peut ainsi révoquer un iPhone perdu sans toucher au Mac.
+### 2. Rien à créer pour l'app
 
-| Scope | Utilisé pour |
-|---|---|
-| `status:read` | `/status` et `/widgets` (écran d'accueil, widgets) |
-| `hosts:read` | liste et détail des hôtes |
-| `monitors:read` | liste, détail et historique des sondes |
-| `metrics:read` | graphiques des hôtes |
-| `reports:read` | consommation électrique et rapport mensuel |
-| `updates:read`, `smart:read`, `docker:read` | écrans mises à jour, disques, conteneurs (si l'app les propose) |
-| `maintenance:write` | boutons « Maintenance » de l'app et des widgets |
-| `push:write` | inscription aux notifications |
-| `preferences:read`, `preferences:write` | préférences partagées avec le web |
-
-N'ajoutez `hosts:write` (suppression d'hôtes, mise à jour d'agent) que si l'app propose ces actions.
+L'app obtient elle-même son jeton à la connexion ([Connexion au hub](#connexion-au-hub)), un par appareil, avec tous les scopes. Il apparaît dans *Réglages → API* sous le nom de l'appareil (« Connexion de admin ») : le révoquer déconnecte cet appareil seul, et le désinscrit des notifications. Changer le mot de passe du compte déconnecte tous les appareils.
 
 ### 3. Configurer l'envoi des notifications (APNs)
 
@@ -263,6 +251,13 @@ public struct WidgetSummary: Codable, Sendable {
     public let problems: [Problem]
     public let power: Power
     public let time: Date
+}
+
+/// GET /overview : l'écran d'accueil en un appel (les widgets gardent /widgets, plus léger).
+public struct Overview: Codable, Sendable {
+    public let summary: WidgetSummary
+    public let hosts: [MonitoredHost]
+    public let monitors: [Monitor]
 }
 ```
 
@@ -831,7 +826,7 @@ public enum HubError: LocalizedError, Sendable {
         }
     }
 
-    /// 401 : jeton révoqué ou expiré, à redemander. 404 sur /api/v1 : API désactivée.
+    /// 401 : jeton révoqué ou mot de passe du compte changé : se reconnecter.
     public var needsNewToken: Bool { if case .http(401, _) = self { true } else { false } }
     public var missingScope: Bool { if case .http(403, _) = self { true } else { false } }
 }
@@ -918,6 +913,8 @@ public enum HistoryRange: String, Sendable, CaseIterable {
 public enum ItemKind: String, Sendable { case host = "hosts", monitor = "monitors" }
 
 public extension Hub {
+    /// Écran d'accueil en un appel : résumé (comme /widgets), hôtes et sondes, toujours cohérents entre eux.
+    func overview() async throws -> Overview { try await get("/overview") }
     func status() async throws -> StatusSummary { try await get("/status") }
     func widgets() async throws -> WidgetSummary { try await get("/widgets") }
 
@@ -1074,39 +1071,58 @@ public enum HubStore {
 
 ## Connexion au hub
 
-L'écran de connexion demande l'adresse du hub et le jeton, puis vérifie les deux avec `/status` avant d'enregistrer.
+L'écran de connexion demande l'adresse du hub, l'identifiant et le mot de passe du monitoring. L'app les échange contre un jeton (`POST /auth/login`), garde le jeton dans le trousseau et **oublie le mot de passe**.
 
 ```swift
-@MainActor
-func connect(urlText: String, token: String) async throws {
-    guard var comps = URLComponents(string: urlText.trimmingCharacters(in: .whitespaces)),
-          comps.scheme == "https" || comps.scheme == "http", comps.host != nil else {
-        throw HubError.http(status: 400, message: "Adresse invalide, par exemple https://monitoring.example.fr")
+// HubKit/Hub+Login.swift
+import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
+
+public extension Hub {
+    /// Échange le compte contre un jeton et configure le hub partagé. Le mot de passe n'est pas conservé.
+    @MainActor
+    static func signIn(urlText: String, username: String, password: String) async throws {
+        guard var comps = URLComponents(string: urlText.trimmingCharacters(in: .whitespaces)),
+              comps.scheme == "https" || comps.scheme == "http", comps.host != nil else {
+            throw HubError.http(status: 400, message: "Adresse invalide, par exemple https://monitoring.example.fr")
+        }
+        comps.path = ""
+        struct Body: Encodable { let username: String; let password: String; let name: String }
+        struct Reply: Decodable { let token: String }
+        #if canImport(UIKit)
+        let device = UIDevice.current.name
+        #else
+        let device = Host.current().localizedName ?? "Mac"
+        #endif
+        // Hub sans jeton : seule /auth/login répond sans en-tête Authorization valide.
+        let probe = Hub(config: HubConfiguration(baseURL: comps.url!, token: ""))
+        let reply: Reply = try await probe.send("POST", "/auth/login",
+            body: Body(username: username.trimmingCharacters(in: .whitespaces), password: password, name: String(device.prefix(64))))
+        let config = HubConfiguration(baseURL: comps.url!, token: reply.token)
+        try HubStore.save(config)
+        await Hub.shared.configure(config)
     }
-    comps.path = ""
-    let config = HubConfiguration(baseURL: comps.url!, token: token.trimmingCharacters(in: .whitespacesAndNewlines))
-    let probe = Hub(config: config)
-    do {
-        _ = try await probe.status()
-    } catch HubError.http(404, _) {
-        throw HubError.http(status: 404, message: "L'API est désactivée : Réglages → API dans le monitoring.")
+
+    /// Révoque le jeton (et l'inscription aux notifications qui lui est liée), puis oublie la configuration.
+    func signOut() async {
+        _ = try? await data("POST", "/auth/logout", body: Data("{}".utf8))
+        try? HubStore.save(nil)
+        configure(nil)
     }
-    try HubStore.save(config)
-    await Hub.shared.configure(config)
 }
 ```
 
-| Réponse de `/status` | Message à afficher |
+| Réponse de `/auth/login` | Message à afficher |
 |---|---|
-| `200` | connexion réussie |
-| `401` | jeton invalide, révoqué ou expiré |
-| `403` | le jeton n'a pas `status:read` |
-| `404` | API désactivée, ou adresse qui n'est pas un hub Midnights Monitoring |
+| `201` | connexion réussie |
+| `401` | identifiant ou mot de passe incorrect |
+| `429` | trop de tentatives, réessayer dans une minute |
+| `404` | adresse qui n'est pas un hub Midnights Monitoring (ou hub trop ancien) |
 | erreur réseau | hub injoignable (adresse, VPN, certificat) |
 
-Testez ensuite les autres scopes au besoin : un `403` sur `/preferences` ou `/devices` signifie que la fonction correspondante doit être masquée, pas que la connexion a échoué.
-
-À la déconnexion : désinscrivez l'appareil (`DELETE /devices/{token}`), puis effacez la configuration avec `HubStore.save(nil)`.
+Plus tard, un `401` sur n'importe quelle route (`HubError.needsNewToken`) veut dire que le jeton a été révoqué ou que le mot de passe du compte a changé : affichez de nouveau l'écran de connexion.
 
 ## Notifications push
 
@@ -1514,7 +1530,7 @@ Button(intent: RefreshHub()) { Image(systemName: "arrow.clockwise") }
     .buttonStyle(.plain)
 ```
 
-- `maintenance:write` est indispensable au jeton pour ces boutons (sinon `403`, et le bouton ne fait rien de visible : prévoyez de masquer les boutons si `/hosts/{id}/maintenance` a déjà répondu `403`).
+- Ces boutons demandent le scope `maintenance:write`, que le jeton obtenu à la connexion possède (tous les scopes). Si l'app demande moins de scopes à `POST /auth/login`, masquez les boutons quand `/hosts/{id}/maintenance` a déjà répondu `403`.
 - Les mêmes intents apparaissent dans l'app **Raccourcis** et peuvent être déclenchés par Siri ou une automatisation (« mettre le NAS en maintenance à 3 h »). Pour qu'ils y apparaissent avec une liste d'hôtes plutôt qu'un identifiant, remplacez `itemID` par une `AppEntity` alimentée par `/hosts` (`EntityQuery`).
 - Un widget n'a pas d'état local modifiable : après l'intent, la nouvelle timeline relit `/widgets`, qui reflète la maintenance (l'élément disparaît des problèmes).
 
@@ -1604,7 +1620,7 @@ struct RootView: View {
 
 | Contexte | Fréquence conseillée | Route |
 |---|---|---|
-| Écran principal ouvert | 30 s (`.task` + `Task.sleep`) | `/widgets` ou `/status`, puis `/hosts` et `/monitors` à la demande |
+| Écran principal ouvert | 30 s (`.task` + `Task.sleep`) | `/overview` : résumé, hôtes et sondes en un appel, toujours cohérents entre eux |
 | Écran d'un hôte | 30 s | `/hosts/{id}`, graphique `/hosts/{id}/metrics?range=…` à l'ouverture |
 | Retour au premier plan | une fois | `/widgets`, `/preferences`, rechargement des widgets |
 | Arrière-plan (iOS) | laissé à iOS (`BGAppRefreshTask`) | `/widgets`, puis `WidgetCenter.shared.reloadAllTimelines()` |
@@ -1624,7 +1640,8 @@ Les agents remontent leurs mesures toutes les 30 secondes par défaut : interrog
 
 ## Sécurité
 
-- **Un jeton par appareil**, avec les seuls scopes utilisés, une expiration (1 an par exemple) et un nom explicite (« iPhone de … »). Révoquer le jeton coupe l'accès **et** désinscrit l'appareil des notifications.
+- **Un jeton par appareil**, obtenu à la connexion sous le nom de l'appareil. Révoquer le jeton coupe l'accès **et** désinscrit l'appareil des notifications ; changer le mot de passe du compte déconnecte tous les appareils.
+- **Le mot de passe ne reste pas sur l'appareil** : il ne sert qu'à `POST /auth/login`, jamais stocké.
 - **Trousseau uniquement**, avec `AfterFirstUnlockThisDeviceOnly` : pas de jeton dans `UserDefaults`, les fichiers de l'App Group, les journaux ou les rapports de plantage.
 - **HTTPS** avec un certificat valide. Ne désactivez pas la validation TLS (`URLSessionDelegate` qui accepte tout) : préférez un certificat Let's Encrypt sur le reverse proxy.
 - **Pas de CORS nécessaire** : une app native n'est pas un navigateur, laissez *Origines autorisées* vide pour elle.
@@ -1643,9 +1660,9 @@ Les agents remontent leurs mesures toutes les 30 secondes par défaut : interrog
 | `APNs 410 Unregistered` (appareil retiré) | app désinstallée ou notifications désactivées | normal ; l'appareil se réinscrit s'il réactive les notifications |
 | Aucune notification, aucune erreur | aucun changement d'état, ou appareil inscrit avec un autre jeton révoqué depuis | *Envoyer un test* ; vérifier la liste des appareils |
 | Notification de panne en retard | regroupement (60 s par défaut) + seuil d'échecs des sondes + 3 intervalles d'agent pour un hôte | réduire la *Fenêtre de regroupement* (*Réglages → Notifications par e-mail*) ou l'intervalle des sondes |
-| `401` partout | jeton révoqué ou expiré | redemander un jeton à l'utilisateur |
-| `404` sur toutes les routes | API désactivée, ou URL qui pointe vers Midnights Management | activer l'API ; utiliser l'adresse du monitoring |
-| `403` sur une route | scope manquant | ajouter le scope dans un nouveau jeton (les scopes d'un jeton ne se modifient pas) |
+| `401` partout | jeton révoqué dans *Réglages → API*, ou mot de passe du compte changé | afficher de nouveau l'écran de connexion |
+| `404` sur `/auth/login` | URL qui pointe vers Midnights Management, ou monitoring trop ancien | utiliser l'adresse du monitoring ; le mettre à jour |
+| `403` sur une route | scope manquant (connexion avec une liste `scopes` réduite) | se reconnecter sans `scopes`, ou masquer la fonction |
 | Widget vide ou « Hub non configuré » | jeton non lisible par l'extension | même groupe Keychain Sharing et même App Group sur les trois cibles ; `kSecUseDataProtectionKeychain` sur macOS |
 | Erreur de décodage sur `by_status` ou les préférences | `convertFromSnakeCase` activé | utiliser `JSONDecoder.hub` et les `CodingKeys` de ce guide |
 | Erreur réseau sur un hub local en HTTP | App Transport Security ou autorisation *Réseau local* refusée | HTTPS ; sinon `NSAllowsLocalNetworking` et `NSLocalNetworkUsageDescription` |
@@ -1658,7 +1675,9 @@ Les agents remontent leurs mesures toutes les 30 secondes par défaut : interrog
 - [ ] App, widgets et extension de notification partagent l'App Group et le groupe Keychain Sharing.
 - [ ] Le jeton est stocké dans le trousseau avec `AfterFirstUnlockThisDeviceOnly`.
 - [ ] Les écrans dépendant d'un scope se masquent sur `403` au lieu d'afficher une erreur.
-- [ ] Déconnexion : `DELETE /devices/{token}` puis effacement du trousseau.
+- [ ] Le mot de passe n'est jamais enregistré : seul le jeton de `POST /auth/login` va dans le trousseau.
+- [ ] Un `401` ramène à l'écran de connexion.
+- [ ] Déconnexion : `POST /auth/logout` (révoque le jeton et l'inscription aux notifications) puis effacement du trousseau.
 - [ ] Les widgets affichent le cache quand le hub est injoignable.
 - [ ] Les clés de préférences propres à l'app sont préfixées `ios.`.
 - [ ] *Time Sensitive Notifications* est activé si vous voulez que les pannes passent les modes Concentration.

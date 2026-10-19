@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -77,10 +78,14 @@ func (s *Server) mgVncRelay(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "Intégration Proxmox introuvable")
 		return
 	}
-	auth, err := pveAuth(i)
+	auth, err := pveAuth(r.Context(), i)
 	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
+	}
+	var authLines strings.Builder
+	for k, v := range auth {
+		authLines.WriteString(k + ": " + v + "\r\n")
 	}
 	u, _ := url.Parse(i.URL)
 	secure := u.Scheme == "https"
@@ -116,8 +121,8 @@ func (s *Server) mgVncRelay(w http.ResponseWriter, r *http.Request) {
 	path := fmt.Sprintf("/api2/json/nodes/%s/%s/%d/vncwebsocket?port=%s&vncticket=%s",
 		url.PathEscape(v.node), v.typ, v.vmid, url.QueryEscape(v.port), url.QueryEscape(v.ticket))
 	fmt.Fprintf(upstream, "GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: %s\r\n"+
-		"Sec-WebSocket-Version: %s\r\nSec-WebSocket-Protocol: %s\r\nAuthorization: %s\r\n\r\n",
-		path, u.Host, r.Header.Get("Sec-WebSocket-Key"), ver, proto, auth)
+		"Sec-WebSocket-Version: %s\r\nSec-WebSocket-Protocol: %s\r\n%s\r\n",
+		path, u.Host, r.Header.Get("Sec-WebSocket-Key"), ver, proto, authLines.String())
 
 	conn, buf, err := http.NewResponseController(w).Hijack()
 	if err != nil {

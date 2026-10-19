@@ -13,8 +13,8 @@ import { useT } from "@/i18n/client";
 
 const HELP: Record<IntegrationType, string> = {
   proxmox:
-    "Datacenter → Permissions → API Tokens. Décoche « Privilege Separation » ou donne au jeton le rôle PVEAuditor (lecture) / PVEVMAdmin (actions) sur « / ».",
-  hlm: "Dans le monitoring : Paramètres → API, active l'API puis « Créer un jeton » avec les scopes hosts:read et monitors:read, plus hosts:write pour retirer un hôte au décommissionnement. Les hôtes équipés de l'agent sont reliés à l'inventaire automatiquement.",
+    "Jeton API : Datacenter → Permissions → API Tokens, décoche « Privilege Separation » ou donne au jeton le rôle PVEAuditor (lecture) / PVEVMAdmin (actions) sur « / ». Compte : utilisateur@royaume (ex. root@pam), sans double authentification. La migration vers un autre nœud demande un jeton sur le nœud cible.",
+  hlm: "Le compte avec lequel tu te connectes au monitoring. L'API publique du monitoring peut rester désactivée : la gestion obtient elle-même son accès, visible et révocable dans Réglages → API du monitoring. Les hôtes équipés de l'agent sont reliés à l'inventaire automatiquement.",
   webmin:
     "URL de l'interface Webmin. Pour l'état système, choisis une clé SSH (Paramètres → Clés SSH) et ajoute sa clé publique dans ~/.ssh/authorized_keys de l'utilisateur. Un compte non-root suffit : tout est en lecture seule.",
 };
@@ -30,7 +30,33 @@ export function IntegrationDialog({
 }) {
   const tr = useT();
   const meta = INTEGRATION_META[type];
-  const secretHint = integration?.config.has_secret ? tr("Laisser vide pour conserver la valeur enregistrée") : undefined;
+  const keep = tr("Laisser vide pour conserver la valeur enregistrée");
+  const secretHint = integration?.config.has_secret ? keep : undefined;
+  // A monitoring set up with a pasted token keeps it until an account is entered.
+  const legacyToken = type === "hlm" && !!integration?.config.has_token && !integration.config.username;
+  const [pveAuth, setPveAuth] = useState(integration?.config.username && !integration.config.token_id ? "password" : "token");
+  const account = (
+    <>
+      <TextField
+        label={tr("Identifiant")}
+        name="username"
+        defaultValue={integration?.config.username}
+        placeholder={type === "proxmox" ? "root@pam" : "admin"}
+        required={!legacyToken}
+        className="font-mono"
+        autoComplete="off"
+      />
+      <TextField
+        label={tr("Mot de passe")}
+        name="password"
+        type="password"
+        placeholder={integration?.config.has_password ? "••••••••" : undefined}
+        hint={integration?.config.has_password ? keep : undefined}
+        required={!integration?.config.has_password && !legacyToken}
+        autoComplete="new-password"
+      />
+    </>
+  );
   return (
     <FormDialog
       title={integration ? tr("Modifier « {name} »", { name: integration.name }) : tr("Connecter {label}", { label: meta.label })}
@@ -67,6 +93,20 @@ export function IntegrationDialog({
         />
 
         {type === "proxmox" && (
+          <SelectField
+            label={tr("Authentification")}
+            name="auth"
+            value={pveAuth}
+            onChange={(e) => setPveAuth(e.target.value)}
+            options={[
+              { value: "token", label: tr("Jeton API") },
+              { value: "password", label: tr("Identifiant et mot de passe") },
+            ]}
+            className="sm:col-span-2"
+          />
+        )}
+        {type === "proxmox" && pveAuth === "password" && account}
+        {type === "proxmox" && pveAuth === "token" && (
           <>
             <TextField
               label={tr("ID du jeton")}
@@ -90,17 +130,11 @@ export function IntegrationDialog({
         )}
 
 
-        {type === "hlm" && (
-          <TextField
-            label={tr("Jeton d'API")}
-            name="token_secret"
-            type="password"
-            placeholder={integration?.config.has_secret ? "••••••••" : "hlm_…"}
-            hint={secretHint}
-            required={!integration?.config.has_secret}
-            autoComplete="new-password"
-            className="font-mono sm:col-span-2"
-          />
+        {type === "hlm" && account}
+        {legacyToken && (
+          <p className="text-xs text-meta sm:col-span-2">
+            {tr("Cette intégration utilise encore un jeton d'API saisi à la main. Renseigne un compte pour le remplacer.")}
+          </p>
         )}
 
 

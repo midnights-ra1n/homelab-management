@@ -127,6 +127,9 @@ var migrations = []string{
 		hour INTEGER NOT NULL,
 		octets INTEGER NOT NULL,
 		PRIMARY KEY(monitor_id, hour)) WITHOUT ROWID;`,
+	// Tokens obtained by signing in (POST /api/v1/auth/login): tied to the account, usable with
+	// the public API disabled, revoked with the account or when its password changes.
+	`ALTER TABLE api_tokens ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;`,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's

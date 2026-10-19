@@ -193,23 +193,30 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &c) {
 		return
 	}
+	if id, ok := s.checkCredentials(w, r, c); ok {
+		s.startSession(w, r, id)
+	}
+}
+
+// checkCredentials returns the account's id, or answers 401 (same cost for an unknown user).
+func (s *Server) checkCredentials(w http.ResponseWriter, r *http.Request, c credentials) (int64, bool) {
 	setLogActor(r, clip(strings.TrimSpace(c.Username), 64)+" (IP "+s.clientIP(r)+")")
 	var id int64
 	var hash string
 	if err := s.db.QueryRow(`SELECT id, password_hash FROM users WHERE username=?`, strings.TrimSpace(c.Username)).Scan(&id, &hash); err != nil {
 		checkPassword(dummyHash, c.Password)
 		writeErr(w, http.StatusUnauthorized, "Identifiant ou mot de passe incorrect")
-		return
+		return 0, false
 	}
 	if !checkPassword(hash, c.Password) {
 		slog.Warn("failed login", "user", c.Username, "ip", s.clientIP(r))
 		writeErr(w, http.StatusUnauthorized, "Identifiant ou mot de passe incorrect")
-		return
+		return 0, false
 	}
 	if !strings.HasPrefix(hash, "argon2id$") {
 		s.db.Exec(`UPDATE users SET password_hash=? WHERE id=?`, hashPassword(c.Password), id)
 	}
-	s.startSession(w, r, id)
+	return id, true
 }
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64) {
@@ -255,7 +262,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, msg)
 		return
 	}
-	// Changing the password signs out every other session.
+	// Changing the password signs out every other session, and the apps and servers signed in with it.
 	c, _ := r.Cookie(s.cookieName())
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -268,6 +275,10 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := tx.Exec(`DELETE FROM sessions WHERE user_id=? AND token_hash<>?`, uid, hashToken(c.Value)); err != nil {
+		serverErr(w, err)
+		return
+	}
+	if _, err := tx.Exec(`DELETE FROM api_tokens WHERE user_id=?`, uid); err != nil {
 		serverErr(w, err)
 		return
 	}

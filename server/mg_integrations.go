@@ -33,6 +33,7 @@ type integrationConfig struct {
 	Password    string `json:"password,omitempty"`
 	TokenID     string `json:"token_id,omitempty"`
 	TokenSecret string `json:"token_secret,omitempty"`
+	LoginToken  string `json:"login_token,omitempty"` // monitoring: token obtained by signing in with Username/Password
 	AuthHeader  string `json:"auth_header,omitempty"`
 	VerifyTLS   *bool  `json:"verify_tls,omitempty"`
 	SSHKeyID    int64  `json:"ssh_key_id,omitempty"`
@@ -101,6 +102,7 @@ func (i integration) public() map[string]any {
 		"config": map[string]any{
 			"username": c.Username, "token_id": c.TokenID, "verify_tls": c.VerifyTLS,
 			"has_secret": c.Password != "" || c.TokenSecret != "", "has_header": c.AuthHeader != "",
+			"has_password": c.Password != "", "has_token": c.TokenSecret != "",
 			"ssh_key_id": nilIfZero(c.SSHKeyID), "ssh_user": c.SSHUser, "ssh_port": nilIfZero(int64(c.SSHPort)), "ssh_host_key": c.SSHHostKey,
 		},
 	}
@@ -165,17 +167,55 @@ func integrationForm(f *form, prev *integration) (integration, bool) {
 	}
 	if prev != nil {
 		p := prev.Config
-		if c.Password == "" {
+		if c.Password == "" && c.Username == p.Username {
 			c.Password = p.Password
 		}
-		if c.TokenSecret == "" {
+		if c.TokenSecret == "" && c.TokenID == p.TokenID {
 			c.TokenSecret = p.TokenSecret
+		}
+		if prev.URL == u && c.Username == p.Username && c.Password == p.Password {
+			c.LoginToken = p.LoginToken
 		}
 		if c.AuthHeader == "" && !f.check("clear_header") {
 			c.AuthHeader = p.AuthHeader
 		}
 		if hostOf(prev.URL) == hostOf(u) && p.SSHPort == c.SSHPort && !f.check("reset_host_key") {
 			c.SSHHostKey = p.SSHHostKey
+		}
+	}
+	// Proxmox: an API token or an account; the monitoring: an account (a token pasted by hand
+	// before accounts existed keeps working until one is entered).
+	switch in.Type {
+	case "proxmox":
+		if f.raw("auth") == "password" {
+			c.TokenID, c.TokenSecret = "", ""
+			if c.Username != "" && !strings.Contains(c.Username, "@") {
+				c.Username += "@pam"
+			}
+			if c.Username == "" {
+				f.fail("username", "L'identifiant est requis (ex. root@pam)")
+			}
+			if c.Password == "" {
+				f.fail("password", "Le mot de passe est requis")
+			}
+		} else {
+			c.Username, c.Password = "", ""
+			if c.TokenID == "" {
+				f.fail("token_id", "L'ID du jeton est requis")
+			}
+			if c.TokenSecret == "" {
+				f.fail("token_secret", "Le secret du jeton est requis")
+			}
+		}
+	case "hlm":
+		if c.Username != "" || c.TokenSecret == "" {
+			c.TokenSecret = ""
+			if c.Username == "" {
+				f.fail("username", "L'identifiant du monitoring est requis")
+			}
+			if c.Password == "" {
+				f.fail("password", "Le mot de passe est requis")
+			}
 		}
 	}
 	in.Config = c
@@ -232,6 +272,9 @@ func (s *Server) mgSaveIntegration(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
+	if prev != nil && prev.Type == "hlm" && prev.Config.LoginToken != "" && in.Config.LoginToken == "" {
+		go hlmLogout(prev, prev.Config.LoginToken) // account or address changed: the old token is no longer kept
+	}
 	if prev != nil {
 		formOK(w, "Intégration mise à jour.")
 	} else {
@@ -280,7 +323,14 @@ func (s *Server) testIntegration(ctx context.Context, i *integration) (string, e
 	case "webmin":
 		return s.testWebmin(ctx, i)
 	case "hlm":
+		before := i.Config.LoginToken
 		d, err := s.hlmData(ctx, i)
+		// A token obtained for values not saved (yet) is revoked straight away.
+		if tok := i.Config.LoginToken; tok != "" && tok != before {
+			if saved, e := s.getIntegration(i.ID, "hlm"); e != nil || saved.Config.LoginToken != tok {
+				hlmLogout(i, tok)
+			}
+		}
 		if err != nil {
 			return "", err
 		}

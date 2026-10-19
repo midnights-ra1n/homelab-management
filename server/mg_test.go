@@ -156,3 +156,108 @@ func TestManagementMCPTools(t *testing.T) {
 		}
 	}
 }
+
+// The management signs in to the monitoring with an account, the monitoring's public API disabled:
+// the token it gets is kept encrypted, replaced when revoked, and the password never travels again.
+func TestMonitoringIntegrationWithAccount(t *testing.T) {
+	mon, monTS := newTestServer(t)
+	cookie := setupAdmin(t, mon, monTS)
+	mon.db.Exec(`INSERT INTO hosts(name,token_hash,created_at) VALUES('nas',?,?)`, hashToken("agent"), time.Now().Unix())
+
+	s, ts, tok := newMgTestServer(t)
+	form := url.Values{"type": {"hlm"}, "name": {"Monitoring"}, "url": {monTS.URL}, "enabled": {"on"}, "verify_tls": {"on"},
+		"username": {"admin"}, "password": {"wrong password!"}}
+	if out := postForm(t, ts, tok, "/api/mg/integrations/test", form); !strings.Contains(out, "incorrect") {
+		t.Fatal("bad password:", out)
+	}
+	form.Set("password", "correct horse battery")
+	if out := postForm(t, ts, tok, "/api/mg/integrations/test", form); !strings.Contains(out, `"ok":true`) || !strings.Contains(out, "1 hôte") {
+		t.Fatal("test:", out)
+	}
+	var n int
+	mon.db.QueryRow(`SELECT COUNT(*) FROM api_tokens`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("the connection test must revoke its token, %d left", n)
+	}
+	if out := postForm(t, ts, tok, "/api/mg/integrations", form); !strings.Contains(out, `"ok":true`) {
+		t.Fatal("save:", out)
+	}
+	i, _ := s.getIntegration(1, "hlm")
+	if _, err := s.hlmData(context.Background(), i); err != nil {
+		t.Fatal("sync:", err)
+	}
+	i, _ = s.getIntegration(1, "hlm")
+	first := i.Config.LoginToken
+	if first == "" {
+		t.Fatal("token not kept")
+	}
+	if _, err := s.hlmData(context.Background(), i); err != nil {
+		t.Fatal(err)
+	}
+	mon.db.QueryRow(`SELECT COUNT(*) FROM api_tokens WHERE user_id IS NOT NULL`).Scan(&n)
+	if n != 1 {
+		t.Fatalf("one sign-in expected, got %d tokens", n)
+	}
+	// Revoked in Réglages → API: the next call signs in again.
+	mon.db.Exec(`DELETE FROM api_tokens`)
+	if _, err := s.hlmData(context.Background(), i); err != nil {
+		t.Fatal("after revocation:", err)
+	}
+	if i, _ = s.getIntegration(1, "hlm"); i.Config.LoginToken == first || i.Config.LoginToken == "" {
+		t.Fatal("new token not saved")
+	}
+	// A token created by hand still needs the public API.
+	manual := createToken(t, monTS, cookie, []string{"status:read"}, nil)
+	if code, _ := apiReq(t, monTS, "GET", "/api/v1/status", manual, ""); code != 404 {
+		t.Fatalf("manual token with the API disabled: %d", code)
+	}
+	// Changing the password revokes the sign-ins.
+	if resp, out := do(t, monTS, "POST", "/api/auth/password", cookie, map[string]string{"current": "correct horse battery", "new": "another long password"}); resp.StatusCode != 200 {
+		t.Fatal(out)
+	}
+	if _, err := s.hlmData(context.Background(), i); err == nil || !strings.Contains(err.Error(), "incorrect") {
+		t.Fatal("old password must fail:", err)
+	}
+}
+
+// Proxmox with an account: one ticket for several calls, CSRF token on writes, new ticket when refused.
+func TestProxmoxTicket(t *testing.T) {
+	logins := 0
+	ticket := "PVE:root@pam:1"
+	pveSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api2/json/access/ticket" {
+			r.ParseForm()
+			if r.Form.Get("username") != "root@pam" || r.Form.Get("password") != "secret" {
+				w.WriteHeader(401)
+				return
+			}
+			logins++
+			w.Write([]byte(`{"data":{"ticket":"` + ticket + `","CSRFPreventionToken":"csrf1"}}`))
+			return
+		}
+		if c, _ := r.Cookie("PVEAuthCookie"); c == nil || c.Value != ticket || (r.Method != "GET" && r.Header.Get("CSRFPreventionToken") != "csrf1") {
+			w.WriteHeader(401)
+			return
+		}
+		w.Write([]byte(`{"data":"ok"}`))
+	}))
+	defer pveSrv.Close()
+	i := &integration{ID: -1, Type: "proxmox", URL: pveSrv.URL, Config: integrationConfig{Username: "root@pam", Password: "secret"}}
+	var out string
+	for _, m := range []string{"GET", "POST", "GET"} {
+		if err := pve(context.Background(), i, m, "/version", url.Values{}, &out); err != nil || out != "ok" {
+			t.Fatalf("%s: %v %q", m, err, out)
+		}
+	}
+	if logins != 1 {
+		t.Fatalf("ticket not reused: %d sign-ins", logins)
+	}
+	ticket = "PVE:root@pam:2" // Proxmox restarted: the cached ticket is refused
+	if err := pve(context.Background(), i, "GET", "/version", nil, &out); err != nil || logins != 2 {
+		t.Fatalf("no new sign-in after a refused ticket: %v, %d", err, logins)
+	}
+	i.Config.Password = "nope"
+	if err := pve(context.Background(), i, "GET", "/version", nil, &out); err == nil || !strings.Contains(err.Error(), "incorrect") {
+		t.Fatal("bad password:", err)
+	}
+}

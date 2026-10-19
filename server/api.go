@@ -42,6 +42,7 @@ type APIToken struct {
 	ExpiresAt  *int64   `json:"expires_at"`
 	CreatedAt  int64    `json:"created_at"`
 	LastUsedAt int64    `json:"last_used_at"`
+	User       string   `json:"user,omitempty"` // account signed in with POST /api/v1/auth/login
 }
 
 type tokenCtxKey struct{}
@@ -54,6 +55,9 @@ var lastUsed sync.Map
 func (s *Server) apiRoutes(mux *http.ServeMux) {
 	t := s.requireToken
 	mux.HandleFunc("OPTIONS /api/v1/", s.handleAPIPreflight)
+	mux.HandleFunc("POST /api/v1/auth/login", s.apiLogin)
+	mux.HandleFunc("POST /api/v1/auth/logout", t("", s.apiLogout))
+	mux.HandleFunc("GET /api/v1/overview", t("status:read hosts:read monitors:read", s.apiOverview))
 	mux.HandleFunc("GET /api/v1/status", t("status:read", s.apiStatus))
 	mux.HandleFunc("GET /api/v1/hosts", t("hosts:read", s.handleListHosts))
 	mux.HandleFunc("POST /api/v1/hosts", t("hosts:write", s.apiRegisterHost))
@@ -121,23 +125,30 @@ func (s *Server) handleAPIPreflight(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// requireToken checks the bearer token and its scopes (space separated, all required). Tokens
+// created in Réglages → API need the public API enabled; tokens obtained by signing in do not.
 func (s *Server) requireToken(scope string, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.setCORS(w, r)
-		if s.getSetting("api_enabled", "false") != "true" {
-			writeErr(w, 404, "L'API est désactivée (Réglages → API)")
-			return
-		}
+		apiOff := s.getSetting("api_enabled", "false") != "true"
 		tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !ok || !strings.HasPrefix(tok, tokenPrefix) {
+			if apiOff {
+				writeErr(w, 404, "L'API est désactivée (Réglages → API)")
+				return
+			}
 			w.Header().Set("WWW-Authenticate", `Bearer realm="hlm"`)
 			writeErr(w, 401, "Jeton API manquant : en-tête Authorization: Bearer hlm_…")
 			return
 		}
 		var id int64
 		var scopes, name string
-		var exp sql.NullInt64
-		err := s.db.QueryRow(`SELECT id, scopes, expires_at, name FROM api_tokens WHERE token_hash=?`, hashToken(tok)).Scan(&id, &scopes, &exp, &name)
+		var exp, user sql.NullInt64
+		err := s.db.QueryRow(`SELECT id, scopes, expires_at, name, user_id FROM api_tokens WHERE token_hash=?`, hashToken(tok)).Scan(&id, &scopes, &exp, &name, &user)
+		if err == nil && apiOff && !user.Valid {
+			writeErr(w, 404, "L'API est désactivée (Réglages → API)")
+			return
+		}
 		if err != nil {
 			if !s.limiter.allow("api:" + s.clientIP(r)) {
 				writeErr(w, 429, "Trop de tentatives")
@@ -150,9 +161,11 @@ func (s *Server) requireToken(scope string, h http.HandlerFunc) http.HandlerFunc
 			writeErr(w, 401, "Jeton API expiré")
 			return
 		}
-		if !slices.Contains(strings.Split(scopes, ","), scope) {
-			writeErr(w, 403, "Ce jeton n'a pas le scope "+scope)
-			return
+		for _, sc := range strings.Fields(scope) {
+			if !slices.Contains(strings.Split(scopes, ","), sc) {
+				writeErr(w, 403, "Ce jeton n'a pas le scope "+sc)
+				return
+			}
 		}
 		if !apiLimiter.allow(strconv.FormatInt(id, 10)) {
 			w.Header().Set("Retry-After", "60")
@@ -308,7 +321,8 @@ func (s *Server) apiMonitorMaintenance(w http.ResponseWriter, r *http.Request) {
 /* ---------- Token management (dashboard, session-authenticated) ---------- */
 
 func (s *Server) handleListTokens(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.Query(`SELECT id,name,prefix,scopes,expires_at,created_at,last_used_at FROM api_tokens ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT t.id,t.name,t.prefix,t.scopes,t.expires_at,t.created_at,t.last_used_at,COALESCE(u.username,'')
+		FROM api_tokens t LEFT JOIN users u ON u.id=t.user_id ORDER BY t.created_at DESC`)
 	if err != nil {
 		serverErr(w, err)
 		return
@@ -318,7 +332,7 @@ func (s *Server) handleListTokens(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var t APIToken
 		var scopes string
-		if err := rows.Scan(&t.ID, &t.Name, &t.Prefix, &scopes, &t.ExpiresAt, &t.CreatedAt, &t.LastUsedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.Prefix, &scopes, &t.ExpiresAt, &t.CreatedAt, &t.LastUsedAt, &t.User); err != nil {
 			serverErr(w, err)
 			return
 		}
@@ -395,4 +409,77 @@ func (s *Server) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+/* ---------- Sign-in for apps and servers (no token to copy, works with the API disabled) ---------- */
+
+// apiLogin exchanges an account's username and password for an API token tied to the account,
+// for the native apps and the management server. Without scopes it gets them all.
+func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
+	s.setCORS(w, r)
+	if !s.limiter.allow("login:" + s.clientIP(r)) {
+		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessayez dans une minute")
+		return
+	}
+	var in struct {
+		credentials
+		Name   string   `json:"name"`   // shown in Réglages → API, e.g. "iPhone de Noé"
+		Scopes []string `json:"scopes"` // optional: fewer rights than the account
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	if len(in.Scopes) == 0 {
+		for sc := range apiScopes {
+			in.Scopes = append(in.Scopes, sc)
+		}
+	}
+	name, msg := validateTokenRequest(in.Name, in.Scopes, nil)
+	if msg != "" {
+		writeErr(w, 400, msg)
+		return
+	}
+	uid, ok := s.checkCredentials(w, r, in.credentials)
+	if !ok {
+		return
+	}
+	slices.Sort(in.Scopes)
+	in.Scopes = slices.Compact(in.Scopes)
+	tok := tokenPrefix + randomToken(32)
+	if _, err := s.db.Exec(`INSERT INTO api_tokens(name,token_hash,prefix,scopes,created_at,user_id) VALUES(?,?,?,?,?,?)`,
+		name, hashToken(tok), tok[:len(tokenPrefix)+6], strings.Join(in.Scopes, ","), time.Now().Unix(), uid); err != nil {
+		serverErr(w, err)
+		return
+	}
+	logName(r, name)
+	writeJSON(w, 201, map[string]any{"token": tok, "scopes": in.Scopes})
+}
+
+// apiLogout revokes the token of the request (and the push devices registered with it).
+func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
+	id, _ := r.Context().Value(tokenCtxKey{}).(int64)
+	if _, err := s.db.Exec(`DELETE FROM api_tokens WHERE id=?`, id); err != nil {
+		serverErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// apiOverview is the app's home screen in one call: the /widgets summary plus the hosts and
+// monitors lists, read together so the counts and the lists always agree.
+func (s *Server) apiOverview(w http.ResponseWriter, r *http.Request) {
+	sum, hosts, err := s.widgets()
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	mons, err := s.loadMonitors("")
+	if err == nil {
+		err = s.attachDays(mons, 90)
+	}
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"summary": sum, "hosts": withoutPackages(hosts), "monitors": mons})
 }

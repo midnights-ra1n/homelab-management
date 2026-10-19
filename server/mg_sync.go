@@ -1,8 +1,8 @@
 package main
 
 // Midnights Monitoring integration and inventory sync. The agents only talk to the monitoring
-// server (the VPS); this server reads its /api/v1 with a token (scopes hosts:read, plus
-// monitors:read for the probes and hosts:write for decommissioning) and keeps the inventory
+// server (the VPS); this server signs in to its /api/v1 with a monitoring account (scopes
+// hosts:read, monitors:read and hosts:write, see hlmCall) and keeps the inventory
 // in step: each monitored host is linked to an inventory item, created when missing, and
 // the hardware the agent reports (CPU, RAM, disks, NICs, IP, OS) fills that item.
 
@@ -15,9 +15,11 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,28 +29,113 @@ type hlmData struct {
 	Bandwidth map[string]any   `json:"bandwidth"` // nil with an older hub or a token without monitors:read
 }
 
-func hlmGet(ctx context.Context, i *integration, path string, out any) error {
-	if i.Config.TokenSecret == "" {
-		return integrationErr("Jeton d'API Midnights Monitoring manquant (hlm_…)")
+func (s *Server) hlmGet(ctx context.Context, i *integration, path string, out any) error {
+	return s.hlmCall(ctx, i, "GET", path, "", 10*time.Second, out)
+}
+
+// hlmScopes are the rights this server asks for when it signs in to the monitoring.
+var hlmScopes = []string{"hosts:read", "hosts:write", "monitors:read", "reports:read"}
+
+// hlmLoginMu keeps two syncs from signing in at the same time (one token per integration).
+var hlmLoginMu sync.Mutex
+
+// hlmCall calls the monitoring's /api/v1. With an account, it signs in once (POST /auth/login,
+// which works with the monitoring's public API disabled) and keeps the token, encrypted with
+// the rest of the configuration; a refused token means a new sign-in. A token pasted by hand
+// (integrations set up before accounts) is used as is.
+func (s *Server) hlmCall(ctx context.Context, i *integration, method, path, body string, timeout time.Duration, out any) error {
+	c := i.Config
+	if c.Username == "" {
+		if c.TokenSecret == "" {
+			return integrationErr("Identifiant et mot de passe du monitoring manquants")
+		}
+		return hlmDo(ctx, i, c.TokenSecret, method, path, body, timeout, out)
 	}
-	return httpJSON(ctx, "GET", i.URL+"/api/v1"+path, map[string]string{"Authorization": "Bearer " + i.Config.TokenSecret},
-		strings.NewReader(""), i.Config.verify(true), 10*time.Second, out)
+	if tok := c.LoginToken; tok != "" {
+		var ie *integrationError
+		if err := hlmDo(ctx, i, tok, method, path, body, timeout, out); !errors.As(err, &ie) || ie.status != 401 {
+			return err
+		}
+	}
+	tok, err := s.hlmLogin(ctx, i, c.LoginToken)
+	if err != nil {
+		return err
+	}
+	return hlmDo(ctx, i, tok, method, path, body, timeout, out)
+}
+
+func hlmDo(ctx context.Context, i *integration, tok, method, path, body string, timeout time.Duration, out any) error {
+	headers := map[string]string{"Authorization": "Bearer " + tok}
+	if body != "" {
+		headers["Content-Type"] = "application/json"
+	}
+	return httpJSON(ctx, method, i.URL+"/api/v1"+path, headers, strings.NewReader(body), i.Config.verify(true), timeout, out)
+}
+
+// hlmLogin replaces the refused token: unless another call already did, it signs in and stores
+// the new token when the integration is saved with these credentials (not for a form test).
+func (s *Server) hlmLogin(ctx context.Context, i *integration, refused string) (string, error) {
+	hlmLoginMu.Lock()
+	defer hlmLoginMu.Unlock()
+	saved, err := s.getIntegration(i.ID, "hlm")
+	same := err == nil && saved.URL == i.URL && saved.Config.Username == i.Config.Username && saved.Config.Password == i.Config.Password
+	if same && saved.Config.LoginToken != "" && saved.Config.LoginToken != refused {
+		i.Config.LoginToken = saved.Config.LoginToken
+		return saved.Config.LoginToken, nil
+	}
+	name := "Gestion"
+	if h, err := os.Hostname(); err == nil {
+		name += " (" + clip(h, 40) + ")"
+	}
+	in, _ := json.Marshal(map[string]any{"username": i.Config.Username, "password": i.Config.Password, "name": name, "scopes": hlmScopes})
+	var res struct {
+		Token string `json:"token"`
+	}
+	err = httpJSON(ctx, "POST", i.URL+"/api/v1/auth/login", map[string]string{"Content-Type": "application/json"},
+		strings.NewReader(string(in)), i.Config.verify(true), 15*time.Second, &res)
+	var ie *integrationError
+	switch {
+	case errors.As(err, &ie) && ie.status == 401:
+		return "", integrationErr("Identifiant ou mot de passe du monitoring incorrect")
+	case errors.As(err, &ie) && ie.status == 404:
+		return "", integrationErr("Ce monitoring ne gère pas encore la connexion par compte : mettez-le à jour")
+	case err != nil:
+		return "", err
+	case res.Token == "":
+		return "", integrationErr("Réponse inattendue du monitoring")
+	}
+	i.Config.LoginToken = res.Token
+	if same {
+		saved.Config.LoginToken = res.Token
+		cfg, _ := json.Marshal(saved.Config)
+		if _, err := s.db.Exec(`UPDATE integrations SET config = ? WHERE id = ?`, s.encrypt(string(cfg)), i.ID); err != nil {
+			slog.Warn("monitoring token not saved", "integration", i.Name, "err", err)
+		}
+	}
+	return res.Token, nil
+}
+
+// hlmLogout revokes a token this server no longer keeps (connection test, changed account).
+func hlmLogout(i *integration, tok string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	hlmDo(ctx, i, tok, "POST", "/auth/logout", "{}", 10*time.Second, nil)
 }
 
 func (s *Server) hlmData(ctx context.Context, i *integration) (hlmData, error) {
 	var d hlmData
-	if err := hlmGet(ctx, i, "/hosts", &d.Hosts); err != nil {
+	if err := s.hlmGet(ctx, i, "/hosts", &d.Hosts); err != nil {
 		return d, err
 	}
 	// monitors:read is optional: a token limited to hosts stays usable.
-	if err := hlmGet(ctx, i, "/monitors", &d.Monitors); err != nil {
+	if err := s.hlmGet(ctx, i, "/monitors", &d.Monitors); err != nil {
 		var ie *integrationError
 		if !errors.As(err, &ie) || ie.status != 403 {
 			return d, err
 		}
 	}
 	// Same view as the monitoring dashboards; a hub older than this route answers 404.
-	if err := hlmGet(ctx, i, "/bandwidth", &d.Bandwidth); err != nil {
+	if err := s.hlmGet(ctx, i, "/bandwidth", &d.Bandwidth); err != nil {
 		var ie *integrationError
 		if !errors.As(err, &ie) || (ie.status != 403 && ie.status != 404) {
 			return d, err
@@ -80,7 +167,7 @@ func (s *Server) mgLiveBandwidth(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	writeJSON(w, 200, collect(ctx, list, func(ctx context.Context, i *integration) (map[string]any, error) {
 		var v map[string]any
-		return v, hlmGet(ctx, i, "/bandwidth/live", &v)
+		return v, s.hlmGet(ctx, i, "/bandwidth/live", &v)
 	}))
 }
 
@@ -101,7 +188,7 @@ func (s *Server) mgEnergy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var rep json.RawMessage
-	if err := hlmGet(r.Context(), &list[0], fmt.Sprintf("/reports/energy?days=%d", days), &rep); err != nil {
+	if err := s.hlmGet(r.Context(), &list[0], fmt.Sprintf("/reports/energy?days=%d", days), &rep); err != nil {
 		writeErr(w, 502, err.Error())
 		return
 	}
@@ -125,7 +212,7 @@ func (s *Server) mgAssetMonitoring(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var h map[string]any
-	err = hlmGet(r.Context(), i, fmt.Sprintf("/hosts/%d", host.Int64), &h)
+	err = s.hlmGet(r.Context(), i, fmt.Sprintf("/hosts/%d", host.Int64), &h)
 	out := map[string]any{"linked": true, "integration": map[string]any{"id": i.ID, "name": i.Name, "url": i.URL}, "host_id": host.Int64}
 	if err != nil {
 		out["error"] = err.Error()
@@ -226,7 +313,7 @@ func (s *Server) syncInventory(ctx context.Context) (int, error) {
 	for k := range list {
 		i := &list[k]
 		var hosts []map[string]any
-		if err := hlmGet(ctx, i, "/hosts", &hosts); err != nil {
+		if err := s.hlmGet(ctx, i, "/hosts", &hosts); err != nil {
 			errs = append(errs, fmt.Errorf("%s : %w", i.Name, err))
 			continue
 		}

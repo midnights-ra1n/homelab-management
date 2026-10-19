@@ -285,3 +285,31 @@ func TestAPIRegisterHost(t *testing.T) {
 		t.Fatal("old agent token must be revoked by rotation")
 	}
 }
+
+// The app signs in with the account (public API disabled) and loads its home screen in one call.
+func TestAppLoginAndOverview(t *testing.T) {
+	s, ts := newTestServer(t)
+	setupAdmin(t, s, ts)
+	if code, _ := apiReq(t, ts, "POST", "/api/v1/auth/login", "", `{"username":"admin","password":"nope","name":"iPhone"}`); code != 401 {
+		t.Fatalf("bad password: %d", code)
+	}
+	code, out := apiReq(t, ts, "POST", "/api/v1/auth/login", "", `{"username":"admin","password":"correct horse battery","name":"iPhone"}`)
+	if code != 201 {
+		t.Fatalf("login: %d %v", code, out)
+	}
+	tok := out["token"].(string)
+	code, out = apiReq(t, ts, "GET", "/api/v1/overview", tok, "")
+	if code != 200 || out["summary"] == nil || out["hosts"] == nil || out["monitors"] == nil {
+		t.Fatalf("overview: %d %v", code, out)
+	}
+	if code, _ := apiReq(t, ts, "POST", "/api/v1/auth/logout", tok, "{}"); code != 204 {
+		t.Fatalf("logout: %d", code)
+	}
+	if code, _ := apiReq(t, ts, "GET", "/api/v1/overview", tok, ""); code != 401 {
+		t.Fatalf("token still valid after logout: %d", code)
+	}
+	_, out = apiReq(t, ts, "POST", "/api/v1/auth/login", "", `{"username":"admin","password":"correct horse battery","name":"Widget","scopes":["status:read"]}`)
+	if code, _ := apiReq(t, ts, "GET", "/api/v1/overview", out["token"].(string), ""); code != 403 {
+		t.Fatalf("overview needs hosts:read and monitors:read: %d", code)
+	}
+}

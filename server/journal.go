@@ -98,7 +98,7 @@ func (s *Server) journal(next http.Handler) http.Handler {
 		if !ok {
 			return
 		}
-		failedLogin := rec.code == http.StatusUnauthorized && r.Pattern == "POST /api/auth/login"
+		failedLogin := rec.code == http.StatusUnauthorized && (r.Pattern == "POST /api/auth/login" || r.Pattern == "POST /api/v1/auth/login")
 		if rec.code >= 400 && !failedLogin {
 			return
 		}
@@ -167,6 +167,8 @@ var journalLabels = map[string]journalLabel{
 	"DELETE /api/enroll-tokens/{id}":        jl("token", "delete", "Jeton d'inscription supprimé"),
 	"POST /api/tokens":                      jl("token", "create", "Jeton d'API créé"),
 	"DELETE /api/tokens/{id}":               jl("token", "delete", "Jeton d'API révoqué"),
+	"POST /api/v1/auth/login":               jl("account", "login", "Connexion d'une application"),
+	"POST /api/v1/auth/logout":              jl("account", "logout", "Déconnexion d'une application"),
 	"POST /api/v1/hosts":                    jl("host", "create", "Hôte inscrit par l'API"),
 	"POST /api/v1/devices":                  jl("device", "create", "Appareil inscrit aux notifications push"),
 	"DELETE /api/v1/devices/{token}":        jl("device", "delete", "Appareil retiré des notifications push"),

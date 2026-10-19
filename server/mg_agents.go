@@ -42,7 +42,7 @@ func (s *Server) linkedAgents(ctx context.Context) ([]agentState, []string, erro
 			i, err := s.getIntegration(iid, "hlm")
 			var list []map[string]any
 			if err == nil {
-				err = hlmGet(ctx, i, "/hosts", &list)
+				err = s.hlmGet(ctx, i, "/hosts", &list)
 			}
 			if err != nil {
 				errs = append(errs, err.Error())
@@ -109,9 +109,7 @@ func (s *Server) mgUpdateAgents(w http.ResponseWriter, r *http.Request) {
 		}
 		i, err := s.getIntegration(a.IntegrationID, "hlm")
 		if err == nil {
-			err = httpJSON(ctx, "POST", fmt.Sprintf("%s/api/v1/hosts/%d/agent-update", i.URL, a.HostID),
-				map[string]string{"Authorization": "Bearer " + i.Config.TokenSecret, "Content-Type": "application/json"},
-				strings.NewReader("{}"), i.Config.verify(true), 15*time.Second, nil)
+			err = s.hlmCall(ctx, i, "POST", fmt.Sprintf("/hosts/%d/agent-update", a.HostID), "{}", 15*time.Second, nil)
 		}
 		if err != nil {
 			msg := err.Error()
