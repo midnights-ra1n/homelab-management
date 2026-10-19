@@ -12,7 +12,7 @@ const loadLive = async (): Promise<LiveSource[]> => [{ key: "0", view: await api
 export function BandwidthPage() {
   const [range, setRange] = useState<Range>("live");
   // The live view lists the links from the last hour and reads their rates itself.
-  const { data, error } = usePoll(() => api.get<Bandwidth>(`/api/bandwidth?range=${range === "live" ? "1h" : range}`), range === "live" ? 60000 : 30000, [range]);
+  const { data, error } = usePoll(() => api.get<Bandwidth>(`/api/bandwidth?range=${range === "live" ? "1h" : range}`), range === "live" ? 60000 : 30000, [range], ["metrics"]);
   return (
     <>
       <PageHeader title="Bande passante" description={range === "live"

@@ -47,7 +47,7 @@ function ActionStatus({ h }: { h: Host }) {
 }
 
 export function UpdatesPage() {
-  const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts?packages=1"), 8000);
+  const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts?packages=1"), 8000, [], ["hosts"]);
   const [open, setOpen] = useState<Record<number, boolean>>({});
   const [securityOnly, setSecurityOnly] = useState(false);
   const [confirm, setConfirm] = useState<Host>();

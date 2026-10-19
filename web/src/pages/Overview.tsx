@@ -49,7 +49,7 @@ function parseLayout(raw: string): Widget[] {
 }
 
 export function OverviewPage() {
-  const { data, error } = usePoll(() => api.get<Overview>("/api/overview"), 15000);
+  const { data, error } = usePoll(() => api.get<Overview>("/api/overview"), 15000, [], ["hosts", "monitors", "metrics"]);
   const [layout, setLayout] = useState<Widget[]>(DEFAULT_LAYOUT);
   const [editing, setEditing] = useState(false);
   const toast = useToast();

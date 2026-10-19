@@ -41,7 +41,7 @@ const uptime = (m: Monitor, last = 90) => {
 };
 
 export function MonitorsPage() {
-  const { data, error, refresh } = usePoll(() => api.get<Monitor[]>("/api/monitors"), 15000);
+  const { data, error, refresh } = usePoll(() => api.get<Monitor[]>("/api/monitors"), 15000, [], ["monitors", "metrics"]);
   const [editing, setEditing] = useState<Monitor | "new">();
   const [view, setView] = useState<"cards" | "table">(() => (localStorage.getItem("hlm-view-monitors") as "table") || "cards");
   const changeView = (v: "cards" | "table") => { setView(v); savePrefs({ monitors_view: v }); try { localStorage.setItem("hlm-view-monitors", v); } catch { /* private mode */ } };
@@ -447,9 +447,9 @@ function MonitorDialog({ monitor, categories = [], onClose }: { monitor?: Monito
 type Range = "1h" | "24h" | "7d" | "30d" | "90d";
 
 export function MonitorDetailPage({ id }: { id: number }) {
-  const mon = usePoll(() => api.get<Monitor>(`/api/monitors/${id}`), 15000, [id]);
+  const mon = usePoll(() => api.get<Monitor>(`/api/monitors/${id}`), 15000, [id], ["monitors", "metrics"]);
   const [range, setRange] = useState<Range>("24h");
-  const res = usePoll(() => api.get<Series>(`/api/monitors/${id}/results?range=${range}`), 30000, [id, range]);
+  const res = usePoll(() => api.get<Series>(`/api/monitors/${id}/results?range=${range}`), 30000, [id, range], ["metrics"]);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const toast = useToast();

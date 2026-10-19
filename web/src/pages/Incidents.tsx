@@ -25,7 +25,7 @@ export function incidents(data: Overview): Incident[] {
 type Filter = "all" | "Hôte" | "Sonde";
 
 export function IncidentsPage() {
-  const { data, error } = usePoll(() => api.get<Overview>("/api/overview"), 15000);
+  const { data, error } = usePoll(() => api.get<Overview>("/api/overview"), 15000, [], ["hosts", "monitors"]);
   const [filter, setFilter] = useState<Filter>("all");
   const all = data ? incidents(data) : [];
   const list = filter === "all" ? all : all.filter((i) => i.kind === filter);
@@ -33,7 +33,7 @@ export function IncidentsPage() {
 
   return (
     <>
-      <PageHeader title="Incidents en cours" description="Hôtes et sondes qui ne sont pas opérationnels, du plus grave au moins grave. Actualisé toutes les 15 secondes." />
+      <PageHeader title="Incidents en cours" description="Hôtes et sondes qui ne sont pas opérationnels, du plus grave au moins grave. Mis à jour en direct." />
       {error && <Alert kind="error" title="Impossible de charger les incidents" className="mb-6">{error}</Alert>}
       <div className={SECTIONS}>
         <div className={STAT_GRID}>

@@ -59,6 +59,7 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/logout", t("", s.apiLogout))
 	mux.HandleFunc("GET /api/v1/overview", t("status:read hosts:read monitors:read", s.apiOverview))
 	mux.HandleFunc("GET /api/v1/status", t("status:read", s.apiStatus))
+	mux.HandleFunc("GET /api/v1/events", t("status:read", s.handleEvents))
 	mux.HandleFunc("GET /api/v1/hosts", t("hosts:read", s.handleListHosts))
 	mux.HandleFunc("POST /api/v1/hosts", t("hosts:write", s.apiRegisterHost))
 	mux.HandleFunc("GET /api/v1/hosts/{id}", t("hosts:read", s.handleGetHost))

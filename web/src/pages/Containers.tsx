@@ -96,7 +96,7 @@ export function ContainersTable({ h, filter = "all", onChanged }: { h: Host; fil
 }
 
 export function ContainersPage() {
-  const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts"), 10000);
+  const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts"), 10000, [], ["hosts"]);
   const [filter, setFilter] = useState<"all" | "updates" | "stopped">(() => (new URLSearchParams(location.search).get("filtre") === "maj" ? "updates" : "all"));
   const hosts = (data ?? []).filter((h) => h.docker);
   const all = hosts.flatMap((h) => h.docker!.containers);

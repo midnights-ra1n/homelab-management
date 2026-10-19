@@ -8,7 +8,7 @@ API REST intégrée au hub Midnights Monitoring. Elle expose les données de sup
 - **JSON UTF-8**, horodatages en **secondes Unix** (sauf mention contraire, voir [Conventions](#conventions)).
 - Seul le rôle **monitoring** expose cette API. Midnights Management (rôle gestion) la consomme mais n'en publie pas.
 
-> **Vous développez une app iOS, iPadOS ou macOS ?** Lisez ensuite le [guide Apple](API-APPLE.md) : modèles `Codable` complets, client Swift, notifications push, widgets interactifs et synchronisation des préférences.
+> **Vous développez une app iOS, iPadOS ou macOS ?** Lisez ensuite le [guide des applications natives](API-APPLE.md) : connexion, routes par écran, temps réel, notifications push, widgets et préférences partagées.
 
 ## Sommaire
 
@@ -55,7 +55,7 @@ curl -fsS -H "Authorization: Bearer $HLM_TOKEN" "$HLM_URL/api/v1/status"
 
 **Réponses.** Toujours du JSON, sauf `204 No Content` (corps vide). Les listes sont renvoyées en entier, sans pagination : elles restent petites (quelques dizaines d'éléments dans un homelab). Les listes renvoyées par une route (`/hosts`, `/monitors`…) valent `[]` quand elles sont vides ; une liste imbriquée peut être absente ou `null` : prévoyez les deux.
 
-**Noms de champs.** `snake_case`. Attention aux conversions automatiques en `camelCase` (Swift `convertFromSnakeCase`, certains réglages Kotlin ou TypeScript) : elles réécrivent aussi les clés des **dictionnaires** (`by_status`, préférences), qui sont des données et pas des noms de champs. Déclarez plutôt la correspondance champ par champ (`CodingKeys` en Swift, voir le [guide Apple](API-APPLE.md#modèles-codable)).
+**Noms de champs.** `snake_case`. Attention aux conversions automatiques en `camelCase` (stratégies de décodage « snake_case vers camelCase » de certains langages) : elles réécrivent aussi les clés des **dictionnaires** (`by_status`, préférences), qui sont des données et pas des noms de champs. Déclarez plutôt la correspondance champ par champ (voir [Format des réponses](API-APPLE.md#format-des-réponses)).
 
 **Valeurs absentes.** Un champ documenté comme facultatif peut être absent **ou** `null` : traitez les deux de la même façon. Une mesure inconnue vaut `null`, jamais `0`.
 
@@ -193,6 +193,7 @@ L'état global est le pire état parmi les hôtes et les sondes actives.
 | `POST` | [`/auth/login`](#post-apiv1authlogin) | — | Échanger identifiant et mot de passe contre un jeton |
 | `POST` | [`/auth/logout`](#post-apiv1authlogout) | — | Révoquer le jeton de la requête |
 | `GET` | [`/overview`](#get-apiv1overview) | `status:read`, `hosts:read`, `monitors:read` | Écran d'accueil en un appel : résumé, hôtes, sondes |
+| `GET` | [`/events`](#get-apiv1events) | `status:read` | Flux en direct (Server-Sent Events) : ce qui vient de changer |
 | `GET` | [`/status`](#get-apiv1status) | `status:read` | État global et comptes par état |
 | `GET` | [`/widgets`](#get-apiv1widgets) | `status:read` | Résumé compact pour widgets : état, problèmes, puissance |
 | `GET` | [`/hosts`](#get-apiv1hosts) | `hosts:read` | Hôtes et dernières mesures |
@@ -253,6 +254,31 @@ Scopes `status:read`, `hosts:read` et `monitors:read`. L'écran d'accueil de l'a
 ```
 
 `summary` est exactement la réponse de [`/widgets`](#get-apiv1widgets). Les widgets et l'extension de notification gardent `/widgets`, bien plus léger.
+
+### `GET /api/v1/events`
+
+Scope `status:read`. Flux [Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html) qui annonce les changements, pour recharger une vue seulement quand c'est utile au lieu de l'interroger à intervalle fixe. Le web utilise le même flux (`/api/events`, session).
+
+```text
+retry: 5000
+event: ready
+data: {}
+
+event: changed
+data: {"topics":["hosts","metrics"]}
+
+: ping
+```
+
+- `ready` : envoyé à chaque connexion. Rechargez tout : des changements ont pu être manqués pendant une coupure.
+- `changed` : les sujets modifiés pendant la dernière seconde. `hosts` (état, infos d'agent, mises à jour, disques, conteneurs, action), `monitors` (état d'une sonde), `metrics` (nouvelles mesures, fréquent : rechargez au plus toutes les 30 s), `all` (modification faite depuis le web ou l'API).
+- `: ping` toutes les 25 s, pour que les proxys ne ferment pas la connexion. Côté proxy, désactivez la mise en tampon (`proxy_buffering off` avec nginx ; le hub envoie aussi `X-Accel-Buffering: no`).
+- Le flux ne porte aucune donnée : lisez-les ensuite sur les routes habituelles.
+- 200 connexions simultanées au plus pour tout le hub (`503` au-delà).
+
+```sh
+curl -N -H "Authorization: Bearer $HLM_TOKEN" "$HLM_URL/api/v1/events"
+```
 
 ### `GET /api/v1/status`
 
@@ -779,7 +805,7 @@ Scope `status:read`. Un seul appel pour les widgets de l'écran d'accueil : le r
 
 ### `POST /api/v1/devices`
 
-Scope `push:write`. Inscrit un appareil aux notifications push (APNs). À appeler à chaque lancement de l'app avec le `deviceToken` reçu par `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)` : l'appel est idempotent.
+Scope `push:write`. Inscrit un appareil aux notifications push (APNs). À appeler à chaque lancement de l'app avec le `deviceToken` fourni par le système à l'inscription aux notifications : l'appel est idempotent.
 
 ```json
 { "token": "a1b2…(hexadécimal)", "name": "iPhone de Midnights", "sandbox": false }
@@ -858,7 +884,7 @@ Le web relit les préférences à chaque ouverture et enregistre chaque changeme
 
 ## Applications Apple (iOS, macOS)
 
-Les routes `/widgets`, `/devices` et `/preferences` ont été conçues pour l'app native. Le [guide Apple](API-APPLE.md) décrit l'ensemble : configuration d'Xcode et du serveur, modèles `Codable` de toutes les réponses, client Swift (`async`/`await`), stockage du jeton dans le trousseau, notifications push, widgets interactifs, App Intents et synchronisation des préférences.
+Les routes `/auth/login`, `/overview`, `/events`, `/widgets`, `/devices` et `/preferences` ont été conçues pour l'app native. Le [guide des applications natives](API-APPLE.md) décrit l'ensemble : préparation du serveur et du compte Apple, connexion, route à utiliser pour chaque écran, temps réel, notifications push, widgets et préférences. Il ne contient pas de code : l'app vit dans son propre dépôt.
 
 ## Exemples d'intégration
 
@@ -936,5 +962,6 @@ Le préfixe `/api/v1` est stable. Des champs peuvent être **ajoutés** aux rép
 
 | Date | Changement |
 |---|---|
+| 2026-10 | Route `GET /events` (flux en direct, Server-Sent Events). |
 | 2026-10 | Routes `POST /auth/login`, `POST /auth/logout` (jetons rattachés à un compte, valides avec l'API désactivée) et `GET /overview`. |
 | 2026-10 | Routes `GET /bandwidth` et `GET /bandwidth/live` (scope `monitors:read`). Routes `GET /widgets`, `POST` / `DELETE /devices`, `GET` / `PUT /preferences` ; scopes `push:write`, `preferences:read`, `preferences:write`. Champs `agent_down` et `reachable` des hôtes ; un hôte dont l'agent est arrêté mais qui répond au ping passe en `degraded` au lieu de `major_outage`. Sondes SNMP : `snmp_mode` et `interface` (débit et état d'interface). Route `GET /snmp/devices`. Bande passante : `speed_mbps`, `days`, `today_octets`, `month_octets`, `daily_octets` ; `peak_mbps` devient la plus forte mesure de la période. Sondes SNMP : `max_percent`, `idle_minutes`. |

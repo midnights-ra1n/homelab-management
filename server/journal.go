@@ -98,6 +98,9 @@ func (s *Server) journal(next http.Handler) http.Handler {
 		if !ok {
 			return
 		}
+		if rec.code < 400 && label.entity != "account" {
+			events.publish("all") // live views reload after any change made from the UI or the API
+		}
 		failedLogin := rec.code == http.StatusUnauthorized && (r.Pattern == "POST /api/auth/login" || r.Pattern == "POST /api/v1/auth/login")
 		if rec.code >= 400 && !failedLogin {
 			return

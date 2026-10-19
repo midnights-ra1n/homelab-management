@@ -700,20 +700,25 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 			if _, err := s.db.Exec(`UPDATE hosts SET info=? WHERE id=?`, string(b), id); err != nil {
 				slog.Error("store agent info", "err", err)
 			}
+			events.publish("hosts")
 		case m.Type == "action_result" && hostActions[m.Action] && (m.State == "running" || m.State == "done" || m.State == "failed"):
 			s.setHostAction(id, m.Action, m.State, m.Message)
+			events.publish("hosts")
 		case m.Type == "docker" && m.Docker != nil:
 			if err := s.storeDocker(id, hostName, m.Docker); err != nil {
 				slog.Error("store docker", "err", err)
 			}
+			events.publish("hosts")
 		case m.Type == "smart" && m.Smart != nil:
 			if err := s.storeSmart(id, hostName, m.Smart); err != nil {
 				slog.Error("store smart", "err", err)
 			}
+			events.publish("hosts")
 		case m.Type == "updates" && m.Updates != nil:
 			if err := s.storeUpdates(id, hostName, m.Updates); err != nil {
 				slog.Error("store updates", "err", err)
 			}
+			events.publish("hosts")
 		case m.Type == "live" && m.Metrics != nil:
 			me.mu.Lock()
 			if time.Since(me.liveAt) >= time.Second {
@@ -730,6 +735,7 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 				slog.Error("store metrics", "err", err)
 			}
 			s.checkDiskSpace(id, hostName, m.Metrics.Disks)
+			events.publish("metrics")
 		}
 	}
 }
@@ -831,6 +837,9 @@ func (s *Server) watchHosts(ctx context.Context) {
 			s.pingDownHosts(ctx, hosts)
 			for _, h := range hosts {
 				h.Status = s.hostStatus(&h)
+				if p, seen := prev[h.ID]; seen && p != h.Status {
+					events.publish("hosts")
+				}
 				if p, seen := prev[h.ID]; seen && p != h.Status && p != StatusUnknown && h.Status != StatusUnknown {
 					msg := ""
 					if h.AgentDown {

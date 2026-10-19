@@ -1,4 +1,3 @@
-| `HLT_LEGACY_LISTEN` | vide (`:8080` dans l’image Docker et dans `monitoring.env`) | Ancien port, gardé après le passage de 8080 à 3000. Une page ouverte sur `hôte:8080` est redirigée vers le nouveau port ; l’API, les agents et les reverse proxies qui visent encore 8080 sont servis normalement. En Docker, pas de redirection (le port publié sur l’hôte n’est pas connu) : le port reste seulement servi. Videz-la quand tout est passé sur 3000 |
 # Midnights Management
 
 > [!NOTE]
@@ -20,6 +19,20 @@ Gestion et supervision d'un homelab, réunies dans un seul projet issu de la fus
 
 L'interface est en français.
 
+## Documentation
+
+| Document | Pour |
+|---|---|
+| [Architecture et communications](docs/ARCHITECTURE.md) | comprendre comment les rôles, les agents, les navigateurs et les apps se parlent |
+| [Guide du monitoring](docs/MONITORING.md) | hôtes, sondes, alertes, page de statut, rapports, réglages |
+| [Guide de la gestion](docs/GESTION.md) | inventaire, réseau, déploiements, tâches, Proxmox, Webmin, réglages |
+| [Déployer l'agent](docs/AGENT.md) · [Ansible](docs/ANSIBLE.md) | installer l'agent sur une ou plusieurs machines |
+| [Sondes SNMP](docs/SNMP.md) | bande passante et équipements réseau (TP-Link Omada ER605) |
+| [API du monitoring](docs/API.md) | scripts, outils tiers, apps : routes, jetons, temps réel |
+| [Applications natives](docs/API-APPLE.md) | app iOS, iPadOS, macOS : connexion, temps réel, notifications, widgets |
+
+Ce README couvre l'installation, le reverse proxy et la mise à jour.
+
 ## Architecture
 
 ```
@@ -36,6 +49,7 @@ L'interface est en français.
 - La gestion se connecte au monitoring avec un **compte du monitoring** (identifiant et mot de passe, chiffrés côté gestion). Elle obtient elle-même un jeton (scopes `hosts:read`, `hosts:write`, `monitors:read`, `reports:read`), sans que l'API publique du monitoring ait besoin d'être activée : tableau de bord, alertes, page *Monitoring* et **synchronisation de l'inventaire**.
 - Les intégrations **Proxmox** (Paramètres → Intégrations) restent **indépendantes** de l'inventaire et du monitoring. Elles centralisent plusieurs nœuds autonomes sans créer de cluster, donc sans problème de quorum. Chaque nœud se connecte avec un jeton API ou avec un compte (`root@pam`, sans double authentification) ; la migration entre nœuds exige un jeton sur le nœud cible.
 - Intégrations disponibles : Proxmox VE, Midnights Monitoring et Webmin. Beszel, Maintenant et PatchMon ont été retirés.
+- Le détail des flux, de l'authentification et du temps réel est dans [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Inventaire et monitoring
 
@@ -125,6 +139,7 @@ Image : `ghcr.io/midnights-ra1n/homelab-management`, distroless, non-root, syst�
 |---|---|---|
 | `HLT_ROLE` | `monitoring` | `monitoring` ou `management` |
 | `HLT_LISTEN` | `:3000` | Adresse d’écoute (ex. `:3001` pour faire tourner les deux rôles sur le même hôte) |
+| `HLT_LEGACY_LISTEN` | vide (`:8080` dans l’image Docker et dans `monitoring.env`) | Ancien port, gardé après le passage de 8080 à 3000. Une page ouverte sur `hôte:8080` est redirigée vers le nouveau port ; l’API, les agents et les reverse proxies qui visent encore 8080 sont servis normalement. En Docker, pas de redirection (le port publié sur l’hôte n’est pas connu) : le port reste seulement servi. Videz-la quand tout est passé sur 3000 |
 | `HLT_DATA_DIR` | `./data` (`/data` en Docker) | Base, clés, icônes |
 | `HLT_PUBLIC_URL` | — | Adresse publique (commandes d'installation de l'agent, contrôle d'origine) |
 | `HLT_TRUSTED_PROXIES` | — | Reverse proxies autorisés à transmettre `X-Forwarded-*` : IP ou CIDR, séparés par des virgules (une entrée invalide est ignorée et signalée dans les journaux) |
@@ -173,7 +188,7 @@ Plusieurs valeurs se séparent par des virgules. Restez aussi précis que possib
 
 ### 3. Régler le proxy
 
-Le proxy doit transmettre `X-Forwarded-Proto: https`, conserver l'en-tête `Host` et laisser passer les **WebSockets**. Ceux-ci servent aux agents (monitoring) et à la console noVNC Proxmox (gestion).
+Le proxy doit transmettre `X-Forwarded-Proto: https`, conserver l'en-tête `Host` et laisser passer les **WebSockets**. Ceux-ci servent aux agents (monitoring) et à la console noVNC Proxmox (gestion). Les mises à jour en direct de l'interface et de l'app (`/api/events`, Server-Sent Events) passent par une simple connexion HTTP longue. Le hub envoie `X-Accel-Buffering: no` pour que nginx et Nginx Proxy Manager ne les retardent pas, et un *ping* toutes les 25 s pour que le proxy ne les coupe pas.
 
 - **Zoraxy** : créez un *HTTP Proxy* vers `http://<ip-du-serveur>:3000` avec TLS activé sur le domaine. Zoraxy ajoute lui-même `X-Forwarded-Proto` et `X-Forwarded-For` et relaie les WebSockets. Si le diagnostic n'affiche aucun en-tête reçu, ajoutez-le dans les règles de l'hôte : *Edit → Custom Headers*, en-tête `X-Forwarded-Proto`, valeur `https`, sens *To upstream*.
 - **NPMPlus / Nginx Proxy Manager** : *Proxy Host* avec le schéma `http`, l'IP et le port `3000`. Cochez **Websockets Support**. Dans l'onglet SSL, prenez un certificat et cochez *Force SSL*. L'en-tête `X-Forwarded-Proto` est déjà envoyé par le modèle de configuration ; rien à ajouter dans *Advanced*.
@@ -228,7 +243,7 @@ Si l'agent ne répond plus (service arrêté, bloqué), le monitoring pingue la 
 
 Dans les deux cas, une alerte e-mail est envoyée. Le ping et la sonde *Ping (ICMP)* passent par une socket ICMP non privilégiée : `net.ipv4.ping_group_range` doit inclure le groupe du serveur. C'est le cas par défaut sous Docker et Debian. Sinon, un agent arrêté reste en panne majeure.
 
-Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). API du monitoring : [docs/API.md](docs/API.md) ; app iOS / macOS (notifications push, widgets, préférences) : [docs/API-APPLE.md](docs/API-APPLE.md) ; sondes SNMP, bande passante et routeur TP-Link Omada ER605 : [docs/SNMP.md](docs/SNMP.md).
+Détails : [docs/AGENT.md](docs/AGENT.md), [docs/ANSIBLE.md](docs/ANSIBLE.md). Toute la documentation : [docs/README.md](docs/README.md).
 
 ## Développement
 

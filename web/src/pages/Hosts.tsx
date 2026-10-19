@@ -12,7 +12,7 @@ import { AgentVersion, useHostAction } from "./AgentVersion";
 import { ContainersTable } from "./Containers";
 
 export function HostsPage() {
-  const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts"), 15000);
+  const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts"), 15000, [], ["hosts", "metrics"]);
   const [adding, setAdding] = useState(false);
   const [mass, setMass] = useState(false);
   const online = data?.filter((h) => h.connected).length ?? 0;
@@ -88,13 +88,13 @@ export function HostsPage() {
 type Range = "1h" | "24h" | "7d" | "30d";
 
 export function HostDetailPage({ id }: { id: number }) {
-  const host = usePoll(() => api.get<Host>(`/api/hosts/${id}`), 10000, [id]);
+  const host = usePoll(() => api.get<Host>(`/api/hosts/${id}`), 10000, [id], ["hosts", "metrics"]);
   const [range, setRange] = useState<Range>("24h");
-  const metrics = usePoll(() => api.get<HostSeries>(`/api/hosts/${id}/metrics?range=${range}`), 30000, [id, range]);
+  const metrics = usePoll(() => api.get<HostSeries>(`/api/hosts/${id}/metrics?range=${range}`), 30000, [id, range], ["metrics"]);
   // Live view: polling asks the agent to stream every 2 s while the page is open.
   const live = usePoll(() => api.get<{ live: boolean; metrics?: HostLatest }>(`/api/hosts/${id}/live`), 2000, [id]);
   const agentAction = useHostAction((updated) => host.setData(updated));
-  const disks = usePoll(() => api.get<HostDisks[]>("/api/disks"), 300000, [id]);
+  const disks = usePoll(() => api.get<HostDisks[]>("/api/disks"), 300000, [id], ["hosts"]);
   const myDisks = disks.data?.find((d) => d.host_id === id);
   const [install, setInstall] = useState<Install>();
   const [confirmDelete, setConfirmDelete] = useState(false);

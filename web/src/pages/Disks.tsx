@@ -78,7 +78,7 @@ export function DiskCard({ d }: { d: Disk }) {
 }
 
 export function DisksPage() {
-  const { data, error } = usePoll(() => api.get<HostDisks[]>("/api/disks"), 60000);
+  const { data, error } = usePoll(() => api.get<HostDisks[]>("/api/disks"), 60000, [], ["hosts"]);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   const refresh = async () => {

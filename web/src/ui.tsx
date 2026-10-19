@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, us
 import uPlot from "uplot";
 import { CircleAlert, CircleCheck, CirclePause, Clock, Copy, TriangleAlert, Wrench, X } from "lucide-react";
 import { savePrefs, statusLabel, type Day, type Status } from "./api";
+import { isLive, subscribeLive, type Topic } from "./live";
 
 /** Search shortcut label: ⌘K on Apple systems, Ctrl K elsewhere. */
 export const SEARCH_KEY = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘K" : "Ctrl K";
@@ -48,21 +49,59 @@ export function Link({ to, children, ...rest }: { to: string; children: ReactNod
 
 /* ---------- Data loading ---------- */
 
-/** Loads data on mount and every `intervalMs` while the tab is visible. */
-export function usePoll<T>(load: () => Promise<T>, intervalMs: number, deps: unknown[] = []) {
+/** Safety reload of a live view, in case an event was lost. */
+const LIVE_SAFETY_MS = 5 * 60_000;
+
+/**
+ * Loads data on mount, then:
+ * - without `topics`: every `intervalMs` while the tab is visible;
+ * - with `topics`: when the server announces a change of one of them (live/events stream).
+ *   "metrics" (frequent) reloads at most every `intervalMs`, the other topics at once.
+ *   While the stream is down, the view polls every `intervalMs` as before.
+ */
+export function usePoll<T>(load: () => Promise<T>, intervalMs: number, deps: unknown[] = [], topics?: Topic[]) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState<string>();
   const loadRef = useRef(load);
   loadRef.current = load;
+  const lastRef = useRef(0);
   const refresh = useCallback(() => {
+    lastRef.current = Date.now();
     loadRef.current().then((d) => { setData(d); setError(undefined); }, (e: Error) => setError(e.message));
   }, []);
+  const topicKey = topics?.join(",");
   useEffect(() => {
     refresh();
-    const id = setInterval(() => { if (!document.hidden) refresh(); }, intervalMs);
-    return () => clearInterval(id);
+    let dirty = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let due = Infinity;
+    // One pending reload; an urgent topic brings forward a reload planned for metrics.
+    const later = (ms: number) => {
+      const at = Date.now() + ms;
+      if (timer && at >= due) return;
+      clearTimeout(timer);
+      due = at;
+      timer = setTimeout(() => { timer = undefined; due = Infinity; run(); }, ms);
+    };
+    const run = () => { if (document.hidden) { dirty = true; return; } dirty = false; refresh(); };
+    const id = setInterval(() => {
+      const stale = Date.now() - lastRef.current >= (topics && isLive() ? LIVE_SAFETY_MS : intervalMs);
+      if (stale) run();
+    }, intervalMs);
+    const onVisible = () => { if (!document.hidden && dirty) run(); };
+    document.addEventListener("visibilitychange", onVisible);
+    const unsubscribe = topics ? subscribeLive((changed) => {
+      if (changed.some((t) => t !== "metrics" && (t === "all" || topics.includes(t)))) later(300);
+      else if (changed.includes("metrics") && topics.includes("metrics")) later(Math.max(0, lastRef.current + intervalMs - Date.now()));
+    }) : undefined;
+    return () => {
+      clearInterval(id);
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      unsubscribe?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, topicKey]);
   return { data, error, refresh, setData };
 }
 
