@@ -96,26 +96,6 @@ func TestAPNsJWT(t *testing.T) {
 	}
 }
 
-func TestHostStatusPing(t *testing.T) {
-	s, _ := newTestServer(t)
-	h := Host{ID: 7, LastSeen: time.Now().Add(-time.Hour).Unix(), Latest: []byte("{}")}
-	if st := s.hostStatus(&h); st != StatusMajor || h.Ping != nil {
-		t.Fatalf("no ping result: %s", st)
-	}
-	s.pings.Store(int64(7), true)
-	if st := s.hostStatus(&h); st != StatusMinor || hostMessage(&Host{Status: st, Ping: h.Ping}) != "Agent injoignable, l'hôte répond au ping" {
-		t.Fatalf("ping ok: %s", st)
-	}
-	s.pings.Store(int64(7), false)
-	h.Ping = nil
-	if st := s.hostStatus(&h); st != StatusMajor || *h.Ping {
-		t.Fatalf("ping down: %s", st)
-	}
-	if assetStatusFor(StatusMinor) != "online" || assetStatusFor(StatusMajor) != "offline" {
-		t.Fatal("management mapping")
-	}
-}
-
 func TestSNMPThroughput(t *testing.T) {
 	m := Monitor{Name: "WAN", Type: "snmp", Target: "192.168.0.1", Config: MonitorConfig{SNMPMode: "in", Interface: "WAN1"}}
 	if msg := m.validate(); msg != "" || m.Config.Unit != "Mbit/s" {

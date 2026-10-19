@@ -48,6 +48,14 @@ pub fn request_container_update(name: &str) -> Result<(), String> {
     drop_request("docker-request", name)
 }
 
+/// Asks the root SMART collector (hlm-agent-smart.path) to run now instead of at the next hourly tick.
+pub fn request_smart() -> Result<(), String> {
+    if !std::path::Path::new("/etc/systemd/system/hlm-agent-smart.path").exists() {
+        return Err("Relevé SMART à la demande non installé sur cette machine (relancez install.sh)".into());
+    }
+    drop_request("smart-request", "1")
+}
+
 /// Result of a root helper's last action, once finished after `since`: (ok, message).
 pub fn helper_result((status, log): (&str, &str), since: u64) -> Option<(bool, String)> {
     let st: Value = serde_json::from_slice(&std::fs::read(status).ok()?).ok()?;

@@ -14,10 +14,9 @@ const META = {
 } as const;
 
 /** Statut d'un hôte / d'une sonde du hub Midnights Monitoring. */
-export function hlmKind(status: string, opts: { enabled?: boolean; maintenance?: boolean; ping?: boolean | null } = {}): StatusKind {
+export function hlmKind(status: string, opts: { enabled?: boolean; maintenance?: boolean } = {}): StatusKind {
   if (opts.enabled === false) return "paused";
   if (opts.maintenance || status === "maintenance") return "maintenance";
-  if (opts.ping === true) return "warn"; // agent stopped, machine still answers ping
   if (status === "operational") return "ok";
   if (status === "degraded") return "warn";
   if (status === "unknown") return "pending";

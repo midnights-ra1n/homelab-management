@@ -9,6 +9,7 @@ import { NAV_SECTIONS, isActive, type NavItem } from "./nav-items";
 import { usePathname, useT } from "@/i18n/client";
 import { useSession } from "@/session";
 import { ArrowUpRight } from "lucide-react";
+import { SEARCH_KEY } from "../../../ui";
 
 /**
  * Barre latérale de la charte (.mm-sidebar) : 248 px, rail 64 px (tablette ou replié, :root[data-sidebar="rail"]),
@@ -21,10 +22,10 @@ export function AppSidebar({ userSlot }: { userSlot: ReactNode }) {
     <aside className="mm-sidebar" aria-label={tr("Navigation principale")}>
       <SideHead />
       <nav className="mm-sidebar__nav">
-        <button type="button" onClick={openSearch} title={tr("Rechercher (⌘K)")} className="mm-nav-item">
+        <button type="button" onClick={openSearch} title={`${tr("Rechercher")} (${SEARCH_KEY})`} className="mm-nav-item">
           <Search size={16} aria-hidden="true" className="shrink-0" />
           <span className="mm-nav-item__label">{tr("Rechercher")}</span>
-          <kbd className="mm-nav-item__count font-mono">⌘K</kbd>
+          <kbd className="mm-nav-item__count font-mono">{SEARCH_KEY}</kbd>
         </button>
         {NAV_SECTIONS.map((section, i) => (
           <div key={i} className="mm-sidebar__section">

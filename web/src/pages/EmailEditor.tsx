@@ -36,9 +36,9 @@ export function EmailEditor({ draft, setDraft, save, busy }: {
   }, [draft.email_subject, draft.email_html, draft.email_blocks, mode]);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
       <Card>
-        <CardBody className="grid gap-5">
+        <CardBody className="grid grid-cols-1 gap-5">
           <Segmented label="Mode d'édition" value={mode} onChange={(v) => setDraft({ ...draft, email_mode: v })} options={[["blocks", "Éditeur visuel"], ["html", "HTML avancé"]]} />
           <Field label="Objet" htmlFor="s-subj" hint="Syntaxe Go template : .Down, .Warnings, .Events…">
             <input id="s-subj" className={`${inputClass} font-mono`} value={draft.email_subject ?? ""} onChange={(e) => setDraft({ ...draft, email_subject: e.target.value })} />

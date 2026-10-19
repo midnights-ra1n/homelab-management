@@ -5,6 +5,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Network,
+  Plug,
   Rocket,
   Server,
   Share2,
@@ -26,6 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/proxmox", label: "Proxmox", short: "Proxmox", icon: Server, description: "Nœuds, invités et migrations" },
   { href: "/webmin", label: "Webmin", short: "Webmin", icon: SquareTerminal, description: "Instances et état système via SSH" },
   { href: "/monitoring", label: "Monitoring", short: "Monitoring", icon: Activity },
+  { href: "/energie", label: "Énergie", short: "Énergie", icon: Plug, description: "Consommation des prises Meross, via le monitoring" },
   { href: "/journaux", label: "Journaux", short: "Journaux", icon: ScrollText, description: "Tout ce qui a été fait, sur 90 jours" },
 ];
 
@@ -34,7 +36,7 @@ const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
 /** Sections de la barre latérale (label en capitales ; la première n'en a pas). */
 export type NavSection = { label?: string; items: NavItem[] };
 export const NAV_SECTIONS: NavSection[] = [
-  { items: ["/", "/applications", "/monitoring"].map(byHref) },
+  { items: ["/", "/applications", "/monitoring", "/energie"].map(byHref) },
   { label: "Infrastructure", items: ["/inventaire", "/reseau", "/carte"].map(byHref) },
   { label: "Suivi", items: ["/deploiements", "/taches", "/journaux"].map(byHref) },
   { label: "Serveurs", items: ["/proxmox", "/webmin"].map(byHref) },

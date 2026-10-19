@@ -250,7 +250,7 @@ export function HlmOverview() {
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {hosts.slice(0, MAX_HOSTS).map((h) => {
             const node = machineKeys(h.name, h.info?.hostname).map((k) => nodes.get(k)).find(Boolean);
-            const live = h.kind !== "down" && h.ping == null && h.last_seen > 0 && h.latest;
+            const live = h.kind !== "down" && !h.agent_down && h.last_seen > 0 && h.latest;
             return (
               <li key={h.key} className="grid gap-3 rounded-xl border border-line-subtle bg-box p-4">
                 <div className="flex min-w-0 items-center gap-2.5">
@@ -273,7 +273,7 @@ export function HlmOverview() {
                   </div>
                 ) : (
                   <p className="text-xs text-meta">
-                    {h.ping === true ? tr("Agent injoignable · hôte en ligne.") : h.ping === false ? tr("Hors ligne · injoignable.") : tr("Aucune donnée récente de l'agent.")}
+                    {h.agent_down && h.reachable ? tr("Agent hors ligne · hôte en ligne.") : h.agent_down && h.reachable === false ? tr("Hors ligne · injoignable.") : tr("Aucune donnée récente de l'agent.")}
                   </p>
                 )}
               </li>

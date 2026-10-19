@@ -6,19 +6,21 @@ import { incidents } from "./Incidents";
 import { AgentVersion } from "./AgentVersion";
 import { BandwidthEmpty } from "./Bandwidth";
 import { BandwidthChart, BandwidthFigures } from "../shared/bandwidth";
+import { EnergyCard } from "./Energy";
 import { AlertBanner } from "../layout";
 import {
   Alert, Badge, Button, ButtonLink, Card, CardBody, CardHeader, EmptyState, IconButton, Link, Meter, STAT_GRID, SectionTitle, Skeleton, Stat,
   StatusBadge, StatusIcon, UptimeBars, cn, fmtLatency, formatPct, kindTone, statusKind, usePoll, useToast,
 } from "../ui";
 
-type WidgetId = "kpis" | "problems" | "latency" | "updates" | "uptime" | "bandwidth" | "hosts";
+type WidgetId = "kpis" | "problems" | "latency" | "energy" | "updates" | "uptime" | "bandwidth" | "hosts";
 interface Widget { id: WidgetId; visible: boolean; full: boolean }
 
 const WIDGETS: Record<WidgetId, string> = {
   kpis: "Indicateurs",
   problems: "Incidents en cours",
   latency: "Latence moyenne (24 h)",
+  energy: "Consommation électrique",
   updates: "Mises à jour",
   uptime: "Disponibilité sur 90 jours",
   bandwidth: "Bande passante",
@@ -29,6 +31,7 @@ const DEFAULT_LAYOUT: Widget[] = [
   { id: "latency", visible: true, full: false },
   { id: "problems", visible: true, full: false },
   { id: "updates", visible: true, full: false },
+  { id: "energy", visible: true, full: false },
   { id: "uptime", visible: true, full: true },
   { id: "bandwidth", visible: true, full: true },
   { id: "hosts", visible: true, full: true },
@@ -202,6 +205,8 @@ function WidgetView({ id, data }: { id: WidgetId; data: Overview }) {
         </Card>
       );
     }
+    case "energy":
+      return <EnergyCard href="/energy" />;
     case "latency":
       return (
         <Card className="h-full">
@@ -288,7 +293,7 @@ function WidgetView({ id, data }: { id: WidgetId; data: Overview }) {
                         <Meter size="sm" label="RAM" value={pct(h.latest.mem_used, h.latest.mem_total)} />
                         <Meter size="sm" label="Disque" value={pct(h.latest.disk_used, h.latest.disk_total)} />
                       </div>
-                    ) : <p className="text-xs text-meta">{h.ping == null ? "Aucune donnée récente de l'agent." : `${hostStatusLabel(h)}.`}</p>}
+                    ) : <p className="text-xs text-meta">{!h.agent_down ? "Aucune donnée récente de l'agent." : `${hostStatusLabel(h)}.`}</p>}
                   </li>
                 );
               })}

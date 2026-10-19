@@ -140,6 +140,11 @@ type agentMsg struct {
 type agentConn struct {
 	conn *websocket.Conn
 	ctx  context.Context // the agent connection's context, for writes from other requests
+	// Live view: metrics pushed every 2 s while a dashboard watches the host, kept in memory only.
+	mu        sync.Mutex
+	liveAsked time.Time
+	live      *agentMetrics
+	liveAt    time.Time
 }
 
 type Host struct {
@@ -150,12 +155,13 @@ type Host struct {
 	Maintenance bool            `json:"maintenance"`
 	Public      bool            `json:"public"`
 	Connected   bool            `json:"connected"`
+	AgentDown   bool            `json:"agent_down"`          // agent stopped or cut off
+	Reachable   *bool           `json:"reachable,omitempty"` // ping answer while the agent is down, nil if unknown
 	Info        json.RawMessage `json:"info"`
 	Latest      json.RawMessage `json:"latest"`
 	Updates     *agentUpdates   `json:"updates"`
 	Action      *hostAction     `json:"action"`         // last dashboard action (updates, agent update)
 	Docker      *dockerSnapshot `json:"docker"`         // nil when the host has no Docker
-	Ping        *bool           `json:"ping"`           // agent silent: does the host still answer ICMP? nil when not tried
 	AgentLatest string          `json:"agent_latest"`   // latest published agent release, "" if unknown
 	Outdated    bool            `json:"agent_outdated"` // agent older than AgentLatest
 	CreatedAt   int64           `json:"created_at"`
@@ -198,83 +204,31 @@ func (s *Server) agentInterval() int {
 	return n
 }
 
-func (s *Server) agentStale(h *Host) bool {
-	return h.LastSeen > 0 && time.Since(time.Unix(h.LastSeen, 0)) > time.Duration(3*s.agentInterval()+15)*time.Second
+// agentDown: the connection closed a minute ago without coming back (service stopped,
+// host off), or the agent stays silent while connected.
+func (s *Server) agentDown(h *Host) bool {
+	since := time.Since(time.Unix(h.LastSeen, 0))
+	return since > time.Duration(3*s.agentInterval()+15)*time.Second || (!h.Connected && since > time.Minute)
 }
 
-// hostMessage explains a host status in notifications.
-func hostMessage(h *Host) string {
-	switch {
-	case h.Status == StatusMinor && h.Ping != nil:
-		return "Agent injoignable, l'hôte répond au ping"
-	case h.Status == StatusMajor && h.Ping != nil:
-		return "Hôte injoignable : ni l'agent ni le ping ne répondent"
-	case h.Status == StatusMajor:
-		return "Agent injoignable"
-	}
-	return ""
-}
-
-// pingHost pings the addresses the agent reported. usable is false when none could be tried
-// (no IPv4 address, or ICMP not allowed): the status then relies on the agent alone.
-func pingHost(ctx context.Context, info json.RawMessage) (up, usable bool) {
-	var ai agentInfo
-	json.Unmarshal(info, &ai)
-	for _, a := range ai.IPs {
-		ip := net.ParseIP(a.Address)
-		if ip == nil || ip.To4() == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() ||
-			strings.HasPrefix(a.Iface, "docker") || strings.HasPrefix(a.Iface, "br-") || strings.HasPrefix(a.Iface, "veth") {
-			continue
-		}
-		u, ok := ping(ctx, a.Address, 2*time.Second)
-		if u {
-			return true, true
-		}
-		usable = usable || ok
-	}
-	return false, usable
-}
-
-// refreshPings pings the hosts whose agent went silent, concurrently, and forgets the others.
-func (s *Server) refreshPings(ctx context.Context, hosts []Host) {
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 16)
-	for _, h := range hosts {
-		if h.Maintenance || !s.agentStale(&h) {
-			s.pings.Delete(h.ID)
-			continue
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			if up, usable := pingHost(ctx, h.Info); usable {
-				s.pings.Store(h.ID, up)
-			} else {
-				s.pings.Delete(h.ID)
-			}
-		}()
-	}
-	wg.Wait()
-}
-
+// hostStatus: an agent that is down while the host still answers ping is a degraded host
+// (monitoring lost, machine up), not a major outage.
 func (s *Server) hostStatus(h *Host) string {
-	if h.Maintenance {
-		return StatusMaintenance
-	}
 	if h.LastSeen == 0 {
+		if h.Maintenance {
+			return StatusMaintenance
+		}
 		return StatusUnknown
 	}
-	if s.agentStale(h) {
-		// Agent silent but the host answers ping: partial outage, the machine itself is up.
-		if v, ok := s.pings.Load(h.ID); ok {
-			up := v.(bool)
-			h.Ping = &up
-			if up {
-				return StatusMinor
-			}
-		}
+	if h.AgentDown = s.agentDown(h); h.AgentDown {
+		h.Reachable = s.hostPings.get(h.ID)
+	}
+	switch {
+	case h.Maintenance:
+		return StatusMaintenance
+	case h.AgentDown && h.Reachable != nil && *h.Reachable:
+		return StatusDegraded
+	case h.AgentDown:
 		return StatusMajor
 	}
 	var m agentMetrics
@@ -289,6 +243,81 @@ func (s *Server) hostStatus(h *Host) string {
 		}
 	}
 	return StatusOperational
+}
+
+// pingCache keeps the last ping answer of hosts whose agent is down.
+type pingCache struct {
+	mu sync.Mutex
+	m  map[int64]bool
+}
+
+func (c *pingCache) get(id int64) *bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if v, ok := c.m[id]; ok {
+		return &v
+	}
+	return nil
+}
+
+func (c *pingCache) set(id int64, v *bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.m == nil {
+		c.m = map[int64]bool{}
+	}
+	if v == nil {
+		delete(c.m, id)
+	} else {
+		c.m[id] = *v
+	}
+}
+
+// hostAddress: the first IPv4 the agent reported, skipping loopback and container bridges.
+func hostAddress(info json.RawMessage) string {
+	var ai agentInfo
+	json.Unmarshal(info, &ai)
+	for _, ip := range ai.IPs {
+		a := net.ParseIP(ip.Address)
+		bridge := strings.HasPrefix(ip.Iface, "docker") || strings.HasPrefix(ip.Iface, "br-") || strings.HasPrefix(ip.Iface, "veth") || strings.HasPrefix(ip.Iface, "virbr")
+		if a != nil && a.To4() != nil && !a.IsLoopback() && !a.IsLinkLocalUnicast() && !bridge {
+			return a.String()
+		}
+	}
+	return ""
+}
+
+// pingDownHosts pings the hosts whose agent is down, so their status tells "agent stopped"
+// (still answers) from "host unreachable", then refreshes their status.
+func (s *Server) pingDownHosts(ctx context.Context, hosts []Host) {
+	var wg sync.WaitGroup
+	for i := range hosts {
+		h := &hosts[i]
+		if !h.AgentDown {
+			s.hostPings.set(h.ID, nil)
+			continue
+		}
+		ip := hostAddress(h.Info)
+		if ip == "" {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Two tries: one lost packet must not turn a stopped agent into an outage.
+			up, usable := ping(ctx, ip, 2*time.Second)
+			if !up && usable {
+				up, usable = ping(ctx, ip, 2*time.Second)
+			}
+			if usable {
+				s.hostPings.set(h.ID, &up)
+			}
+		}()
+	}
+	wg.Wait()
+	for i := range hosts {
+		hosts[i].Status = s.hostStatus(&hosts[i])
+	}
 }
 
 func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
@@ -545,6 +574,40 @@ func (s *Server) handleHostMetrics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
+// handleHostLive returns the latest live sample and keeps the agent in live mode while the
+// page polls: the agent streams for 60 s after each request, renewed every 20 s.
+func (s *Server) handleHostLive(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	s.agentsMu.Lock()
+	conn := s.agents[id]
+	s.agentsMu.Unlock()
+	if conn == nil {
+		writeJSON(w, 200, map[string]any{"live": false})
+		return
+	}
+	conn.mu.Lock()
+	ask := time.Since(conn.liveAsked) > 20*time.Second
+	if ask {
+		conn.liveAsked = time.Now()
+	}
+	m, at := conn.live, conn.liveAt
+	conn.mu.Unlock()
+	if ask {
+		ctx, cancel := context.WithTimeout(conn.ctx, 5*time.Second)
+		wsjson.Write(ctx, conn.conn, map[string]any{"type": "live", "seconds": 60})
+		cancel()
+	}
+	// An agent older than the live mode never answers: the page keeps the stored metrics.
+	if m == nil || time.Since(at) > 10*time.Second {
+		writeJSON(w, 200, map[string]any{"live": false})
+		return
+	}
+	writeJSON(w, 200, map[string]any{"live": true, "at": at.UnixMilli(), "metrics": m})
+}
+
 // handleAgentWS authenticates an agent in both directions, Beszel-style:
 // the agent proves itself with its token, the hub proves itself by signing the
 // agent's nonce with the key the agent was installed with.
@@ -651,6 +714,12 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 			if err := s.storeUpdates(id, hostName, m.Updates); err != nil {
 				slog.Error("store updates", "err", err)
 			}
+		case m.Type == "live" && m.Metrics != nil:
+			me.mu.Lock()
+			if time.Since(me.liveAt) >= time.Second {
+				me.live, me.liveAt = m.Metrics, time.Now()
+			}
+			me.mu.Unlock()
 		case m.Type == "metrics" && m.Metrics != nil:
 			// Ignore an agent pushing faster than asked instead of letting it fill the disk.
 			if time.Since(lastMetrics) < time.Duration(interval)*time.Second/2 {
@@ -660,6 +729,7 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 			if err := s.storeMetrics(id, m.Metrics); err != nil {
 				slog.Error("store metrics", "err", err)
 			}
+			s.checkDiskSpace(id, hostName, m.Metrics.Disks)
 		}
 	}
 }
@@ -758,11 +828,18 @@ func (s *Server) watchHosts(ctx context.Context) {
 	for {
 		hosts, err := s.loadHosts("")
 		if err == nil {
-			s.refreshPings(ctx, hosts)
+			s.pingDownHosts(ctx, hosts)
 			for _, h := range hosts {
 				h.Status = s.hostStatus(&h)
 				if p, seen := prev[h.ID]; seen && p != h.Status && p != StatusUnknown && h.Status != StatusUnknown {
-					s.notifier.add(Event{Kind: "Hôte", Name: h.Name, From: p, To: h.Status, Message: hostMessage(&h), At: time.Now()})
+					msg := ""
+					if h.AgentDown {
+						msg = "Agent hors ligne, l'hôte ne répond pas au ping"
+						if h.Reachable != nil && *h.Reachable {
+							msg = "Agent hors ligne, l'hôte répond toujours au ping"
+						}
+					}
+					s.notifier.add(Event{Kind: "Hôte", Name: h.Name, From: p, To: h.Status, Message: msg, At: time.Now()})
 				}
 				prev[h.ID] = h.Status
 			}

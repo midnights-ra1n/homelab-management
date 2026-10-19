@@ -33,10 +33,10 @@ export function BackupForms() {
         <div className="mt-4 flex flex-wrap gap-2">
           {/* Téléchargement d'un Route Handler, pas une page : la règle confond /api avec /[lang]. */}
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a href="/api/export" className={buttonClass("primary")}>
+          <a href="/api/mg/export" className={buttonClass("primary")}>
             <Download size={15} /> {tr("Exporter")}</a>
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a href="/api/export?secrets=1" className={buttonClass("secondary")}>
+          <a href="/api/mg/export?secrets=1" className={buttonClass("secondary")}>
             <Download size={15} /> {tr("Avec les secrets")}</a>
         </div>
         <p className="mt-3 text-xs text-meta">

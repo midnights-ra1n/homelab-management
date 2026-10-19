@@ -10,8 +10,9 @@ export type HlmHost = {
   last_seen: number;
   maintenance: boolean;
   connected: boolean;
-  /** Agent silent: did the host answer ping? null when not tried. */
-  ping?: boolean | null;
+  /** Agent stopped or cut off; reachable: its ping answer, absent if unknown. */
+  agent_down?: boolean;
+  reachable?: boolean;
   info?: { hostname?: string; os?: string; kernel?: string; cpu_model?: string; cpu_cores?: number; boot_time?: number } | null;
   latest?: {
     cpu?: number;

@@ -34,7 +34,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	for _, m := range mons {
 		en := m.Enabled
 		doc.Monitors = append(doc.Monitors, monitorInput{Name: m.Name, Type: m.Type, Target: m.Target, IntervalS: m.IntervalS,
-			TimeoutS: m.TimeoutS, Config: m.Config, Enabled: &en, Maintenance: m.Maintenance, Public: m.Public})
+			TimeoutS: m.TimeoutS, Config: m.Config, Enabled: &en, Maintenance: m.Maintenance, Public: m.Public, Category: m.Category})
 	}
 	hosts, err := s.loadHosts("")
 	if err != nil {

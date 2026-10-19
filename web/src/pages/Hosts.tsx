@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, Cpu, HardDrive, KeyRound, MemoryStick, Plus, Server, Thermometer, Trash2, Users } from "lucide-react";
-import { api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostSeries, type Install } from "../api";
+import { ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, Server, Thermometer, Trash2, Users } from "lucide-react";
+import { api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostLatest, type HostSeries, type Install } from "../api";
 import {
-  Alert, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Link, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
+  Alert, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
   Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, usePoll, useTitle, useToast,
 } from "../ui";
 import { DiskCard, type HostDisks } from "./Disks";
@@ -64,7 +64,7 @@ export function HostsPage() {
                         </span>
                       </Link>
                     </td>
-                    <td><StatusBadge status={h.status} label={hostStatusLabel(h)} /></td>
+                    <td><span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} />{h.agent_down && !h.maintenance && <Tag>Agent hors ligne</Tag>}</span></td>
                     <td className="mm-col-muted max-w-56 truncate">{h.info.os || "—"}</td>
                     <td className="mm-col-num font-mono text-xs">{fmtPct(h.latest.cpu)}</td>
                     <td className="mm-col-num font-mono text-xs">{fmtPct(pct(h.latest.mem_used, h.latest.mem_total))}</td>
@@ -91,11 +91,14 @@ export function HostDetailPage({ id }: { id: number }) {
   const host = usePoll(() => api.get<Host>(`/api/hosts/${id}`), 10000, [id]);
   const [range, setRange] = useState<Range>("24h");
   const metrics = usePoll(() => api.get<HostSeries>(`/api/hosts/${id}/metrics?range=${range}`), 30000, [id, range]);
+  // Live view: polling asks the agent to stream every 2 s while the page is open.
+  const live = usePoll(() => api.get<{ live: boolean; metrics?: HostLatest }>(`/api/hosts/${id}/live`), 2000, [id]);
   const agentAction = useHostAction((updated) => host.setData(updated));
   const disks = usePoll(() => api.get<HostDisks[]>("/api/disks"), 300000, [id]);
   const myDisks = disks.data?.find((d) => d.host_id === id);
   const [install, setInstall] = useState<Install>();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [rename, setRename] = useState<string>();
   const toast = useToast();
   const h = host.data;
   useTitle(h?.name ?? "Hôtes");
@@ -121,7 +124,8 @@ export function HostDetailPage({ id }: { id: number }) {
 
   if (host.error) return <Alert kind="error" title="Hôte introuvable">{host.error}</Alert>;
   if (!h) return <Skeleton className="h-72" />;
-  const l = h.latest;
+  const isLive = !!live.data?.live && h.connected;
+  const l = isLive ? live.data!.metrics! : h.latest;
   const pctFmt = (v: number) => `${Math.round(v)} %`;
   const temp = l.cpu_temp ?? l.temp;
 
@@ -133,11 +137,18 @@ export function HostDetailPage({ id }: { id: number }) {
         description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.info.os && <Tag>{h.info.os}</Tag>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
         actions={<>
           <Switch label="Maintenance" checked={h.maintenance} onChange={(v) => update({ maintenance: v })} />
+          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setRename(h.name)}>Renommer</Button>
           <Button variant="secondary" icon={<KeyRound size={16} />} onClick={() => api.post<{ install: Install }>(`/api/hosts/${id}/token`).then((r) => setInstall(r.install))}>Régénérer le jeton</Button>
           <Button variant="danger-ghost" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)}>Supprimer</Button>
         </>} />
 
       <div className={SECTIONS}>
+        {h.agent_down && !h.maintenance && (
+          <Alert kind={h.reachable ? "warning" : "error"} title={h.reachable ? "Agent hors ligne, l'hôte répond au ping" : h.reachable === false ? "Agent hors ligne, l'hôte ne répond pas au ping" : "Agent hors ligne"}>
+            Aucune mesure depuis {fmtAgo(h.last_seen)}. {h.reachable ? "La machine tourne mais le service est arrêté ou bloqué : " : "Vérifiez la machine puis le service : "}
+            <code className="font-mono">systemctl status hlm-agent</code>
+          </Alert>
+        )}
         <div className={STAT_GRID}>
           <Stat label="CPU" value={fmtPct(l.cpu)} icon={<Cpu size={16} />} tone={(l.cpu ?? 0) >= 90 ? "red" : undefined} detail={h.info.cpu_cores ? `${h.info.cpu_cores} cœurs · charge ${l.load1?.toFixed(2).replace(".", ",") ?? "—"}` : undefined} />
           <Stat label="Mémoire" value={fmtPct(pct(l.mem_used, l.mem_total))} icon={<MemoryStick size={16} />} detail={`${fmtBytes(l.mem_used)} / ${fmtBytes(l.mem_total)}`} />
@@ -147,7 +158,7 @@ export function HostDetailPage({ id }: { id: number }) {
 
         <div className="grid gap-8 xl:grid-cols-3 xl:gap-10">
           <Card className="xl:col-span-2">
-            <CardHeader overline="Utilisation" title={`Mesure ${fmtAgo(h.last_seen)}`} />
+            <CardHeader overline="Utilisation" title={isLive ? <span className="flex items-center gap-2"><span className="size-2 animate-pulse rounded-full bg-[var(--mm-success-solid)]" aria-hidden />En direct</span> : `Mesure ${fmtAgo(h.last_seen)}`} />
             <CardBody className="grid gap-4">
               <Meter label="CPU" value={l.cpu ?? null} />
               <Meter label="Mémoire" value={pct(l.mem_used, l.mem_total)} detail={`${fmtBytes(l.mem_used)} / ${fmtBytes(l.mem_total)}`} />
@@ -245,6 +256,14 @@ export function HostDetailPage({ id }: { id: number }) {
       <Dialog open={!!install} onClose={() => setInstall(undefined)} size="lg" title="Nouveau jeton" description="L'ancien jeton est révoqué et l'agent a été déconnecté."
         footer={<Button onClick={() => setInstall(undefined)}>Terminer</Button>}>
         {install && <InstallInstructions install={install} name={h.name} />}
+      </Dialog>
+      <Dialog open={rename != null} onClose={() => setRename(undefined)} size="sm" title={`Renommer ${h.name}`}
+        description="Le nouveau nom est repris par l'inventaire de la gestion à la prochaine synchronisation."
+        footer={<><Button variant="secondary" onClick={() => setRename(undefined)}>Annuler</Button>
+          <Button type="submit" form="rename-form">Renommer</Button></>}>
+        <form id="rename-form" onSubmit={async (e) => { e.preventDefault(); await update({ name: rename }); setRename(undefined); }}>
+          <Field label="Nom" htmlFor="h-name"><input id="h-name" className={inputClass} value={rename ?? ""} onChange={(e) => setRename(e.target.value)} autoFocus /></Field>
+        </form>
       </Dialog>
       <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} size="sm" title={`Supprimer ${h.name}`}
         footer={<><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annuler</Button>

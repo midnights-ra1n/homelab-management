@@ -124,6 +124,17 @@ func (a *apns) send(device string, sandbox bool, payload []byte) (gone bool, err
 }
 
 // pushPayload groups the events of one notifier window into one notification, like the e-mail.
+// hostMessage explains why a host is not operational, with the same wording as its e-mail alert.
+func hostMessage(h *Host) string {
+	switch {
+	case !h.AgentDown:
+		return ""
+	case h.Reachable != nil && *h.Reachable:
+		return "Agent hors ligne, l'hôte répond toujours au ping"
+	}
+	return "Agent hors ligne, l'hôte ne répond pas au ping"
+}
+
 func pushPayload(evs []Event) []byte {
 	type pushEvent struct {
 		Kind    string `json:"kind"`

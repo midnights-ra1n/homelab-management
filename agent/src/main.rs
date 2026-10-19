@@ -191,11 +191,28 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // The root collector refreshes SMART hourly; forward each new file once.
     let mut smart_tick = tokio::time::interval(Duration::from_secs(600));
     let mut smart_sent = 0u64;
+    // After a dashboard request, look for the new SMART file every 15 s for up to 10 minutes.
+    let mut smart_until = 0u64;
+    let mut smart_poll = tokio::time::interval(Duration::from_secs(15));
+    // Live view: while a dashboard watches this host, stream metrics every 2 s (not stored).
+    let mut live_until = 0u64;
+    let mut live_tick = tokio::time::interval(Duration::from_secs(2));
+    live_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         tokio::select! {
             _ = smart_tick.tick() => {
                 if let Some(rep) = smart::read_report().filter(|r| r.collected_at != smart_sent) {
                     smart_sent = rep.collected_at;
+                    let m = serde_json::json!({"type": "smart", "smart": rep});
+                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                        return Failure::Retry(e.to_string());
+                    }
+                }
+            }
+            _ = smart_poll.tick(), if smart_until > actions::now() => {
+                if let Some(rep) = smart::read_report().filter(|r| r.collected_at != smart_sent) {
+                    smart_sent = rep.collected_at;
+                    smart_until = 0;
                     let m = serde_json::json!({"type": "smart", "smart": rep});
                     if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
                         return Failure::Retry(e.to_string());
@@ -212,6 +229,12 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
             }
             _ = tick.tick() => {
                 let m = serde_json::json!({"type": "metrics", "metrics": collector.collect()});
+                if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                    return Failure::Retry(e.to_string());
+                }
+            }
+            _ = live_tick.tick(), if live_until > actions::now() => {
+                let m = serde_json::json!({"type": "live", "metrics": collector.collect()});
                 if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
                     return Failure::Retry(e.to_string());
                 }
@@ -259,6 +282,11 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                 Some(Ok(Message::Close(f))) => return Failure::Retry(format!("closed by hub: {f:?}")),
                 Some(Ok(Message::Text(t))) => {
                     let Ok(m) = serde_json::from_str::<serde_json::Value>(&t) else { continue };
+                    if m["type"] == "live" {
+                        live_until = actions::now() + m["seconds"].as_u64().unwrap_or(60).min(300);
+                        live_tick.reset_immediately();
+                        continue;
+                    }
                     if m["type"] != "action" { continue; }
                     let action = m["action"].as_str().unwrap_or("").to_string();
                     let (state, message) = match action.as_str() {
@@ -271,6 +299,10 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         }
                         "update_container" => match actions::request_container_update(m["target"].as_str().unwrap_or("")) {
                             Ok(()) => { apt_pending = Some((action.clone(), actions::now(), actions::DOCKER_OUTPUT)); ("running", String::new()) }
+                            Err(e) => ("failed", e),
+                        },
+                        "refresh_smart" => match actions::request_smart() {
+                            Ok(()) => { smart_until = actions::now() + 600; ("running", String::new()) }
                             Err(e) => ("failed", e),
                         },
                         "update_agent" if cfg.deb => match actions::request_apt("agentdeb") {

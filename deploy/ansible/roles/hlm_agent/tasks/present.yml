@@ -113,15 +113,16 @@
         src: "{{ item }}"
         dest: /etc/systemd/system/
         mode: "0644"
-      loop: [hlm-agent-smart.service, hlm-agent-smart.timer]
+      loop: [hlm-agent-smart.service, hlm-agent-smart.timer, hlm-agent-smart.path]
       register: _hlm_smart_units
 
-    - name: Enable the hourly SMART timer
+    - name: Enable the hourly SMART timer and the on-demand path unit
       ansible.builtin.systemd_service:
-        name: hlm-agent-smart.timer
+        name: "{{ item }}"
         enabled: true
         state: started
         daemon_reload: "{{ _hlm_smart_units is changed }}"
+      loop: [hlm-agent-smart.timer, hlm-agent-smart.path]
 
 - name: Dashboard apt actions
   when: hlm_remote_updates | bool

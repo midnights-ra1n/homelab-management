@@ -31,15 +31,13 @@ export interface HostUpdates {
 }
 export interface Host {
   id: number; name: string; status: Status; last_seen: number; maintenance: boolean; public: boolean;
-  connected: boolean; info: HostInfo; latest: HostLatest; updates: HostUpdates | null; created_at: number;
+  connected: boolean; agent_down: boolean; reachable?: boolean; info: HostInfo; latest: HostLatest; updates: HostUpdates | null; created_at: number;
   action: HostAction | null; agent_latest: string; agent_outdated: boolean; docker: DockerSnapshot | null;
-  /** Agent silent: did the host answer ping? null when not tried. */
-  ping: boolean | null;
 }
 
 /** Host status wording: tells a stopped agent apart from a machine that is down. */
-export const hostStatusLabel = (h: Pick<Host, "status" | "ping">) =>
-  h.ping === true ? "Agent injoignable · hôte en ligne" : h.ping === false ? "Hors ligne · injoignable" : statusLabel[h.status];
+export const hostStatusLabel = (h: Pick<Host, "status" | "agent_down" | "reachable">) =>
+  !h.agent_down ? statusLabel[h.status] : h.reachable ? "Agent hors ligne · hôte en ligne" : h.reachable === false ? "Hors ligne · injoignable" : statusLabel[h.status];
 export type ImageUpdate = "up_to_date" | "available" | "unknown" | "local" | "pinned";
 export interface DockerContainer {
   id: string; name: string; image: string; state: string; health: string; started_at: string; restart_count: number;
@@ -52,20 +50,20 @@ export interface HostAction { action: HostActionName; target?: string; state: "p
 export const actionBusy = (h: Host) => !!h.action && (h.action.state === "pending" || h.action.state === "running") && Date.now() / 1000 - h.action.at < 7200;
 export interface Install { hub_url: string; key: string; token: string; command: string }
 
-export type MonitorType = "http" | "tcp" | "dns" | "ssl" | "snmp" | "meross";
+export type MonitorType = "http" | "tcp" | "udp" | "ping" | "dns" | "ssl" | "snmp" | "meross" | "truenas";
 export interface MonitorConfig {
   method?: string; expected_status?: string; keyword?: string; ignore_tls?: boolean; check_ssl?: boolean; degraded_ms?: number;
-  dns_server?: string; record_type?: string; expected?: string; warn_days?: number; failure_threshold?: number;
+  dns_server?: string; record_type?: string; expected?: string; payload?: string; warn_days?: number; failure_threshold?: number;
   min_value?: number; max_value?: number; unit?: string; oid?: string; snmp_version?: "1" | "2c" | "3";
   snmp_mode?: "" | "in" | "out" | "ifstatus"; interface?: string; max_percent?: number; idle_minutes?: number;
   /** Secrets are write-only: the API never returns them, an empty value keeps the saved one. */
-  community?: string; snmp_user?: string; auth_proto?: string; auth_pass?: string; priv_proto?: string; priv_pass?: string; channel?: number;
+  community?: string; snmp_user?: string; auth_proto?: string; auth_pass?: string; priv_proto?: string; priv_pass?: string; channel?: number; api_key?: string;
 }
 export interface Day { day: number; uptime: number | null; worst: Status }
 export interface Monitor {
   id: number; name: string; type: MonitorType; target: string; interval_s: number; timeout_s: number;
   config: MonitorConfig; enabled: boolean; maintenance: boolean; public: boolean; status: Status;
-  message: string; latency_ms: number | null; last_check: number; cert_expires_at: number | null; days?: Day[];
+  message: string; latency_ms: number | null; last_check: number; cert_expires_at: number | null; days?: Day[]; category: string;
 }
 
 /** Days until the monitored certificate expires, or null when not tracked. */
@@ -73,7 +71,7 @@ export function certDays(m: Monitor) {
   if (m.cert_expires_at == null || !(m.type === "ssl" || m.config.check_ssl)) return null;
   return Math.floor((m.cert_expires_at * 1000 - Date.now()) / 86400000);
 }
-export type MonitorInput = Pick<Monitor, "name" | "type" | "target" | "interval_s" | "timeout_s" | "config" | "enabled" | "maintenance" | "public">;
+export type MonitorInput = Pick<Monitor, "name" | "type" | "target" | "interval_s" | "timeout_s" | "config" | "enabled" | "maintenance" | "public" | "category">;
 
 export interface Series { t: number[]; latency: (number | null)[]; value?: (number | null)[]; worst: Status[]; name?: string }
 export interface Overview { status: Status; hosts: Host[]; monitors: Monitor[]; latency: Series[]; bandwidth: Bandwidth }

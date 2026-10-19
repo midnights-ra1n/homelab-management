@@ -74,6 +74,7 @@ pub struct Collector {
 
 const PSEUDO_FS: &[&str] = &[
     "tmpfs", "devtmpfs", "overlay", "squashfs", "proc", "sysfs", "ramfs", "efivarfs", "fuse.lxcfs",
+    "fuse", // Proxmox's /etc/pve (pmxcfs)
 ];
 
 // shortcut: interfaces are excluded by name prefix to avoid counting bridged/virtual
@@ -154,17 +155,18 @@ impl Collector {
         let mut seen = HashSet::new();
         let mut disks = Vec::new();
         let (mut disk_used, mut disk_total) = (0, 0);
-        for d in self.disks.list() {
+        // A device mounted several times (bind mounts such as the agent's own sandbox paths,
+        // btrfs subvolumes) is listed and counted once, under its shortest mount point.
+        let mut list: Vec<_> = self.disks.list().iter().collect();
+        list.sort_by_key(|d| d.mount_point().as_os_str().len());
+        for d in list {
             let fs = d.file_system().to_string_lossy().to_string();
-            if PSEUDO_FS.contains(&fs.as_str()) || d.total_space() == 0 {
+            if PSEUDO_FS.contains(&fs.as_str()) || d.total_space() == 0 || !seen.insert(d.name().to_os_string()) {
                 continue;
             }
             let used = d.total_space().saturating_sub(d.available_space());
-            // A device mounted several times (bind mounts, btrfs subvolumes) counts once in the total.
-            if seen.insert(d.name().to_os_string()) {
-                disk_used += used;
-                disk_total += d.total_space();
-            }
+            disk_used += used;
+            disk_total += d.total_space();
             disks.push(Disk {
                 mount: d.mount_point().to_string_lossy().to_string(),
                 fs,

@@ -30,6 +30,8 @@ contents:
     dst: /usr/share/hlm-agent/hlm-agent-smart.service
   - src: agent/hlm-agent-smart.timer
     dst: /usr/share/hlm-agent/hlm-agent-smart.timer
+  - src: agent/hlm-agent-smart.path
+    dst: /usr/share/hlm-agent/hlm-agent-smart.path
   - src: agent/smart-collect.sh
     dst: /usr/share/hlm-agent/smart-collect.sh
     file_info: { mode: 0755 }

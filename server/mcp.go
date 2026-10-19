@@ -275,6 +275,9 @@ func rpcError(id json.RawMessage, code int, msg string) map[string]any {
 
 func (s *Server) mcpAuthorized(r *http.Request) bool {
 	tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if ok && s.oauthAccessValid(tok) {
+		return true
+	}
 	want := s.getSetting("mcp_token_hash", "")
 	return ok && want != "" && subtle.ConstantTimeCompare([]byte(fmt.Sprintf("%x", hashToken(tok))), []byte(want)) == 1
 }
@@ -293,7 +296,8 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 429, "Trop de tentatives")
 			return
 		}
-		w.Header().Set("WWW-Authenticate", `Bearer realm="mcp"`)
+		// Points OAuth clients (Claude) to the discovery document, from which they register and sign in.
+		w.Header().Set("WWW-Authenticate", `Bearer realm="mcp", resource_metadata="`+s.baseURL(r)+`/.well-known/oauth-protected-resource"`)
 		writeErr(w, 401, "Jeton MCP manquant ou invalide")
 		return
 	}
@@ -402,7 +406,8 @@ func (s *Server) handleMCPState(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]any{
 		"enabled": s.getSetting("mcp_enabled", "false") == "true", "token_set": s.getSetting("mcp_token_hash", "") != "",
-		"https": s.isHTTPS(r), "url": s.baseURL(r) + "/api/mcp", "tools": names,
+		"https": s.isHTTPS(r), "url": s.baseURL(r) + "/api/mcp", "tools": names, "proxy": s.proxyDiagnostic(r),
+		"dcr": s.getSetting("mcp_dcr", "true") == "true",
 	})
 }
 
@@ -410,11 +415,19 @@ func (s *Server) handleMCPConfig(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Enabled  *bool `json:"enabled"`
 		NewToken bool  `json:"new_token"`
+		DCR      *bool `json:"dcr"`
 	}
 	if !readJSON(w, r, &in) {
 		return
 	}
 	out := map[string]any{}
+	if in.DCR != nil {
+		if err := s.setSetting("mcp_dcr", strconv.FormatBool(*in.DCR)); err != nil {
+			serverErr(w, err)
+			return
+		}
+		logName(r, map[bool]string{true: "inscription automatique activée", false: "inscription automatique désactivée"}[*in.DCR])
+	}
 	if in.Enabled != nil {
 		if err := s.setSetting("mcp_enabled", strconv.FormatBool(*in.Enabled)); err != nil {
 			serverErr(w, err)

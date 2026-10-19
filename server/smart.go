@@ -4,11 +4,17 @@ package main
 // the verdict is computed here, on read, so thresholds can evolve without redeploying agents.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
+
+	"github.com/coder/websocket/wsjson"
 )
 
 type smartDisk struct {
@@ -269,4 +275,61 @@ func (s *Server) handleDisks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, d)
+}
+
+// handleSmartRefresh asks every connected agent to read SMART now instead of waiting for the
+// hourly timer. Agents answer when the data is ready (a few minutes); their reply is not stored.
+func (s *Server) handleSmartRefresh(w http.ResponseWriter, r *http.Request) {
+	s.agentsMu.Lock()
+	conns := make([]*agentConn, 0, len(s.agents))
+	for _, c := range s.agents {
+		conns = append(conns, c)
+	}
+	s.agentsMu.Unlock()
+	sent := 0
+	for _, c := range conns {
+		ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+		if wsjson.Write(ctx, c.conn, map[string]string{"type": "action", "action": "refresh_smart"}) == nil {
+			sent++
+		}
+		cancel()
+	}
+	writeJSON(w, 200, map[string]int{"sent": sent})
+}
+
+// diskFull remembers the mounts already reported as nearly full, so each crossing alerts once.
+// shortcut: kept in memory, so a restart repeats a still-valid alert once; persist it if that annoys.
+var diskFull sync.Map
+
+// checkDiskSpace warns when a filesystem goes over notify_disk_pct (0 = off). The alert re-arms
+// once usage falls 5 points under the threshold, so a disk hovering around it does not flap.
+func (s *Server) checkDiskSpace(id int64, hostName string, disks []agentDisk) {
+	limit, _ := strconv.Atoi(s.getSetting("notify_disk_pct", "90"))
+	for _, d := range disks {
+		if d.Total == 0 {
+			continue
+		}
+		pct := float64(d.Used) * 100 / float64(d.Total)
+		key := fmt.Sprintf("%d %s", id, d.Mount)
+		_, was := diskFull.Load(key)
+		switch {
+		case limit > 0 && pct >= float64(limit) && !was:
+			diskFull.Store(key, true)
+			s.notifier.add(Event{Kind: KindSpace, Name: hostName + " · " + d.Mount, At: time.Now(),
+				Message: fmt.Sprintf("%.0f %% utilisé, %s libres sur %s", pct, fmtSize(d.Total-d.Used), fmtSize(d.Total))})
+		case was && (limit <= 0 || pct < float64(limit)-5):
+			diskFull.Delete(key)
+		}
+	}
+}
+
+// fmtSize writes bytes the French way: "12,4 Go".
+func fmtSize(b uint64) string {
+	units := []string{"o", "Ko", "Mo", "Go", "To", "Po"}
+	v, i := float64(b), 0
+	for v >= 1024 && i < len(units)-1 {
+		v /= 1024
+		i++
+	}
+	return strings.Replace(strconv.FormatFloat(v, 'f', 1, 64), ".", ",", 1) + " " + units[i]
 }

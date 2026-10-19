@@ -18,6 +18,7 @@ import { IncidentsPage } from "./pages/Incidents";
 import { EnergyPage } from "./pages/Energy";
 import { BandwidthPage } from "./pages/Bandwidth";
 import { LogsPage } from "./shared/system";
+import { OAuthConsent } from "./shared/OAuthConsent";
 
 const ManagementApp = lazy(() => import("./mg/App"));
 
@@ -62,6 +63,8 @@ function App() {
     <Alert kind="warning" className="rounded-none border-x-0 border-t-0" title="Mode test : données simulées et compte admin / devmode-password. Ne jamais exposer cette instance." />
   );
   if (!auth.authenticated) return <>{devBanner}<AuthPage setup={auth.setup_required} onDone={loadAuth} role={auth.role} /></>;
+  // MCP OAuth consent: reached from Claude, kept on the same URL through the login above.
+  if (path === "/oauth/authorize") return <OAuthConsent />;
   if (auth.role === "management") {
     return (
       <Suspense fallback={null}>

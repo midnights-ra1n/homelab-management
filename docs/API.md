@@ -170,8 +170,8 @@ Utilisées par les hôtes, les sondes et l'état global (de la meilleure à la p
 |---|---|
 | `operational` | Opérationnel |
 | `maintenance` | Maintenance |
-| `degraded` | Performances dégradées (réponse lente, disque ou mémoire ≥ 95 %) |
-| `minor_outage` | Panne partielle (service joignable mais réponse incorrecte ; hôte dont l'agent est injoignable mais qui répond au ping) |
+| `degraded` | Performances dégradées (réponse lente, disque ou mémoire ≥ 95 % ; hôte dont l'agent est hors ligne mais qui répond au ping) |
+| `minor_outage` | Panne partielle (service joignable mais réponse incorrecte) |
 | `major_outage` | Panne majeure (injoignable : ni agent ni ping, certificat expiré) |
 | `unknown` | Pas encore vérifié |
 
@@ -273,7 +273,8 @@ Scope `hosts:read`. Liste des hôtes équipés de l'agent, triée par nom. Ajout
 | `action` | dernière action lancée depuis le tableau de bord ou l'API : `action` (`check_updates`, `apply_updates`, `update_agent`, `update_container`), `target`, `state` (`pending`, `running`, `done`, `failed`), `message`, `at` ; `null` si aucune |
 | `docker` | conteneurs de l'hôte (format de [`/containers`](#get-apiv1containers)), `null` sans Docker |
 | `agent_latest`, `agent_outdated` | dernière version publiée de l'agent (vide si inconnue) et `true` si l'agent de l'hôte est plus ancien |
-| `ping` | agent silencieux : `true` si l'hôte répond encore au ping (état `minor_outage`, « agent injoignable, hôte en ligne »), `false` s'il ne répond pas (`major_outage`, « hors ligne ») ; `null` quand l'agent répond ou que le ping n'a pas pu être tenté (pas d'IPv4, ICMP non autorisé) |
+| `agent_down` | `true` si l'agent est hors ligne (service arrêté ou bloqué, connexion coupée depuis une minute) |
+| `reachable` | agent hors ligne : `true` si l'hôte répond encore au ping (état `degraded`, « agent hors ligne, hôte en ligne »), `false` s'il ne répond pas (`major_outage`) ; absent quand l'agent répond ou que le ping n'a pas pu être tenté |
 
 ### `DELETE /api/v1/hosts/{id}`
 
@@ -723,7 +724,7 @@ Scope `status:read`. Un seul appel pour les widgets de l'écran d'accueil : le r
   "hosts": { "total": 5, "by_status": { "operational": 4, "minor_outage": 1 } },
   "monitors": { "total": 12, "by_status": { "operational": 12 } },
   "problems": [
-    { "kind": "host", "id": 2, "name": "nas", "status": "minor_outage", "message": "Agent injoignable, l'hôte répond au ping" }
+    { "kind": "host", "id": 2, "name": "nas", "status": "degraded", "message": "Agent hors ligne, l'hôte répond toujours au ping" }
   ],
   "power": { "plugs": 3, "now_w": 182.4, "avg_24h_w": 171.9 },
   "time": 1792046280
@@ -769,11 +770,11 @@ La page *Réglages → API → Appareils* liste les appareils, la dernière erre
 ```json
 {
   "aps": {
-    "alert": { "title": "nas : Panne partielle", "body": "Agent injoignable, l'hôte répond au ping" },
+    "alert": { "title": "nas : Performances dégradées", "body": "Agent hors ligne, l'hôte répond toujours au ping" },
     "sound": "default", "thread-id": "midnights-monitoring", "mutable-content": 1, "interruption-level": "time-sensitive"
   },
   "events": [
-    { "kind": "Hôte", "name": "nas", "from": "operational", "to": "minor_outage", "message": "Agent injoignable, l'hôte répond au ping", "at": 1792046280 }
+    { "kind": "Hôte", "name": "nas", "from": "operational", "to": "degraded", "message": "Agent hors ligne, l'hôte répond toujours au ping", "at": 1792046280 }
   ]
 }
 ```
@@ -892,4 +893,4 @@ Le préfixe `/api/v1` est stable. Des champs peuvent être **ajoutés** aux rép
 
 | Date | Changement |
 |---|---|
-| 2026-10 | Routes `GET /bandwidth` et `GET /bandwidth/live` (scope `monitors:read`). Routes `GET /widgets`, `POST` / `DELETE /devices`, `GET` / `PUT /preferences` ; scopes `push:write`, `preferences:read`, `preferences:write`. Champ `ping` des hôtes ; un hôte dont l'agent est arrêté mais qui répond au ping passe en `minor_outage` au lieu de `major_outage`. Sondes SNMP : `snmp_mode` et `interface` (débit et état d'interface). Route `GET /snmp/devices`. Bande passante : `speed_mbps`, `days`, `today_octets`, `month_octets`, `daily_octets` ; `peak_mbps` devient la plus forte mesure de la période. Sondes SNMP : `max_percent`, `idle_minutes`. |
+| 2026-10 | Routes `GET /bandwidth` et `GET /bandwidth/live` (scope `monitors:read`). Routes `GET /widgets`, `POST` / `DELETE /devices`, `GET` / `PUT /preferences` ; scopes `push:write`, `preferences:read`, `preferences:write`. Champs `agent_down` et `reachable` des hôtes ; un hôte dont l'agent est arrêté mais qui répond au ping passe en `degraded` au lieu de `major_outage`. Sondes SNMP : `snmp_mode` et `interface` (débit et état d'interface). Route `GET /snmp/devices`. Bande passante : `speed_mbps`, `days`, `today_octets`, `month_octets`, `daily_octets` ; `peak_mbps` devient la plus forte mesure de la période. Sondes SNMP : `max_percent`, `idle_minutes`. |

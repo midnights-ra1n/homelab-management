@@ -290,14 +290,16 @@ public struct MonitoredHost: Codable, Sendable, Identifiable {
     public let docker: DockerSnapshot?
     public let agentLatest: String
     public let agentOutdated: Bool
-    /// Agent silencieux : true = l'hôte répond au ping (« agent injoignable, hôte en ligne »),
-    /// false = hors ligne. nil quand l'agent répond ou que le ping n'a pas été tenté.
-    public let ping: Bool?
+    /// Agent hors ligne (service arrêté ou bloqué).
+    public let agentDown: Bool
+    /// Agent hors ligne : true = l'hôte répond au ping (état degraded), false = hors ligne.
+    /// nil quand l'agent répond ou que le ping n'a pas été tenté.
+    public let reachable: Bool?
     public let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id, name, status, maintenance, connected, info, latest, updates, action, docker, ping
-        case lastSeen = "last_seen", isPublic = "public", agentLatest = "agent_latest"
+        case id, name, status, maintenance, connected, info, latest, updates, action, docker, reachable
+        case agentDown = "agent_down", lastSeen = "last_seen", isPublic = "public", agentLatest = "agent_latest"
         case agentOutdated = "agent_outdated", createdAt = "created_at"
     }
 
@@ -305,10 +307,11 @@ public struct MonitoredHost: Codable, Sendable, Identifiable {
 
     /// Libellé identique à l'interface web.
     public var statusLabel: String {
-        switch ping {
-        case true?: "Agent injoignable · hôte en ligne"
-        case false?: "Hors ligne · injoignable"
-        case nil: status.label
+        guard agentDown else { return status.label }
+        switch reachable {
+        case true?: return "Agent hors ligne · hôte en ligne"
+        case false?: return "Hors ligne · injoignable"
+        case nil: return status.label
         }
     }
 
@@ -1114,14 +1117,14 @@ Une notification par fenêtre de regroupement (60 secondes par défaut, *Réglag
 ```json
 {
   "aps": {
-    "alert": { "title": "2 service(s) en panne", "body": "nas : Panne partielle · Agent injoignable, l'hôte répond au ping\nNextcloud : Panne majeure · Requête échouée : …" },
+    "alert": { "title": "2 service(s) en panne", "body": "nas : Performances dégradées · Agent hors ligne, l'hôte répond toujours au ping\nNextcloud : Panne majeure · Requête échouée : …" },
     "sound": "default",
     "thread-id": "midnights-monitoring",
     "mutable-content": 1,
     "interruption-level": "time-sensitive"
   },
   "events": [
-    { "kind": "Hôte", "name": "nas", "from": "operational", "to": "minor_outage", "message": "Agent injoignable, l'hôte répond au ping", "at": 1792046280 },
+    { "kind": "Hôte", "name": "nas", "from": "operational", "to": "degraded", "message": "Agent hors ligne, l'hôte répond toujours au ping", "at": 1792046280 },
     { "kind": "Sonde", "name": "Nextcloud", "from": "operational", "to": "major_outage", "message": "Requête échouée : …", "at": 1792046291 }
   ]
 }
@@ -1279,7 +1282,7 @@ final class NotificationService: UNNotificationServiceExtension {
 1. Lancez l'app depuis Xcode sur un appareil réel (le simulateur reçoit les notifications depuis Xcode 14 sur Mac Apple Silicon), acceptez les notifications.
 2. *Réglages → API → Appareils* : l'appareil apparaît avec l'étiquette « développement ».
 3. *Envoyer un test* : une notification titrée « Midnights Monitoring », texte « Notification de test », arrive. En cas d'échec, la colonne *Dernier envoi* affiche l'erreur d'Apple (voir [Dépannage](#dépannage)).
-4. Pour un vrai changement d'état, arrêtez l'agent d'un hôte (`sudo systemctl stop hlm-agent`) : après environ 3 intervalles d'agent puis la fenêtre de regroupement, la notification « Agent injoignable, l'hôte répond au ping » arrive.
+4. Pour un vrai changement d'état, arrêtez l'agent d'un hôte (`sudo systemctl stop hlm-agent`) : après environ 3 intervalles d'agent puis la fenêtre de regroupement, la notification « Agent hors ligne, l'hôte répond toujours au ping » arrive.
 
 ## Widgets
 

@@ -110,6 +110,8 @@ var migrations = []string{
 	ALTER TABLE monitor_daily ADD COLUMN energy_wh REAL NOT NULL DEFAULT 0;`,
 	activityTable,
 	passkeysTable,
+	`ALTER TABLE monitors ADD COLUMN category TEXT NOT NULL DEFAULT '';`,
+	oauthTables,
 	// Native apps: devices registered for push notifications, removed with their API token.
 	`CREATE TABLE push_devices(
 		token TEXT PRIMARY KEY,

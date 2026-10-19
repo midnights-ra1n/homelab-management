@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func pendingKinds(s *Server) map[string]int {
@@ -63,12 +64,21 @@ func TestUpdateAlertsAreSentOnce(t *testing.T) {
 	if pendingKinds(s)[KindDisk] != 1 {
 		t.Fatalf("watch level must alert, got %v", pendingKinds(s))
 	}
+	// Disk space: once when crossing the threshold, again only after falling 5 points under it.
+	full := []agentDisk{{Mount: "/", Used: 95, Total: 100}}
+	s.checkDiskSpace(id, "pve", full)
+	s.checkDiskSpace(id, "pve", full)
+	s.checkDiskSpace(id, "pve", []agentDisk{{Mount: "/", Used: 88, Total: 100}})
+	s.checkDiskSpace(id, "pve", full)
+	if pendingKinds(s)[KindSpace] != 1 {
+		t.Fatalf("expected one disk space alert, got %v", pendingKinds(s))
+	}
 	s.notifier.mu.Lock()
 	s.notifier.timer.Stop()
 	evs := s.notifier.pending
 	s.notifier.mu.Unlock()
 	subj, _, err := renderEmail(defaultSubject, defaultEmailHTML, buildEmailData("Lab", "", evs))
-	if err != nil || subj != "[Avertissement] 5 avertissement(s)" {
+	if err != nil || subj != "[Avertissement] 6 avertissement(s)" {
 		t.Fatalf("grouped subject %q (%v)", subj, err)
 	}
 }
@@ -95,6 +105,16 @@ func TestMonthlyReportEmailRenders(t *testing.T) {
 	for _, want := range []string{"Mises à jour", "nas", "Requis", "Santé des disques", "WD Red"} {
 		if !strings.Contains(b.String(), want) {
 			t.Fatalf("report e-mail lacks %q", want)
+		}
+	}
+}
+
+func TestWeekStart(t *testing.T) {
+	// Monday 2026-10-12 to Sunday 2026-10-18: the report covers the week before, from Monday 10-05.
+	for _, day := range []int{12, 14, 18} {
+		got := weekStart(time.Date(2026, 10, day, 9, 0, 0, 0, time.UTC))
+		if got != time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC) {
+			t.Fatalf("day %d: %v", day, got)
 		}
 	}
 }

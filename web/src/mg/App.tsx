@@ -11,6 +11,7 @@ import { EmptyState } from "./components/ui/empty-state";
 import { Skeleton } from "./components/ui/skeleton";
 import { PwaRegister } from "./components/pwa-register";
 import { LogsPage } from "../shared/system";
+import { EnergyPage } from "../pages/Energy";
 
 type Page = ComponentType<PageProps>;
 const page = (load: () => Promise<{ default: Page }>) => lazy(load);
@@ -36,6 +37,7 @@ const ROUTES: [string, Page, string][] = [
   ["/proxmox/:id/:node/:type/:vmid", page(() => import("./app/proxmox/[id]/[node]/[type]/[vmid]/page")), "Invité Proxmox"],
   ["/webmin", page(() => import("./app/webmin/page")), "Webmin"],
   ["/monitoring", page(() => import("./app/monitoring/page")), "Monitoring"],
+  ["/energie", Energy, "Énergie"],
   ["/journaux", Journal, "Journaux"],
   ["/parametres", page(() => import("./app/parametres/page")), "Paramètres"],
 ];
@@ -51,6 +53,10 @@ function match(path: string): { Page: Page; params: Record<string, string>; titl
     }
   }
   return null;
+}
+
+function Energy() {
+  return <EnergyPage source="/api/mg/energy" />;
 }
 
 /** Journal entries link to the item they are about when it has a page. */

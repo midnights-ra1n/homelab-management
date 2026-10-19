@@ -10,7 +10,7 @@ set -eu
 
 # Kept in a variable so the same steps can be piped into each LXC container.
 REMOVE=$(cat <<'EOS'
-units="hlm-agent.service hlm-agent-smart.timer hlm-agent-smart.service hlm-agent-apt.path hlm-agent-apt.service
+units="hlm-agent.service hlm-agent-smart.timer hlm-agent-smart.path hlm-agent-smart.service hlm-agent-apt.path hlm-agent-apt.service
        hlm-agent-docker.timer hlm-agent-docker.service hlm-agent-docker-update.path hlm-agent-docker-update.service"
 if command -v systemctl >/dev/null 2>&1; then
   for u in $units; do systemctl disable --now "$u" 2>/dev/null || true; done

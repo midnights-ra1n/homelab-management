@@ -42,6 +42,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("/api/mcp", s.handleMCP) // bearer token, HTTPS only (see mcp.go)
 	mux.HandleFunc("GET /api/mcp/state", auth(s.handleMCPState))
 	mux.HandleFunc("PUT /api/mcp/config", auth(s.handleMCPConfig))
+	s.oauthRoutes(mux)
 
 	if s.cfg.Role == RoleManagement {
 		s.mgRoutes(mux)
@@ -65,6 +66,7 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/hosts/{id}", auth(s.handleDeleteHost))
 	mux.HandleFunc("POST /api/hosts/{id}/token", auth(s.handleRotateHostToken))
 	mux.HandleFunc("GET /api/hosts/{id}/metrics", auth(s.handleHostMetrics))
+	mux.HandleFunc("GET /api/hosts/{id}/live", auth(s.handleHostLive))
 	mux.HandleFunc("POST /api/hosts/{id}/action", auth(s.handleHostAction))
 
 	mux.HandleFunc("GET /api/monitors", auth(s.handleListMonitors))
@@ -87,9 +89,11 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/import", auth(s.handleImport))
 
 	mux.HandleFunc("GET /api/disks", auth(s.handleDisks))
+	mux.HandleFunc("POST /api/disks/refresh", auth(s.handleSmartRefresh))
 	mux.HandleFunc("GET /api/containers", auth(s.handleContainers))
 	mux.HandleFunc("GET /api/reports/monthly", auth(s.handleMonthlyReport))
 	mux.HandleFunc("POST /api/reports/monthly/send", auth(s.handleSendMonthlyReport))
+	mux.HandleFunc("POST /api/reports/weekly/send", auth(s.handleSendWeeklyReport))
 	mux.HandleFunc("GET /api/reports/energy", auth(s.handleEnergyReport))
 	mux.HandleFunc("GET /api/reports/energy.csv", auth(s.handleEnergyCSV))
 	mux.HandleFunc("POST /api/reports/energy/send", auth(s.handleSendEnergyReport))
@@ -198,7 +202,27 @@ func (s *Server) isHTTPS(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
 	}
-	return s.trustedPeer(r) && r.Header.Get("X-Forwarded-Proto") == "https"
+	return s.trustedPeer(r) && forwardedProto(r) == "https"
+}
+
+// forwardedProto is the scheme the client used, as told by the proxy: X-Forwarded-Proto
+// (first value when proxies are chained, any case), else the standard Forwarded header.
+func forwardedProto(r *http.Request) string {
+	if v := r.Header.Get("X-Forwarded-Proto"); v != "" {
+		return strings.ToLower(strings.TrimSpace(strings.Split(v, ",")[0]))
+	}
+	for _, part := range strings.Split(strings.Split(r.Header.Get("Forwarded"), ",")[0], ";") {
+		if k, v, ok := strings.Cut(strings.TrimSpace(part), "="); ok && strings.EqualFold(k, "proto") {
+			return strings.ToLower(strings.Trim(v, `"`))
+		}
+	}
+	return ""
+}
+
+// proxyDiagnostic explains why a request is (not) seen as HTTPS, for the settings page.
+func (s *Server) proxyDiagnostic(r *http.Request) map[string]any {
+	peer, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return map[string]any{"peer": peer, "trusted": s.trustedPeer(r), "proto": forwardedProto(r), "configured": len(s.cfg.TrustedProxies) > 0}
 }
 
 func (s *Server) requestHost(r *http.Request) string {

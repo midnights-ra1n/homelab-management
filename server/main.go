@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -54,9 +55,9 @@ type Server struct {
 	setupMu   sync.Mutex
 	setupOpen bool // true until the first account exists
 
-	agentsMu sync.Mutex
-	agents   map[int64]*agentConn
-	pings    sync.Map // host id → bool, ICMP result for hosts whose agent is silent
+	agentsMu  sync.Mutex
+	agents    map[int64]*agentConn
+	hostPings pingCache // ping answers of hosts whose agent is down
 
 	key []byte   // AES-256-GCM key for stored secrets (DATA_DIR/secret.key or APP_SECRET)
 	mg  *mgState // management role only
@@ -94,23 +95,18 @@ func main() {
 		Role:      env("ROLE", RoleMonitoring),
 		Listen:    env("LISTEN", ":8080"),
 		DataDir:   env("DATA_DIR", "./data"),
-		PublicURL: strings.TrimRight(env("PUBLIC_URL", ""), "/"),
+		PublicURL: publicURL(env("PUBLIC_URL", "")),
 		Install:   env("INSTALL", ""),
 	}
 	if cfg.Role != RoleMonitoring && cfg.Role != RoleManagement {
 		slog.Error("HLT_ROLE must be monitoring or management", "value", cfg.Role)
 		os.Exit(1)
 	}
-	for _, c := range strings.Split(env("TRUSTED_PROXIES", ""), ",") {
-		if c = strings.TrimSpace(c); c == "" {
-			continue
-		}
-		_, n, err := net.ParseCIDR(c)
-		if err != nil {
-			slog.Error("invalid HLT_TRUSTED_PROXIES entry", "value", c)
-			os.Exit(1)
-		}
-		cfg.TrustedProxies = append(cfg.TrustedProxies, n)
+	var bad []string
+	cfg.TrustedProxies, bad = parseProxies(env("TRUSTED_PROXIES", ""))
+	for _, b := range bad {
+		// Not fatal: in a Proxmox OCI container the server is the init process, exiting stops the CT.
+		slog.Error("HLT_TRUSTED_PROXIES: entry ignored, expected an IP or a CIDR such as 192.168.1.10/32", "value", b)
 	}
 	if err := run(cfg); err != nil {
 		slog.Error("fatal", "err", err)
@@ -198,4 +194,36 @@ func (s *Server) initMonitoring() error {
 	s.db, s.priv, s.pub = db, priv, priv.Public().(ed25519.PublicKey)
 	s.notifier = newNotifier(s)
 	return s.sealMonitorSecrets()
+}
+
+// unquote drops the quotes a container UI may keep around an environment value.
+func unquote(v string) string { return strings.Trim(strings.TrimSpace(v), `"'`) }
+
+// parseProxies reads CIDRs or bare IPs separated by commas, semicolons or spaces.
+func parseProxies(v string) (nets []*net.IPNet, bad []string) {
+	for _, c := range strings.FieldsFunc(unquote(v), func(r rune) bool { return r == ',' || r == ';' || r == ' ' || r == '\t' }) {
+		c = unquote(c)
+		if ip := net.ParseIP(c); ip != nil {
+			bits := 128
+			if ip.To4() != nil {
+				ip, bits = ip.To4(), 32
+			}
+			nets = append(nets, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+		} else if _, n, err := net.ParseCIDR(c); err == nil {
+			nets = append(nets, n)
+		} else if c != "" {
+			bad = append(bad, c)
+		}
+	}
+	return nets, bad
+}
+
+// publicURL keeps an http(s) address without its trailing slash; anything else is ignored.
+func publicURL(v string) string {
+	v = strings.TrimRight(unquote(v), "/")
+	if u, err := url.Parse(v); v != "" && (err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "") {
+		slog.Error("HLT_PUBLIC_URL ignored, expected https://name.example.fr", "value", v)
+		return ""
+	}
+	return v
 }

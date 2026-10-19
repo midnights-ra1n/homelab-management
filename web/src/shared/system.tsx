@@ -2,8 +2,8 @@
    passkeys and the journal. Same server endpoints on both roles, same components. */
 import { useEffect, useState } from "react";
 import { Bot, Database, Download, Fingerprint, KeyRound, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
-import { api, ApiError, fmtBytes } from "../api";
-import { Alert, Badge, Button, CodeBlock, EmptyState, Field, FORM_ACTIONS, inputClass, Meter, PageHeader, SettingsSection, Skeleton, Switch, useToast } from "../ui";
+import { api, ApiError, fmtAgo, fmtBytes } from "../api";
+import { Alert, Badge, Button, CodeBlock, EmptyState, Field, FORM_ACTIONS, inputClass, Meter, PageHeader, SettingsSection, Skeleton, Switch, textareaClass, useToast } from "../ui";
 
 /* ---------- Database ---------- */
 
@@ -102,7 +102,7 @@ export function DatabaseSection() {
 
 /* ---------- Server updates ---------- */
 
-interface UpdateState { current: string; latest: string; available: boolean; install: string; checked_at: number; repo: string; pending?: string }
+interface UpdateState { current: string; latest: string; available: boolean; install: string; checked_at: number; repo: string; pending?: string; docker_auto?: boolean }
 
 export function UpdateSection() {
   const [u, setU] = useState<UpdateState>();
@@ -131,18 +131,19 @@ export function UpdateSection() {
   };
   const isDocker = u.install === "docker";
   const isDeb = u.install === "deb";
+  const isLxc = u.install === "lxc-oci";
 
   return (
     <SettingsSection
       id="updates"
       title="Mises à jour du serveur"
-      description={isDocker ? "Installé avec Docker : l'image se met à jour avec Docker (docker compose pull puis up -d)." : isDeb ? "Installé par paquet .deb : la mise à jour télécharge le paquet de la release GitHub, vérifie son empreinte SHA-256 et l'installe." : "Installation manuelle : remplacez le binaire par celui de la dernière release."}
+      description={isLxc ? "Conteneur LXC Proxmox créé depuis l'image OCI : Proxmox ne remplace pas l'image d'un conteneur existant, la mise à jour se fait en recréant le CT." : isDocker ? (u.docker_auto ? "Installé avec Docker : le bouton demande à Watchtower de télécharger la nouvelle image et de recréer le conteneur." : "Installé avec Docker : l'image se met à jour avec Docker (docker compose pull puis up -d), ou depuis ce bouton si Watchtower est configuré (voir docker-compose.yml).") : isDeb ? "Installé par paquet .deb : la mise à jour télécharge le paquet de la release GitHub, vérifie son empreinte SHA-256 et l'installe." : "Installation manuelle : remplacez le binaire par celui de la dernière release."}
       actions={
         <>
           <Button variant="secondary" icon={<RefreshCw size={15} />} loading={busy === "check"} onClick={() => run("check", "/api/system/update/check")}>
             Rechercher les mises à jour
           </Button>
-          {isDeb && u.available && !u.pending && (
+          {(isDeb || u.docker_auto) && u.available && !u.pending && (
             <Button icon={<Download size={15} />} loading={busy === "apply"} onClick={() => run("apply", "/api/system/update")}>
               Mettre à jour vers {u.latest}
             </Button>
@@ -159,7 +160,15 @@ export function UpdateSection() {
         {u.checked_at > 0 && <span className="text-xs text-meta">vérifié le {new Date(u.checked_at * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>}
       </div>
       {u.pending && <Alert kind="info" title={`Installation de ${u.pending} en cours`}>Le service redémarre tout seul ; cette page se recharge quand la nouvelle version répond.</Alert>}
-      {isDocker && u.available && <CodeBlock text="docker compose pull && docker compose up -d" />}
+      {isLxc && u.available && (
+        <ol className="grid list-decimal gap-1 pl-5 text-sm text-body">
+          <li>Proxmox → stockage → Modèles CT → <strong>Télécharger depuis un registre OCI</strong> : <span className="font-mono">ghcr.io/midnights-ra1n/homelab-management:{u.latest}</span></li>
+          <li>Arrêtez ce CT et notez sa configuration (réseau, variables <span className="font-mono">HLT_*</span>, point de montage de <span className="font-mono">/data</span>).</li>
+          <li>Créez un CT depuis la nouvelle image avec la même configuration, en rattachant le <strong>même volume</strong> sur <span className="font-mono">/data</span>, sans oublier <span className="font-mono">HLT_INSTALL=lxc-oci</span>.</li>
+          <li>Démarrez-le, vérifiez qu'il répond, puis supprimez l'ancien CT <strong>sans supprimer le volume</strong>.</li>
+        </ol>
+      )}
+      {isDocker && !u.docker_auto && u.available && <CodeBlock text="docker compose pull && docker compose up -d" />}
       <a className="text-sm text-accent-text" href={`https://github.com/${u.repo}/releases`} target="_blank" rel="noreferrer">Notes de version</a>
     </SettingsSection>
   );
@@ -167,7 +176,8 @@ export function UpdateSection() {
 
 /* ---------- MCP server ---------- */
 
-interface McpState { enabled: boolean; token_set: boolean; https: boolean; url: string; tools: string[] }
+interface OAuthClient { client_id: string; name: string; redirect_uris: string[]; dynamic: boolean; confidential: boolean; created_at: number; last_used_at: number; active_tokens: number }
+interface McpState { enabled: boolean; token_set: boolean; https: boolean; url: string; tools: string[]; dcr: boolean; proxy?: { peer: string; trusted: boolean; proto: string; configured: boolean } }
 
 /** MCP server for assistants (Claude…): read-only tools, HTTPS only, bearer token. */
 export function McpSection() {
@@ -179,7 +189,7 @@ export function McpSection() {
   useEffect(() => { load(); }, []);
   if (!st) return error ? <Alert kind="error" title={error} /> : <Skeleton className="h-40" />;
 
-  const config = async (key: string, body: { enabled?: boolean; new_token?: boolean }) => {
+  const config = async (key: string, body: { enabled?: boolean; new_token?: boolean; dcr?: boolean }) => {
     setBusy(key);
     setError(undefined);
     try {
@@ -194,7 +204,7 @@ export function McpSection() {
     <SettingsSection
       id="mcp"
       title="Serveur MCP"
-      description="Permet à un assistant compatible MCP (Claude…) d'interroger ce serveur en lecture seule : « est-ce que j'ai un service inaccessible ? ». Disponible uniquement en HTTPS, derrière un reverse proxy, avec un jeton."
+      description="Permet à un assistant compatible MCP (Claude…) d'interroger ce serveur en lecture seule : « est-ce que j'ai un service inaccessible ? ». Disponible uniquement en HTTPS, derrière un reverse proxy ; connexion OAuth (Claude) ou jeton fixe."
       actions={
         <Button variant="secondary" icon={<KeyRound size={15} />} loading={busy === "token"} disabled={!st.https} onClick={() => config("token", { new_token: true })}>
           {st.token_set ? "Régénérer le jeton" : "Générer un jeton"}
@@ -202,7 +212,14 @@ export function McpSection() {
       }
     >
       {error && <Alert kind="error" title={error} />}
-      {!st.https && <Alert kind="warning" title="HTTPS requis">Ouvrez l'interface en HTTPS (reverse proxy avec certificat, HLT_TRUSTED_PROXIES renseigné) pour activer le serveur MCP. En HTTP, il refuse toutes les requêtes.</Alert>}
+      {!st.https && <Alert kind="warning" title="HTTPS requis">
+        Ouvrez l'interface en HTTPS (reverse proxy avec certificat, HLT_TRUSTED_PROXIES renseigné) pour activer le serveur MCP et les passkeys. En HTTP, il refuse toutes les requêtes.
+        {st.proxy && <span className="mt-2 block">
+          Diagnostic : la requête arrive de <span className="font-mono">{st.proxy.peer}</span>, {st.proxy.trusted ? "adresse de confiance" : <>absente de HLT_TRUSTED_PROXIES{st.proxy.configured ? "" : " (vide)"} : ajoutez <span className="font-mono">{st.proxy.peer}/32</span></>} ;
+          {" "}{st.proxy.proto ? <>le proxy annonce <span className="font-mono">{st.proxy.proto}</span>{st.proxy.proto !== "https" && " au lieu de https"}</> : "aucun en-tête X-Forwarded-Proto reçu : configurez le proxy pour l'envoyer"}.
+          {" "}Voir la section « HTTPS derrière un reverse proxy » du README.
+        </span>}
+      </Alert>}
       <Switch checked={st.enabled} disabled={!st.https || busy === "enable"} onChange={(v) => config("enable", { enabled: v })}
         label="Activer le serveur MCP" hint={`Adresse : ${st.url}`} />
       {token && (
@@ -210,14 +227,100 @@ export function McpSection() {
           <CodeBlock text={token} />
         </Alert>
       )}
-      {st.enabled && st.token_set && (
+      {st.enabled && (
         <>
-          <p className="text-sm text-body">Configuration d'un client MCP (ex. Claude Code : <code className="font-mono text-xs text-h2">claude mcp add --transport http {name} {st.url} --header "Authorization: Bearer …"</code>) :</p>
-          <CodeBlock text={JSON.stringify({ mcpServers: { [name]: { type: "http", url: st.url, headers: { Authorization: `Bearer ${token ?? "mcp_…"}` } } } }, null, 2)} />
+          <div className="grid gap-2 border-t border-line-subtle pt-5">
+            <p className="mm-label-caps">Connecter Claude (OAuth, sans jeton à copier)</p>
+            <p className="text-sm text-body">
+              Claude (web, bureau, mobile) : Paramètres → Connecteurs → <strong>Ajouter un connecteur personnalisé</strong>, puis collez cette adresse. Claude s'inscrit tout seul
+              et ouvre une page de ce serveur où vous autorisez l'accès. Claude Code : <code className="font-mono text-xs text-h2">claude mcp add --transport http {name} {st.url}</code> puis <code className="font-mono text-xs text-h2">/mcp</code> pour vous connecter.
+            </p>
+            <CodeBlock text={st.url} />
+            <Switch checked={st.dcr} disabled={busy === "dcr"} onChange={(v) => config("dcr", { dcr: v })}
+              label="Inscription automatique des clients" hint="Réservée à Claude (claude.ai, claude.com) et aux applications locales. Désactivée, seuls les clients créés ci-dessous peuvent se connecter." />
+          </div>
+          <OAuthClients />
+          <div className="grid gap-2 border-t border-line-subtle pt-5">
+            <p className="mm-label-caps">Jeton fixe (autres clients MCP)</p>
+            {st.token_set ? <>
+              <p className="text-sm text-body">Pour un client sans OAuth, avec l'en-tête <code className="font-mono text-xs text-h2">Authorization: Bearer …</code> :</p>
+              <CodeBlock text={JSON.stringify({ mcpServers: { [name]: { type: "http", url: st.url, headers: { Authorization: `Bearer ${token ?? "mcp_…"}` } } } }, null, 2)} />
+            </> : <p className="text-sm text-meta">Aucun jeton fixe : générez-en un avec le bouton en haut de la section si un client ne gère pas OAuth.</p>}
+          </div>
         </>
       )}
       <p className="flex flex-wrap items-center gap-2 text-xs text-meta"><Bot size={13} aria-hidden="true" /> Outils : {st.tools.map((t) => <code key={t} className="font-mono">{t}</code>)}</p>
     </SettingsSection>
+  );
+}
+
+/** OAuth clients of the MCP server: registered by Claude on its own, or created here (id + secret). */
+function OAuthClients() {
+  const [list, setList] = useState<OAuthClient[]>();
+  const [claude, setClaude] = useState<string[]>([]);
+  const [name, setName] = useState("");
+  const [redirects, setRedirects] = useState("");
+  const [made, setMade] = useState<{ client_id: string; client_secret: string }>();
+  const [busy, setBusy] = useState<string>();
+  const [error, setError] = useState<string>();
+  const toast = useToast();
+  const load = () => api.get<{ clients: OAuthClient[]; claude_redirects: string[] }>("/api/mcp/clients").then((r) => { setList(r.clients); setClaude(r.claude_redirects); }, (e) => setError(e.message));
+  useEffect(() => { load(); }, []);
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy("create");
+    setError(undefined);
+    try {
+      setMade(await api.post<{ client_id: string; client_secret: string }>("/api/mcp/clients", { name, redirect_uris: redirects.split(/\s+/).filter(Boolean) }));
+      setName("");
+      setRedirects("");
+      await load();
+    } catch (err) { setError((err as Error).message); } finally { setBusy(undefined); }
+  };
+  const revoke = async (c: OAuthClient) => {
+    setBusy(c.client_id);
+    try { await api.del(`/api/mcp/clients/${c.client_id}`); toast(`Accès de « ${c.name} » révoqué`); await load(); } catch (err) { setError((err as Error).message); } finally { setBusy(undefined); }
+  };
+  const hosts = (c: OAuthClient) => [...new Set(c.redirect_uris.map((u) => { try { return new URL(u).host; } catch { return u; } }))].join(", ");
+
+  return (
+    <div className="grid gap-3 border-t border-line-subtle pt-5">
+      <p className="mm-label-caps">Clients OAuth</p>
+      {error && <Alert kind="error" title={error} />}
+      {list && list.length === 0 && <p className="text-sm text-meta">Aucun client pour l'instant : il apparaîtra ici dès que Claude se connectera.</p>}
+      {list && list.length > 0 && (
+        <ul className="grid gap-2">
+          {list.map((c) => (
+            <li key={c.client_id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line-subtle bg-page px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium text-h1">{c.name} <Badge tone={c.dynamic ? "muted" : "accent"}>{c.dynamic ? "Automatique" : "Créé ici"}</Badge></span>
+                <span className="block truncate font-mono text-xs text-meta">{c.client_id} · {hosts(c)} · {c.last_used_at ? `utilisé ${fmtAgo(c.last_used_at)}` : "jamais utilisé"}{c.active_tokens ? ` · ${c.active_tokens} session(s)` : ""}</span>
+              </span>
+              <Button variant="danger-ghost" size="sm" icon={<Trash2 size={14} />} loading={busy === c.client_id} onClick={() => revoke(c)}>Révoquer</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {made && (
+        <Alert kind="success" title="Client créé : copiez le secret maintenant, il ne sera plus affiché">
+          <span className="mt-2 grid gap-2">
+            <span>Dans Claude : Ajouter un connecteur personnalisé → Paramètres avancés → ID client OAuth et Secret client OAuth.</span>
+            <span className="text-xs text-meta">ID client</span><CodeBlock text={made.client_id} />
+            <span className="text-xs text-meta">Secret client</span><CodeBlock text={made.client_secret} />
+          </span>
+        </Alert>
+      )}
+      <form className="grid gap-3" onSubmit={create}>
+        <Field label="Créer un client (ID et secret)" htmlFor="oc-name" hint="Pour renseigner vous-même l'ID et le secret dans Claude, ou pour un autre client MCP compatible OAuth">
+          <input id="oc-name" className={inputClass} placeholder="Mon Claude" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Adresses de redirection (facultatif)" htmlFor="oc-redir" hint="Une par ligne. Vide : celles de Claude.">
+          <textarea id="oc-redir" className={`${textareaClass} font-mono text-xs`} placeholder={claude.join("\n")} value={redirects} onChange={(e) => setRedirects(e.target.value)} />
+        </Field>
+        <div><Button type="submit" variant="secondary" icon={<Plus size={15} />} loading={busy === "create"} disabled={!name.trim()}>Créer le client</Button></div>
+      </form>
+    </div>
   );
 }
 
