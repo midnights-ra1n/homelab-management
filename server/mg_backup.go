@@ -17,9 +17,9 @@ import (
 )
 
 // backupTables are saved in insertion order (dependencies first).
-var backupTables = []string{"settings", "vlans", "subnets", "integrations", "ssh_keys", "assets", "ip_addresses",
+var backupTables = []string{"settings", "vlans", "subnets", "integrations", "ssh_keys", "assets", "hardware_items", "ip_addresses",
 	"deployments", "deployment_steps", "tasks", "shortcut_groups", "shortcuts", "uploaded_icons", "map_positions",
-	"map_links", "vpn_tunnels", "firewall_rules", "domains", "activity"}
+	"map_links", "vpn_tunnels", "firewall_rules", "domains", "update_reminders", "activity"}
 
 type backupDoc struct {
 	App        string                      `json:"app"`

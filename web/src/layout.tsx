@@ -1,12 +1,14 @@
 /* App shell ported from homelab-management (components/layout/*, components/alert-banner.tsx):
    .mm-app [sidebar | content], bottom bar under 640 px, ⌘K search and the alert strip. */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle, ArrowDownUp, ArrowUpRight, ChevronsUpDown, Container, Plug, CornerDownLeft, Ellipsis, FileBarChart, Globe, HardDrive, LayoutDashboard,
   PackageCheck, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Radar, ScrollText, Search, Server, Settings, Siren, X, type LucideIcon,
 } from "lucide-react";
 import { api, type Overview } from "./api";
 import { incidents } from "./pages/Incidents";
+import { NotificationsMenu, type NotifFeed } from "./shared/notifications";
+import { usePolled } from "./shared/poll";
 import { Link, Logo, StatusDot, StatusIcon, STATUS_TONE, ThemeSwitch, TONE_VAR, SEARCH_KEY, cn, isActive, navigate, toggleRail, usePath, useRail } from "./ui";
 
 type NavItem = { href: string; label: string; short: string; icon: LucideIcon };
@@ -52,6 +54,7 @@ export function AppShell({ username, version, onLogout, children }: { username: 
             {children}
           </main>
         </div>
+        <NotificationsButton floating />
         <MobileNav account={<AccountSheet username={username} onLogout={onLogout} />} />
       </div>
       <CommandPalette />
@@ -86,6 +89,7 @@ function AppSidebar({ version, account }: { version: string; account: ReactNode 
         ))}
       </nav>
       <div className="mm-sidebar__foot">
+        <NotificationsButton />
         <SideLink item={SETTINGS} active={isActive(pathname, SETTINGS.href)} />
         {account}
       </div>
@@ -332,16 +336,8 @@ function CommandPalette() {
 
 /** Polls /api/overview every 30 s while the tab is visible and returns the open incidents. */
 export function useIncidents() {
-  const [list, setList] = useState<ReturnType<typeof incidents>>([]);
-  useEffect(() => {
-    let stopped = false;
-    const load = () => { if (!document.hidden) api.get<Overview>("/api/overview").then((d) => !stopped && setList(incidents(d)), () => {}); };
-    load();
-    const timer = setInterval(load, 30_000);
-    document.addEventListener("visibilitychange", load);
-    return () => { stopped = true; clearInterval(timer); document.removeEventListener("visibilitychange", load); };
-  }, []);
-  return list;
+  const d = usePolled<Overview>("/api/overview"); // same poll as the notifications menu
+  return useMemo(() => (d ? incidents(d) : []), [d]);
 }
 
 type Incident = ReturnType<typeof incidents>[number];
@@ -386,6 +382,21 @@ export function AlertBanner({ list }: { list: Incident[] }) {
       </ul>
     </section>
   );
+}
+
+/** Notifications feed of the monitoring: open incidents and the update state of every host. */
+const toFeed = (d: Overview): NotifFeed => ({
+    alerts: incidents(d).filter((i) => i.status !== "maintenance").map((i) => ({
+      key: i.key, critical: isCritical(i), text: i.name, detail: i.detail, href: i.to,
+    })),
+    hosts: d.hosts.map((h) => ({
+      key: `h${h.id}`, name: h.name, pending: h.updates?.pending ?? 0, security: h.updates?.security ?? 0,
+      reboot: !!h.updates?.reboot_required, href: `/hosts/${h.id}`,
+    })),
+  });
+
+function NotificationsButton({ floating = false }: { floating?: boolean }) {
+  return <NotificationsMenu url="/api/overview" toFeed={toFeed} floating={floating} alertsLink={["/incidents", "Voir les incidents"]} updatesLink={["/updates", "Voir les mises à jour"]} />;
 }
 
 /** Discreet one-line version for the other pages (the overview and incidents pages have their own). */

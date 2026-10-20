@@ -24,6 +24,7 @@ const ROUTES: [string, Page, string][] = [
   ["/inventaire/nouveau", page(() => import("./app/inventaire/nouveau/page")), "Ajouter à l'inventaire"],
   ["/inventaire/:id", page(() => import("./app/inventaire/[id]/page")), "Inventaire"],
   ["/inventaire/:id/modifier", page(() => import("./app/inventaire/[id]/modifier/page")), "Modifier"],
+  ["/stock", page(() => import("./app/stock/page")), "Stock matériel"],
   ["/reseau", page(() => import("./app/reseau/page")), "Réseau"],
   ["/carte", page(() => import("./app/carte/page")), "Carte"],
   ["/deploiements", page(() => import("./app/deploiements/page")), "Déploiements"],
@@ -61,8 +62,10 @@ function Energy() {
 
 /** Journal entries link to the item they are about when it has a page. */
 const ENTITY_PAGES: Record<string, string> = { asset: "/inventaire", deployment: "/deploiements" };
+// Pages without a detail view: the journal links to the list.
+const ENTITY_LISTS: Record<string, string> = { hardware: "/stock" };
 function Journal() {
-  return <LogsPage entityHref={(e) => (e.entity_id && ENTITY_PAGES[e.entity_type] ? `${ENTITY_PAGES[e.entity_type]}/${e.entity_id}` : undefined)} />;
+  return <LogsPage entityHref={(e) => (e.entity_id && ENTITY_PAGES[e.entity_type] ? `${ENTITY_PAGES[e.entity_type]}/${e.entity_id}` : ENTITY_LISTS[e.entity_type])} />;
 }
 
 export default function ManagementApp({ session }: { session: Session }) {

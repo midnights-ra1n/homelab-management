@@ -9,6 +9,7 @@ import {
   Rocket,
   Server,
   Share2,
+  Warehouse,
   ScrollText,
   SquareTerminal,
   type LucideIcon,
@@ -20,6 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Tableau de bord", short: "Accueil", icon: LayoutDashboard },
   { href: "/applications", label: "Applications", short: "Apps", icon: AppWindow },
   { href: "/inventaire", label: "Inventaire", short: "Inventaire", icon: Boxes, description: "Serveurs, VM, conteneurs et équipements" },
+  { href: "/stock", label: "Stock matériel", short: "Stock", icon: Warehouse, description: "Serveurs, PC, composants et leur état" },
   { href: "/reseau", label: "Réseau", short: "Réseau", icon: Network, description: "IPAM, VLAN, VPN et pare-feu" },
   { href: "/carte", label: "Carte", short: "Carte", icon: Share2, description: "Topologie interactive du homelab" },
   { href: "/deploiements", label: "Déploiements", short: "Déploiements", icon: Rocket, description: "Ce qui arrive et où ça en est" },
@@ -37,7 +39,7 @@ const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
 export type NavSection = { label?: string; items: NavItem[] };
 export const NAV_SECTIONS: NavSection[] = [
   { items: ["/", "/applications", "/monitoring", "/energie"].map(byHref) },
-  { label: "Infrastructure", items: ["/inventaire", "/reseau", "/carte"].map(byHref) },
+  { label: "Infrastructure", items: ["/inventaire", "/stock", "/reseau", "/carte"].map(byHref) },
   { label: "Suivi", items: ["/deploiements", "/taches", "/journaux"].map(byHref) },
   { label: "Serveurs", items: ["/proxmox", "/webmin"].map(byHref) },
 ];

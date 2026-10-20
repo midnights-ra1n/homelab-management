@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, use } from "react";
+import { AssetHardware } from "@/features/hardware/hardware-views";
 import { Copy, ExternalLink, Pencil, Plus, SquareTerminal, Star } from "lucide-react";
 import { ancestorsOf, assetDetail, assetMonitoring, assetOptions, childrenOf, getAsset, type Asset } from "@/lib/data/assets";
 import { DecommissionButton, DecommissionPanel } from "@/features/inventory/decommission";
@@ -384,6 +385,11 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
           {/* Monitoring en direct */}
           <Suspense fallback={<Skeleton className="h-40 rounded-2xl" />}>
             <LiveMonitoring asset={asset} />
+          </Suspense>
+
+          {/* Stock matériel */}
+          <Suspense fallback={null}>
+            <AssetHardware assetId={id} physical={asset.kind === "physical"} />
           </Suspense>
 
           {/* Proxmox */}

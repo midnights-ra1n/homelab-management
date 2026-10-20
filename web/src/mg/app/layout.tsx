@@ -4,7 +4,7 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { Toaster } from "@/components/ui/toaster";
-import { AlertStrip } from "@/components/alert-banner";
+import { AlertStrip, NotificationsButton } from "@/components/alert-banner";
 import { TimeZoneSync } from "@/features/settings/time-zone";
 import { getTimeZone } from "@/lib/data/settings";
 import { getT } from "@/i18n/server";
@@ -45,6 +45,7 @@ export default function AppLayout({ children }: LayoutProps<"/[lang]">) {
             {children}
           </main>
         </div>
+        <NotificationsButton floating />
         <Suspense fallback={null}>
           <MobileNav
             accountSlot={

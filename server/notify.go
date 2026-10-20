@@ -34,12 +34,13 @@ const (
 
 // warningLabels gives the badge text and colour of each warning kind in e-mails.
 var warningLabels = map[string][2]string{
-	KindCert:    {"Expiration proche", statusColors[StatusDegraded]},
-	KindDisk:    {"Santé du disque", statusColors[StatusMinor]},
-	KindUpdates: {"Mises à jour de sécurité", statusColors[StatusDegraded]},
-	KindReboot:  {"Redémarrage requis", statusColors[StatusDegraded]},
-	KindImage:   {"Image à mettre à jour", statusColors[StatusMaintenance]},
-	KindSpace:   {"Espace disque faible", statusColors[StatusMinor]},
+	KindCert:     {"Expiration proche", statusColors[StatusDegraded]},
+	KindDisk:     {"Santé du disque", statusColors[StatusMinor]},
+	KindUpdates:  {"Mises à jour de sécurité", statusColors[StatusDegraded]},
+	KindReboot:   {"Redémarrage requis", statusColors[StatusDegraded]},
+	KindImage:    {"Image à mettre à jour", statusColors[StatusMaintenance]},
+	KindSpace:    {"Espace disque faible", statusColors[StatusMinor]},
+	KindReminder: {"Rappel de mise à jour", statusColors[StatusMaintenance]},
 }
 
 type Event struct {

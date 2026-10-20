@@ -17,7 +17,7 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	auth := s.requireAuth
 
-	// Shared by both roles: health, accounts, passkeys, journal, database, updates.
+	// Shared by both roles: health, accounts, passkeys, update reminders, journal, database, updates.
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok", "role": s.cfg.Role})
 	})
@@ -32,6 +32,11 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /api/passkeys/begin", auth(s.handlePasskeyRegisterBegin))
 	mux.HandleFunc("POST /api/passkeys", auth(s.handlePasskeyRegisterFinish))
 	mux.HandleFunc("DELETE /api/passkeys/{id}", auth(s.handleDeletePasskey))
+	mux.HandleFunc("GET /api/reminders", auth(s.handleListReminders))
+	mux.HandleFunc("POST /api/reminders", auth(s.handleSaveReminder))
+	mux.HandleFunc("PUT /api/reminders/{id}", auth(s.handleSaveReminder))
+	mux.HandleFunc("POST /api/reminders/{id}/done", auth(s.handleReminderDone))
+	mux.HandleFunc("DELETE /api/reminders/{id}", auth(s.handleDeleteReminder))
 	mux.HandleFunc("GET /api/logs", auth(s.handleLogs))
 	mux.HandleFunc("GET /api/database", auth(s.handleDatabase))
 	mux.HandleFunc("POST /api/database/cleanup", auth(s.handleDBCleanup))

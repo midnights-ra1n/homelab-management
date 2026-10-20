@@ -131,6 +131,9 @@ func (s *Server) mgAsset(w http.ResponseWriter, r *http.Request) {
 		"tunnels":   {`SELECT id, name FROM vpn_tunnels WHERE endpoint_a_id = ? OR endpoint_b_id = ? ORDER BY name`, []any{id, id}},
 		"rules":     {`SELECT id, name, position FROM firewall_rules WHERE (src_type = 'asset' AND src_value = ?) OR (dst_type = 'asset' AND dst_value = ?) ORDER BY position`, []any{strconv.FormatInt(id, 10), strconv.FormatInt(id, 10)}},
 		"shortcuts": {`SELECT id, name, url FROM shortcuts WHERE asset_id = ? ORDER BY name`, []any{id}},
+		// Stock machines linked to this item, then the components installed in them.
+		"hardware": {hardwareSelect + ` WHERE h.asset_id = ? OR h.parent_id IN (SELECT id FROM hardware_items WHERE asset_id = ?)
+		  ORDER BY h.parent_id IS NOT NULL, h.name COLLATE NOCASE`, []any{id, id}},
 	}
 	for k, q := range queries {
 		rows, err := s.rows(q.q, q.args...)

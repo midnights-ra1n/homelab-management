@@ -34,6 +34,14 @@ func (s *Server) mgRoutes(mux *http.ServeMux) {
 	h("GET /api/mg/agents", s.mgAgents)
 	h("POST /api/mg/agents/update", s.mgUpdateAgents)
 
+	// Hardware stock
+	h("GET /api/mg/hardware", s.mgListHardware)
+	h("POST /api/mg/hardware", s.mgSaveHardware)
+	h("POST /api/mg/hardware/{id}", s.mgSaveHardware)
+	h("DELETE /api/mg/hardware/{id}", s.mgDeleteHardware)
+	h("POST /api/mg/hardware/{id}/install", s.mgInstallHardware)
+	h("POST /api/mg/hardware/{id}/duplicate", s.mgDuplicateHardware)
+
 	// Network
 	h("GET /api/mg/network", s.mgNetwork)
 	h("POST /api/mg/vlans", s.mgSaveVlan)

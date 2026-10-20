@@ -23,6 +23,8 @@ var apiScopes = map[string]string{
 	"metrics:read":      "Historique des métriques des hôtes",
 	"monitors:read":     "Sondes, disponibilité et latence",
 	"updates:read":      "Mises à jour en attente",
+	"reminders:read":    "Rappels de mise à jour",
+	"reminders:write":   "Ajouter, modifier, traiter ou supprimer un rappel de mise à jour",
 	"smart:read":        "Santé des disques (SMART)",
 	"docker:read":       "Conteneurs Docker et mises à jour d'images",
 	"reports:read":      "Rapports mensuels",
@@ -75,6 +77,11 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/snmp/devices", t("monitors:read", s.handleSNMPDevices))
 	mux.HandleFunc("PUT /api/v1/monitors/{id}/maintenance", t("maintenance:write", s.apiMonitorMaintenance))
 	mux.HandleFunc("GET /api/v1/updates", t("updates:read", s.apiUpdates))
+	mux.HandleFunc("GET /api/v1/reminders", t("reminders:read", s.handleListReminders))
+	mux.HandleFunc("POST /api/v1/reminders", t("reminders:write", s.handleSaveReminder))
+	mux.HandleFunc("PUT /api/v1/reminders/{id}", t("reminders:write", s.handleSaveReminder))
+	mux.HandleFunc("POST /api/v1/reminders/{id}/done", t("reminders:write", s.handleReminderDone))
+	mux.HandleFunc("DELETE /api/v1/reminders/{id}", t("reminders:write", s.handleDeleteReminder))
 	mux.HandleFunc("GET /api/v1/disks", t("smart:read", s.handleDisks))
 	mux.HandleFunc("GET /api/v1/containers", t("docker:read", s.handleContainers))
 	mux.HandleFunc("GET /api/v1/reports/monthly", t("reports:read", s.handleMonthlyReport))

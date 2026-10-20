@@ -1,53 +1,35 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { AlertTriangle, ArrowUpRight } from "lucide-react";
+import { NotificationsMenu, type NotifFeed } from "../../shared/notifications";
+import { usePolled } from "../../shared/poll";
 import { TONE_VAR } from "@/lib/constants";
 import type { MonitorAlert } from "@/lib/monitor/alerts";
 import { usePathname, useT } from "@/i18n/client";
 import { StatusIcon } from "./status-icon";
 import { ButtonLink } from "@/components/ui/button";
-import { api } from "@/lib/client";
 import { alertsFrom } from "@/lib/monitor/alerts";
 import type { Source } from "@/lib/integrations";
 import type { HlmData } from "@/lib/integrations/hlm";
 import { tr } from "@/i18n/translate";
 
-const POLL_MS = 30_000;
+const MONITORING = "/api/mg/monitoring";
 
-/** Relit les alertes du monitoring toutes les 30 s tant que l'onglet est visible. */
+/** Alertes du monitoring, relues toutes les 30 s par le même appel que le menu Notifications. */
 function useAlerts(initial: MonitorAlert[] | null, refreshOnChange = false) {
   const router = useRouter();
-  const [alerts, setAlerts] = useState(initial);
+  const sources = usePolled<Source<HlmData>[]>(MONITORING);
+  const alerts = useMemo(() => (sources ? alertsFrom(sources, tr) : initial), [sources, initial]);
   const last = useRef(JSON.stringify(initial));
   useEffect(() => {
-    let stopped = false;
-    const load = async () => {
-      if (document.hidden) return;
-      try {
-        const data = alertsFrom(await api.get<Source<HlmData>[]>("/api/mg/monitoring"), tr);
-        if (stopped) return;
-        const key = JSON.stringify(data);
-        if (key === last.current) return;
-        const first = last.current === "null";
-        last.current = key;
-        setAlerts(data);
-        if (!first && refreshOnChange) router.refresh();
-      } catch {
-        // Réseau coupé : on garde le dernier état connu.
-      }
-    };
-    if (initial === null) void load();
-    const timer = setInterval(load, POLL_MS);
-    document.addEventListener("visibilitychange", load);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", load);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `initial` et `refreshOnChange` ne servent qu'au montage
-  }, []);
+    const key = JSON.stringify(alerts);
+    if (key === last.current) return;
+    const first = last.current === "null";
+    last.current = key;
+    if (!first && refreshOnChange) router.refresh();
+  }, [alerts, refreshOnChange, router]);
   return alerts ?? [];
 }
 
@@ -132,4 +114,19 @@ export function AlertStrip() {
       <ArrowUpRight size={14} className="shrink-0 text-meta" aria-hidden="true" />
     </Link>
   );
+}
+
+/** Flux de notifications de la gestion : alertes et état des mises à jour des hôtes du monitoring. */
+const toFeed = (sources: Source<HlmData>[]): NotifFeed => ({
+    alerts: alertsFrom(sources, tr).map((a, i) => ({ key: `a${i}`, critical: a.tone === "red", text: a.text, href: a.href })),
+    hosts: sources.flatMap((s) => (s.data?.hosts ?? []).map((h) => ({
+      key: `${s.id}:${h.id}`, name: h.name, pending: h.updates?.pending ?? 0, security: h.updates?.security ?? 0,
+      // La fiche de l'hôte (paquets, bouton de mise à jour) est dans le monitoring.
+      reboot: !!h.updates?.reboot_required, href: s.url ? `${s.url}/hosts/${h.id}` : "/monitoring",
+    }))),
+  });
+
+/** Bouton de la barre latérale, au-dessus de Paramètres (bouton rond en haut de page sur mobile). */
+export function NotificationsButton({ floating = false }: { floating?: boolean }) {
+  return <NotificationsMenu url={MONITORING} toFeed={toFeed} floating={floating} alertsLink={["/monitoring", "Voir le monitoring"]} updatesLink={["/monitoring", "Voir le monitoring"]} />;
 }

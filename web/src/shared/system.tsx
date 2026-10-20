@@ -428,7 +428,7 @@ interface Logs { items: LogItem[]; entities: string[]; retention_days: number; m
 const ENTITY_LABEL: Record<string, string> = {
   account: "Compte", settings: "Paramètres", database: "Base de données", system: "Système", host: "Hôtes", monitor: "Sondes",
   token: "Jetons", device: "Appareils", report: "Rapports", status: "Page de statut", asset: "Inventaire", vlan: "VLAN", subnet: "Sous-réseaux",
-  ip: "Adresses IP", vpn: "VPN", firewall: "Pare-feu", domain: "Domaines", deployment: "Déploiements", task: "Tâches",
+  ip: "Adresses IP", vpn: "VPN", firewall: "Pare-feu", domain: "Domaines", deployment: "Déploiements", task: "Tâches", hardware: "Matériel", reminder: "Rappels",
   shortcut: "Applications", integration: "Intégrations", proxmox: "Proxmox",
 };
 const ACTION_TONE: Record<string, "green" | "red" | "yellow" | "blue" | "muted" | "accent"> = {

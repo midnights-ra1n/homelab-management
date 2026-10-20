@@ -10,10 +10,11 @@ import { usePathname, useT } from "@/i18n/client";
 import { useSession } from "@/session";
 import { ArrowUpRight } from "lucide-react";
 import { SEARCH_KEY } from "../../../ui";
+import { NotificationsButton } from "../alert-banner";
 
 /**
  * Barre latérale de la charte (.mm-sidebar) : 248 px, rail 64 px (tablette ou replié, :root[data-sidebar="rail"]),
- * masquée sous 640 px au profit de la barre basse. Pied fixe : Paramètres puis compte.
+ * masquée sous 640 px au profit de la barre basse. Pied fixe : Notifications, Paramètres puis compte.
  */
 export function AppSidebar({ userSlot }: { userSlot: ReactNode }) {
   const tr = useT();
@@ -38,6 +39,7 @@ export function AppSidebar({ userSlot }: { userSlot: ReactNode }) {
         ))}
       </nav>
       <div className="mm-sidebar__foot">
+        <NotificationsButton />
         <SideLink item={{ href: "/parametres", label: "Paramètres", short: "", icon: Settings }} active={isActive(pathname, "/parametres")} />
         {userSlot}
       </div>

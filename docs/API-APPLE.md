@@ -9,14 +9,15 @@ Ce guide décrit ce qu'une app native attend du hub Midnights Monitoring et comm
 3. [Préparer le compte Apple Developer](#préparer-le-compte-apple-developer)
 4. [Connexion](#connexion)
 5. [Écrans et routes](#écrans-et-routes)
-6. [Temps réel](#temps-réel)
-7. [Notifications push](#notifications-push)
-8. [Widgets et actions rapides](#widgets-et-actions-rapides)
-9. [Préférences synchronisées](#préférences-synchronisées)
-10. [Format des réponses](#format-des-réponses)
-11. [Sécurité](#sécurité)
-12. [Dépannage](#dépannage)
-13. [Liste de contrôle avant publication](#liste-de-contrôle-avant-publication)
+6. [Gestion : inventaire, stock et notifications](#gestion--inventaire-stock-et-notifications)
+7. [Temps réel](#temps-réel)
+8. [Notifications push](#notifications-push)
+9. [Widgets et actions rapides](#widgets-et-actions-rapides)
+10. [Préférences synchronisées](#préférences-synchronisées)
+11. [Format des réponses](#format-des-réponses)
+12. [Sécurité](#sécurité)
+13. [Dépannage](#dépannage)
+14. [Liste de contrôle avant publication](#liste-de-contrôle-avant-publication)
 
 ## Vue d'ensemble
 
@@ -31,7 +32,7 @@ Ce guide décrit ce qu'une app native attend du hub Midnights Monitoring et comm
                                        └─────────────── APNs (Apple) ◀── clé .p8 du hub
 ```
 
-- **L'app ne parle qu'au monitoring**, par l'API v1. La gestion (Midnights Management) n'expose pas d'API pour les apps : les hôtes et l'état affichés sont ceux du monitoring, qui alimente aussi la gestion.
+- **L'état des hôtes et des sondes vient du monitoring**, par l'API v1 et un jeton. La gestion (Midnights Management) n'a pas d'API publique ni de jetons : pour l'inventaire, le stock matériel, les tâches et les rappels, l'app utilise les routes `/api/mg` de l'interface web avec une session (voir [Gestion](#gestion--inventaire-stock-et-notifications)).
 - **Connexion par compte.** L'utilisateur saisit l'adresse du hub, son identifiant et son mot de passe ; l'app les échange contre un jeton (`POST /auth/login`) et ne garde que le jeton. L'API publique du hub peut rester désactivée.
 - **Au premier plan**, l'app écoute le flux d'événements (`GET /events`) et ne recharge que ce qui a changé.
 - **En arrière-plan**, c'est le hub qui réveille l'appareil par une notification push ; l'extension de notification met les widgets à jour au passage.
@@ -142,6 +143,124 @@ Chaque requête porte `Authorization: Bearer hlm_…` et `Accept: application/js
 
 `/overview` remplace l'enchaînement `/status` + `/hosts` + `/monitors` : les comptes, les problèmes et les listes y sont lus ensemble, donc toujours d'accord entre eux. Les écrans de détail réutilisent l'hôte ou la sonde déjà chargés par `/overview` et ne rechargent leur route qu'à l'ouverture et sur un événement.
 
+## Gestion : inventaire, stock et notifications
+
+La gestion n'a pas d'API v1 : l'app appelle les mêmes routes que l'interface web, sous `/api/mg`, avec un cookie de session. Ces routes peuvent évoluer avec l'interface ; décodez-les de façon tolérante (champ absent ou inconnu ignoré).
+
+### Session
+
+1. `POST {gestion}/api/auth/login` avec `{"username": "…", "password": "…"}` en JSON. Réponse `200 {"ok": true}` et cookie `hlt_mg_session` (HttpOnly, valable 7 jours). `401` : identifiants incorrects ; `429` : trop de tentatives.
+2. Laissez `URLSession` garder le cookie (`HTTPCookieStorage`) et renvoyez-le à chaque requête.
+3. Un `401` plus tard signifie que la session a expiré ou a été fermée : rouvrez-la avec les identifiants du trousseau, puis rejouez la requête une fois. La gestion n'ayant pas de jetons, l'app doit garder l'identifiant et le mot de passe dans le trousseau (`AfterFirstUnlockThisDeviceOnly`), jamais ailleurs.
+4. `POST /api/auth/logout` ferme la session.
+
+Les écritures n'ont pas besoin d'en-tête `Origin` : un client natif n'en envoie pas, et le serveur ne refuse que les requêtes de navigateur venues d'un autre site.
+
+**Deux formats d'écriture :**
+
+| Format | Routes | Réponse |
+|---|---|---|
+| Formulaire (`application/x-www-form-urlencoded` ou `multipart/form-data`) | création et modification (`POST /api/mg/assets`, `POST /api/mg/hardware/{id}`…) | **toujours `200`**, avec un *FormState* : `{"ok": true, "message": "…"}` ou `{"message": "Certains champs sont invalides.", "errors": {"name": "Le nom est requis"}}` |
+| JSON | actions (`…/status`, `…/install`, rappels) | `204` ou `200` + JSON ; erreur `4xx` avec `{"error": "…"}` |
+
+Pour un formulaire, testez `ok` et affichez `errors` champ par champ : un `200` ne veut pas dire que l'écriture a eu lieu.
+
+### Inventaire
+
+| Écran | Route | Remarques |
+|---|---|---|
+| Liste | `GET /api/mg/assets` | filtres facultatifs : `kind`, `status`, `q` (nom, hostname, IP, MAC, n° de série, tag…), `tag`, `vlan` (numéro), `host` (id du parent) |
+| Compteurs, capacité | `GET /api/mg/assets/meta` | `counts` (par type et état), `tags`, `hosts`, `hardware` (cœurs, threads, RAM des serveurs physiques), `storage` |
+| Listes de choix | `GET /api/mg/assets/options?kinds=physical,vm` | `id`, `display_name`, `kind`, `hostname`, `subnet_id` |
+| Fiche | `GET /api/mg/assets/{id}` | `asset`, `children`, `ancestors`, `ips`, `activity`, `domains`, `tunnels`, `rules`, `shortcuts`, `hardware` |
+| Changer l'état | `POST /api/mg/assets/{id}/status` | JSON `{"status": "maintenance"}` → `204` |
+| Supprimer | `DELETE /api/mg/assets/{id}` | `204` |
+
+- `kind` : `physical`, `vm`, `lxc`, `docker`, `network`, `other`. `status` : `online`, `offline`, `maintenance`, `planned`, `decommissioned`.
+- Champs principaux d'un élément : `id`, `kind`, `display_name`, `hostname`, `status`, `role`, `description`, `tags` (liste), `parent_id`, `parent_name`, `os`, `os_version`, `location`, `manufacturer`, `model`, `serial_number`, `cpu_model`, `cpu_cores`, `cpu_threads`, `ram_gb`, `disks` (liste `name`, `type`, `capacity_gb`, `usage`), `nics` (liste `name`, `mac`, `speed`), `primary_ip`, `vlan_number`, `vlan_name`, `subnet_cidr`, `children_count`, `notes`, `created_at`, `updated_at`.
+- Dates de la gestion : texte `AAAA-MM-JJ HH:MM:SS` en UTC (pas de secondes Unix, contrairement au monitoring).
+- `hardware` (fiche) : les machines du stock liées à l'élément, puis les composants installés dedans (même format que `GET /api/mg/hardware`). Liste vide si aucune machine n'est liée.
+
+### Stock matériel
+
+| Action | Route | Corps | Réponse |
+|---|---|---|---|
+| Liste | `GET /api/mg/hardware` | | liste triée par nom |
+| Ajouter | `POST /api/mg/hardware` | formulaire | FormState |
+| Modifier | `POST /api/mg/hardware/{id}` | formulaire (tous les champs) | FormState |
+| Installer / retirer | `POST /api/mg/hardware/{id}/install` | JSON `{"parent_id": 12}` ou `{"parent_id": null}` | `204` ; `400` avec message |
+| Dupliquer | `POST /api/mg/hardware/{id}/duplicate` | | `204` |
+| Supprimer | `DELETE /api/mg/hardware/{id}` | | `204` |
+
+Champs d'un matériel :
+
+| Champ | Valeurs |
+|---|---|
+| `name` | requis, 200 caractères |
+| `category` | `server`, `pc` (les **machines**), `cpu`, `ram`, `disk`, `motherboard`, `gpu`, `psu`, `nic`, `case`, `cooling`, `other` |
+| `status` | `in_use`, `stock`, `ordered`, `repair`, `faulty`, `retired` |
+| `quantity` | pièces identiques sur la ligne, 1 par défaut |
+| `brand`, `model`, `serial_number`, `specs`, `location`, `vendor`, `notes` | texte |
+| `capacity_gb` | capacité **d'une** pièce (RAM, disque) ; total = `capacity_gb × quantity` |
+| `purchase_price` | prix **unitaire** en euros |
+| `purchase_date`, `warranty_until` | `AAAA-MM-JJ` |
+| `tags` | formulaire : texte séparé par des virgules ; réponse : liste |
+| `parent_id`, `parent_name` | machine dans laquelle le composant est installé |
+| `asset_id`, `asset_name` | machines seulement : élément de l'inventaire lié |
+| `components` | lecture seule : nombre de lignes installées dans cette machine |
+
+Règles appliquées par le serveur (l'app n'a pas à les refaire, mais peut éviter de proposer l'impossible) :
+
+- Un composant ne s'installe que dans un serveur ou un PC ; une machine ne s'installe nulle part.
+- Un composant installé passe `in_use`, sauf s'il est `repair`, `faulty` ou `retired`. Retiré (`parent_id: null`), il revient en `stock`.
+- Installer depuis un lot (`quantity` > 1, non installé) en sort **une** pièce : une nouvelle ligne est créée dans la machine et le lot perd une unité.
+- Une machine qui contient des composants ne peut pas changer pour une catégorie de composant ; supprimée, ses composants reviennent en stock.
+
+### Menu de notifications
+
+Le web affiche un menu à trois onglets, dans la barre latérale et en bouton rond sur mobile. Pour le reproduire :
+
+| Onglet | Source | Contenu |
+|---|---|---|
+| Alertes | gestion : `GET /api/mg/monitoring` ; monitoring : `GET /api/v1/overview` | ce qui ne va pas, du plus grave au moins grave |
+| Mises à jour | `hosts[].updates` de la même réponse | hôtes avec des paquets en attente ou un redémarrage requis |
+| Rappels | `GET /api/reminders` | rappels programmés ; ceux dont la date est atteinte sont « dus » |
+
+**Pastille** : nombre d'alertes + nombre d'hôtes à mettre à jour + nombre de rappels dus. Rouge s'il y a une alerte critique, jaune s'il y a une alerte, un correctif de sécurité en attente ou un rappel en retard, couleur d'accent sinon.
+
+**Alertes depuis la gestion.** `GET /api/mg/monitoring` renvoie une liste de sources, une par intégration monitoring : `{id, name, url, ok, error?, data: {hosts, monitors, bandwidth}}`. Le web en tire, dans cet ordre :
+
+| Cas | Gravité |
+|---|---|
+| hôte `major_outage` (hors ligne) | critique |
+| sonde active `minor_outage` ou `major_outage` | critique |
+| source `ok: false` (hub injoignable, clé refusée) : afficher `error` | critique |
+| hôte à plus de 85 % de CPU, 90 % de RAM ou 90 % de disque (`latest`) | avertissement |
+| certificat d'une sonde (`cert_expires_at`, secondes) qui expire dans moins de 21 jours | avertissement |
+| hôte avec `updates.reboot_required` | avertissement |
+
+Depuis le monitoring seul, `GET /api/v1/overview` donne déjà les problèmes triés.
+
+**Mises à jour.** Chaque hôte porte `updates: {pending, security, reboot_required}` (ou `null` si l'agent n'a encore rien remonté). Le web liste les hôtes où `pending > 0` ou `reboot_required`, triés par correctifs de sécurité, puis redémarrage, puis nombre de paquets ; le détail des paquets est dans `GET /api/v1/hosts/{id}` du monitoring.
+
+**Rappels de mise à jour.** Ils existent sur les deux serveurs (chacun garde les siens). Avec la session web, ils sont sous `/api/reminders` ; sur le monitoring, les mêmes routes existent sous `/api/v1/reminders` pour un jeton (scopes `reminders:read` et `reminders:write`, inclus dans le jeton de connexion) :
+
+| Action | Route | Corps | Réponse |
+|---|---|---|---|
+| Liste | `GET /api/reminders` | | `{"today": "2026-10-20", "reminders": [{"id": 1, "host": "nas", "host_ref": "h3", "due_date": "2026-10-18", "repeat_days": 30, "note": "noyau", "due": true}]}` |
+| Ajouter | `POST /api/reminders` | `{"host": "nas", "host_ref": "h3", "due_date": "2026-10-27", "repeat_days": 0, "note": ""}` | `201 {"id": 2}` |
+| Modifier | `PUT /api/reminders/{id}` | même corps | `204` |
+| Fait | `POST /api/reminders/{id}/done` | | `200 {"next_due": "2026-11-19"}` ; `null` pour un rappel unique, alors supprimé |
+| Supprimer | `DELETE /api/reminders/{id}` | | `204` |
+
+- `host_ref` (facultatif) lie le rappel à l'hôte : `h{id}` sur le monitoring, `{id de la source}:{id de l'hôte}` sur la gestion. Affichez le nom actuel de l'hôte qui porte cette référence, et `host` (le nom enregistré) seulement si aucun ne correspond : un hôte renommé garde ainsi ses rappels.
+- `repeat_days` : 0 (une fois) à 366. « Fait » reprogramme le rappel à aujourd'hui + `repeat_days`, dans le fuseau du serveur.
+- `due` et `today` sont calculés par le serveur dans son fuseau horaire : utilisez-les plutôt que la date de l'appareil.
+- Erreurs `400` : `Choisissez un hôte`, `Date invalide`, `La répétition va de 0 à 366 jours`, `500 caractères maximum pour la note`.
+- **Notification** : sur le monitoring, un rappel arrivé à échéance part une fois par les canaux d'alerte (push et e-mail), comme un événement `{"kind": "Rappel", "name": "nas", "message": "Mise à jour prévue le 2026-10-27 · noyau"}`. Les rappels de la gestion n'envoient rien : pour eux, l'app peut programmer une notification locale (`UNCalendarNotificationTrigger`) à la date `due_date`.
+
+**Rafraîchissement.** Le web relit les trois sources toutes les 30 s quand l'onglet est visible. L'app peut relire au retour au premier plan et sur les événements `hosts` du flux du monitoring.
+
 ## Temps réel
 
 L'app ne recharge plus ses écrans à intervalle fixe. Elle garde ouverte, au premier plan, une connexion au flux d'événements du hub, et ne recharge que lorsqu'un changement est annoncé. Le web fait exactement la même chose (`/api/events`).
@@ -220,7 +339,7 @@ Une notification par fenêtre de regroupement (60 s par défaut, *Réglages → 
 - `interruption-level` vaut `time-sensitive` quand un élément passe en panne partielle ou majeure, `active` sinon.
 - `mutable-content: 1` réveille l'**extension de notification** (environ 30 s) : elle relit `/widgets`, met à jour le cache partagé et demande à WidgetKit de redessiner.
 - Les événements ne portent pas d'identifiant : retrouvez l'hôte ou la sonde par `name`.
-- Toutes les notifications vont à tous les appareils inscrits. Les interrupteurs de *Réglages → Notifications par e-mail* (mises à jour de sécurité, redémarrage requis, images Docker, niveau SMART, espace disque) s'appliquent aussi au push.
+- Toutes les notifications vont à tous les appareils inscrits. Les interrupteurs de *Réglages → Notifications par e-mail* (mises à jour de sécurité, redémarrage requis, images Docker, niveau SMART, espace disque) s'appliquent aussi au push. Les rappels de mise à jour arrivés à échéance partent toujours (`kind` = `Rappel`).
 
 ### Tester
 
@@ -259,7 +378,7 @@ Préfixez les clés propres à l'app : le web les ignore, sans risque de collisi
 ## Sécurité
 
 - **Un jeton par appareil**, obtenu à la connexion sous le nom de l'appareil. Le révoquer coupe l'accès **et** désinscrit l'appareil des notifications ; changer le mot de passe du compte déconnecte tous les appareils.
-- **Le mot de passe ne reste pas sur l'appareil** : il ne sert qu'à `POST /auth/login`.
+- **Le mot de passe du monitoring ne reste pas sur l'appareil** : il ne sert qu'à `POST /auth/login`. Celui de la gestion, qui n'a pas de jetons, est gardé dans le trousseau pour rouvrir la session.
 - **Trousseau uniquement** pour le jeton, en `AfterFirstUnlockThisDeviceOnly` (pas de sauvegarde iCloud, pas de copie sur un autre appareil) : jamais dans `UserDefaults`, les fichiers de l'App Group, les journaux ou les rapports de plantage.
 - **HTTPS avec un certificat valide.** Ne désactivez pas la validation TLS ; préférez un certificat Let's Encrypt sur le reverse proxy.
 - **Pas de CORS** : une app native n'est pas un navigateur ; laissez *Origines autorisées* vide pour elle.
@@ -281,6 +400,8 @@ Préfixez les clés propres à l'app : le web les ignore, sans risque de collisi
 | L'écran ne se met plus à jour tout seul | flux `/events` coupé ou retardé par le proxy | `curl -N -H "Authorization: Bearer …" https://…/api/v1/events` doit montrer un `: ping` toutes les 25 s ; nginx : `proxy_buffering off` |
 | `401` partout | jeton révoqué, ou mot de passe du compte changé | afficher l'écran de connexion |
 | `404` sur `/auth/login` | adresse de la gestion au lieu du monitoring, ou monitoring trop ancien | utiliser l'adresse du monitoring ; le mettre à jour |
+| Formulaire de la gestion sans effet, réponse `200` | *FormState* avec `ok` absent et `errors` | afficher `errors` champ par champ |
+| `401` sur `/api/mg/…` ou `/api/reminders` (gestion) | session de la gestion expirée (7 jours) | rouvrir la session avec `POST /api/auth/login` et rejouer la requête |
 | `403` sur une route | connexion avec une liste `scopes` réduite | se reconnecter sans `scopes`, ou masquer la fonction |
 | Widget vide ou « hub non configuré » | jeton illisible par l'extension | même groupe Keychain Sharing et même App Group sur les trois cibles |
 | Erreur réseau sur un hub local en HTTP | App Transport Security ou autorisation *Réseau local* refusée | HTTPS ; sinon `NSAllowsLocalNetworking` et `NSLocalNetworkUsageDescription` |

@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const tr = use(getT());
   return (
     <>
-      <header className="mb-8 sm:mb-12">
+      <header className="mm-dash-head mb-8 sm:mb-12">
         <h1 className="text-4xl font-bold tracking-tight text-h1 sm:text-5xl">
           {tr("Tableau de ")}<span className="text-accent-text">{tr("bord")}</span>
         </h1>

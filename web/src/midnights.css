@@ -772,6 +772,8 @@
 :root[data-sidebar="rail"] .mm-app .mm-account__chev { display: none; }
 :root[data-sidebar="rail"] .mm-app .mm-nav-item, :root[data-sidebar="rail"] .mm-app .mm-account { justify-content: center; padding: 0; }
 :root[data-sidebar="rail"] .mm-app .mm-account-menu { left: 0; right: auto; width: var(--mm-popover-width); }
+.mm-nav-item--notify { position: relative; }
+:root[data-sidebar="rail"] .mm-app .mm-nav-item--notify .mm-nav-item__count { display: grid; position: absolute; top: 2px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; }
 
 /* Topbar */
 .mm-topbar {
@@ -817,7 +819,11 @@
   .mm-app[data-mobile-nav="bottom"] .mm-sidebar,
   .mm-app[data-mobile-nav="bottom"] .mm-drawer-scrim,
   .mm-app[data-mobile-nav="bottom"] .mm-topbar { display: none; }
-  .mm-app[data-mobile-nav="bottom"] .mm-page { padding-top: calc(var(--mm-content-pad) + 8px + var(--mm-safe-top)); padding-bottom: calc(var(--mm-bottomnav-height) + var(--mm-content-pad) + var(--mm-safe-bottom)); }
+  /* Bouton Notifications : en haut de page (défile avec elle), centré sur la ligne du titre. */
+  .mm-notify-fab { position: absolute; z-index: var(--mm-z-sticky); right: var(--mm-content-pad); top: calc(var(--mm-content-pad) + 16px + var(--mm-safe-top) + (var(--mm-notify-line, var(--mm-leading-page)) - var(--mm-control-md)) / 2); border-radius: 999px; }
+  .mm-app:has(.mm-dash-head) .mm-notify-fab { --mm-notify-line: 2.5rem; } /* titre text-4xl du tableau de bord */
+  .mm-app[data-mobile-nav="bottom"] :is(.mm-page__head, .mm-dash-head) { padding-right: calc(var(--mm-control-md) + 12px); }
+  .mm-app[data-mobile-nav="bottom"] .mm-page { padding-top: calc(var(--mm-content-pad) + 16px + var(--mm-safe-top)); padding-bottom: calc(var(--mm-bottomnav-height) + var(--mm-content-pad) + var(--mm-safe-bottom)); }
   .mm-app[data-mobile-nav="bottom"] ~ .mm-toast-region, .mm-app[data-mobile-nav="bottom"] .mm-toast-region { bottom: calc(var(--mm-bottomnav-height) + 12px + var(--mm-safe-bottom)); }
   .mm-bottomnav {
     display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);

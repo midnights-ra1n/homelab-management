@@ -396,6 +396,36 @@ var mgMigrations = []string{
 	// Name of the linked monitoring host at the last sync: a rename there renames the item.
 	`ALTER TABLE assets ADD COLUMN hlm_name TEXT NOT NULL DEFAULT '';`,
 	oauthTables,
+	// Hardware stock: machines (server, pc) and the components installed in them.
+	`
+  CREATE TABLE hardware_items (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name           TEXT NOT NULL,
+    category       TEXT NOT NULL CHECK (category IN ('server','pc','cpu','ram','disk','motherboard','gpu','psu','nic','case','cooling','other')),
+    status         TEXT NOT NULL DEFAULT 'stock' CHECK (status IN ('in_use','stock','ordered','repair','faulty','retired')),
+    brand          TEXT NOT NULL DEFAULT '',
+    model          TEXT NOT NULL DEFAULT '',
+    serial_number  TEXT NOT NULL DEFAULT '',
+    specs          TEXT NOT NULL DEFAULT '',
+    capacity_gb    REAL,
+    parent_id      INTEGER REFERENCES hardware_items(id) ON DELETE SET NULL,
+    asset_id       INTEGER REFERENCES assets(id) ON DELETE SET NULL,
+    location       TEXT NOT NULL DEFAULT '',
+    vendor         TEXT NOT NULL DEFAULT '',
+    purchase_date  TEXT,
+    purchase_price REAL,
+    warranty_until TEXT,
+    notes          TEXT NOT NULL DEFAULT '',
+    tags           TEXT NOT NULL DEFAULT '[]',
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX hardware_parent ON hardware_items(parent_id);
+	`,
+	// Identical pieces kept as one stock row (4 RAM sticks…).
+	`ALTER TABLE hardware_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 1);`,
+	remindersTable,
+	remindersRef,
 }
 
 // mgFusionMigration (010) moves homelab.db to the Go server: Go session format, only the

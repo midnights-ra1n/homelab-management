@@ -122,6 +122,8 @@ En HTTP (sans reverse proxy HTTPS), le jeton circule en clair : réservez cet us
 | `metrics:read` | `GET /api/v1/hosts/{id}/metrics` |
 | `monitors:read` | `GET /api/v1/monitors`, `GET /api/v1/monitors/{id}`, `GET /api/v1/monitors/{id}/results`, `GET /api/v1/bandwidth`, `GET /api/v1/bandwidth/live` |
 | `updates:read` | `GET /api/v1/updates` |
+| `reminders:read` | `GET /api/v1/reminders` |
+| `reminders:write` | `POST /api/v1/reminders`, `PUT /api/v1/reminders/{id}`, `POST /api/v1/reminders/{id}/done`, `DELETE /api/v1/reminders/{id}` |
 | `smart:read` | `GET /api/v1/disks` |
 | `docker:read` | `GET /api/v1/containers` |
 | `reports:read` | `GET /api/v1/reports/monthly`, `GET /api/v1/reports/energy` |
@@ -211,6 +213,8 @@ L'état global est le pire état parmi les hôtes et les sondes actives.
 | `GET` | [`/snmp/devices`](#get-apiv1snmpdevices) | `monitors:read` | Équipements SNMP et toutes leurs interfaces (découverte) |
 | `PUT` | [`/monitors/{id}/maintenance`](#put-apiv1monitorsidmaintenance) | `maintenance:write` | Maintenance d'une sonde |
 | `GET` | [`/updates`](#get-apiv1updates) | `updates:read` | Mises à jour en attente |
+| `GET` | [`/reminders`](#rappels-de-mise-à-jour-apiv1reminders) | `reminders:read` | Rappels de mise à jour |
+| `POST` `PUT` `DELETE` | [`/reminders…`](#rappels-de-mise-à-jour-apiv1reminders) | `reminders:write` | Ajouter, modifier, traiter, supprimer un rappel |
 | `GET` | [`/disks`](#get-apiv1disks) | `smart:read` | Santé SMART des disques |
 | `GET` | [`/containers`](#get-apiv1containers) | `docker:read` | Conteneurs Docker |
 | `GET` | [`/reports/monthly`](#get-apiv1reportsmonthlymonth2026-09) | `reports:read` | Rapport mensuel |
@@ -652,6 +656,20 @@ Scope `updates:read`. Mises à jour en attente sur chaque hôte, avec la liste d
 
 L'agent analyse les mises à jour au démarrage puis toutes les 6 heures, à partir des listes apt actualisées par `apt-daily.timer`. `lists_updated_at` indique leur fraîcheur.
 
+### Rappels de mise à jour (`/api/v1/reminders`)
+
+Scopes `reminders:read` (liste) et `reminders:write` (le reste). Les mêmes rappels que le menu Notifications du web.
+
+| Action | Route | Corps | Réponse |
+|---|---|---|---|
+| Liste | `GET /api/v1/reminders` | | `{"today": "2026-10-20", "reminders": [{"id": 1, "host": "nas", "host_ref": "h3", "due_date": "2026-10-18", "repeat_days": 30, "note": "noyau", "due": true}]}` |
+| Ajouter | `POST /api/v1/reminders` | `{"host": "nas", "host_ref": "h3", "due_date": "2026-10-27", "repeat_days": 0, "note": ""}` | `201 {"id": 2}` |
+| Modifier | `PUT /api/v1/reminders/{id}` | même corps | `204` |
+| Fait | `POST /api/v1/reminders/{id}/done` | | `200 {"next_due": "2026-11-19"}` ; `null` pour un rappel unique, alors supprimé |
+| Supprimer | `DELETE /api/v1/reminders/{id}` | | `204` |
+
+`host_ref` (facultatif) vaut `h{id}` de l'hôte : le rappel suit l'hôte s'il est renommé. `repeat_days` va de 0 (une fois) à 366 ; `due` et `today` suivent le fuseau du serveur. Un rappel arrivé à échéance part une fois par push et par e-mail (`kind` = `Rappel`).
+
 ### `GET /api/v1/disks`
 
 Scope `smart:read`. Santé SMART des disques, par hôte. Les hôtes sans collecte SMART n'apparaissent pas.
@@ -962,6 +980,7 @@ Le préfixe `/api/v1` est stable. Des champs peuvent être **ajoutés** aux rép
 
 | Date | Changement |
 |---|---|
+| 2026-10 | Routes `/reminders` (rappels de mise à jour) ; scopes `reminders:read`, `reminders:write`. Événement push et e-mail `Rappel`. |
 | 2026-10 | Route `GET /events` (flux en direct, Server-Sent Events). |
 | 2026-10 | Routes `POST /auth/login`, `POST /auth/logout` (jetons rattachés à un compte, valides avec l'API désactivée) et `GET /overview`. |
 | 2026-10 | Routes `GET /bandwidth` et `GET /bandwidth/live` (scope `monitors:read`). Routes `GET /widgets`, `POST` / `DELETE /devices`, `GET` / `PUT /preferences` ; scopes `push:write`, `preferences:read`, `preferences:write`. Champs `agent_down` et `reachable` des hôtes ; un hôte dont l'agent est arrêté mais qui répond au ping passe en `degraded` au lieu de `major_outage`. Sondes SNMP : `snmp_mode` et `interface` (débit et état d'interface). Route `GET /snmp/devices`. Bande passante : `speed_mbps`, `days`, `today_octets`, `month_octets`, `daily_octets` ; `peak_mbps` devient la plus forte mesure de la période. Sondes SNMP : `max_percent`, `idle_minutes`. |

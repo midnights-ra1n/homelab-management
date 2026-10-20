@@ -201,3 +201,35 @@ export const FW_TARGET_LABEL: Record<FwTarget, string> = {
 export const FW_PROTOCOLS = ["any", "tcp", "udp", "icmp"] as const;
 export type FwProtocol = (typeof FW_PROTOCOLS)[number];
 export const FW_PROTOCOL_LABEL: Record<FwProtocol, string> = { any: "Tous", tcp: "TCP", udp: "UDP", icmp: "ICMP (ping)" };
+
+export const HARDWARE_CATEGORIES = ["server", "pc", "cpu", "ram", "disk", "motherboard", "gpu", "psu", "nic", "case", "cooling", "other"] as const;
+export type HardwareCategory = (typeof HARDWARE_CATEGORIES)[number];
+/** Catégories qui reçoivent des composants. */
+export const HARDWARE_MACHINES: HardwareCategory[] = ["server", "pc"];
+
+export const HARDWARE_CATEGORY_META: Record<HardwareCategory, { label: string; plural: string }> = {
+  server: { label: "Serveur", plural: "Serveurs" },
+  pc: { label: "PC", plural: "PC" },
+  cpu: { label: "Processeur", plural: "Processeurs" },
+  ram: { label: "Mémoire RAM", plural: "Mémoire" },
+  disk: { label: "Disque", plural: "Disques" },
+  motherboard: { label: "Carte mère", plural: "Cartes mères" },
+  gpu: { label: "Carte graphique", plural: "Cartes graphiques" },
+  psu: { label: "Alimentation", plural: "Alimentations" },
+  nic: { label: "Carte réseau", plural: "Cartes réseau" },
+  case: { label: "Boîtier", plural: "Boîtiers" },
+  cooling: { label: "Refroidissement", plural: "Refroidissement" },
+  other: { label: "Autre", plural: "Autres" },
+};
+
+export const HARDWARE_STATUSES = ["in_use", "stock", "ordered", "repair", "faulty", "retired"] as const;
+export type HardwareStatus = (typeof HARDWARE_STATUSES)[number];
+
+export const HARDWARE_STATUS_META: Record<HardwareStatus, { label: string; tone: Tone }> = {
+  in_use: { label: "En service", tone: "green" },
+  stock: { label: "En stock", tone: "accent" },
+  ordered: { label: "Commandé", tone: "blue" },
+  repair: { label: "En réparation", tone: "yellow" },
+  faulty: { label: "Défectueux", tone: "red" },
+  retired: { label: "Retiré", tone: "muted" },
+};
