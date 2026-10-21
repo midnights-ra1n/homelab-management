@@ -21,6 +21,7 @@ import { LogsPage } from "./shared/system";
 import { OAuthConsent } from "./shared/OAuthConsent";
 
 const ManagementApp = lazy(() => import("./mg/App"));
+const MapPage = lazy(() => import("./pages/Map"));
 
 interface AuthState {
   setup_required: boolean; authenticated: boolean; username: string; version: string; dev_mode: boolean;
@@ -34,7 +35,7 @@ function App() {
   const seg = path.split("/").filter(Boolean);
   // Detail pages (/hosts/3, /monitors/7) set their own title from the item's name; the public page uses its own title.
   const PAGE_TITLES: Record<string, string> = {
-    "": "Vue d'ensemble", hosts: "Hôtes", monitors: "Sondes", incidents: "Incidents", updates: "Mises à jour", disks: "Disques",
+    "": "Vue d'ensemble", hosts: "Hôtes", map: "Carte", monitors: "Sondes", incidents: "Incidents", updates: "Mises à jour", disks: "Disques",
     containers: "Conteneurs", reports: "Rapports", energy: "Énergie", bandwidth: "Bande passante", "status-page": "Page de statut", settings: "Paramètres", logs: "Journaux",
   };
   if (auth) setAppName(auth.role);
@@ -76,6 +77,7 @@ function App() {
   let page;
   if (seg[0] === "hosts" && seg[1]) page = <HostDetailPage id={Number(seg[1])} />;
   else if (seg[0] === "hosts") page = <HostsPage />;
+  else if (seg[0] === "map") page = <Suspense fallback={null}><MapPage /></Suspense>;
   else if (seg[0] === "monitors" && seg[1]) page = <MonitorDetailPage id={Number(seg[1])} />;
   else if (seg[0] === "monitors") page = <MonitorsPage />;
   else if (seg[0] === "incidents") page = <IncidentsPage />;

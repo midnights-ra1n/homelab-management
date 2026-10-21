@@ -16,6 +16,7 @@ export const savePrefs = (p: Preferences) => { api.put("/api/preferences", p).ca
 export interface HostInfo {
   hostname?: string; os?: string; kernel?: string; arch?: string; cpu_model?: string;
   cpu_cores?: number; mem_total?: number; agent_version?: string; boot_time?: number;
+  virtualization?: string; manufacturer?: string; model?: string; ips?: { iface: string; address: string; prefix: number }[];
 }
 export interface HostLatest {
   cpu?: number; mem_used?: number; mem_total?: number; swap_used?: number; swap_total?: number;

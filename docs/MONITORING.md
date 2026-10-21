@@ -67,6 +67,8 @@ La liste montre l'état, le système, le processeur, la mémoire, les disques et
 
 L'intervalle des agents (30 s par défaut) se règle dans *Paramètres → Collecte et rétention*.
 
+**Carte** (`/map`) : le monitoring au centre, puis une colonne par équipement SNMP (interfaces et débits), par hôte (CPU, RAM, disque, conteneurs) et par catégorie de sondes. Les hôtes sont classés d'après ce que détecte l'agent : **VPS** (machine virtuelle avec une adresse publique), **serveur physique** (aucun hyperviseur), **machine virtuelle**, **conteneur système**. Les **tunnels WireGuard** relient les hôtes qui ont une adresse `wg*` dans le même réseau, avec le débit de l'interface ; l'adresse la plus basse (souvent le `.1`) sert de centre. Une sonde se range sous l'hôte ou l'équipement dont elle vise le nom. La carte se met à jour en direct ; on peut chercher, masquer conteneurs ou sondes, n'afficher que les problèmes et cliquer un élément pour son détail. Une colonne se déplace d'un bloc ; sa place est gardée dans les préférences.
+
 ## Conteneurs, disques, mises à jour
 
 - **Conteneurs** : les conteneurs Docker de chaque hôte (état, image, ressources), avec les **nouvelles images** disponibles. Le bouton de mise à jour demande à l'agent de tirer l'image et de recréer le conteneur.

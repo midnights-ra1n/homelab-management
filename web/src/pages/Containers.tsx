@@ -39,7 +39,7 @@ function ContainerAction({ h, c, onAsk }: { h: Host; c: DockerContainer; onAsk: 
   );
 }
 
-const containerKind = (c: DockerContainer): StatusKind =>
+export const containerKind = (c: DockerContainer): StatusKind =>
   c.health === "unhealthy" ? "down" : c.state === "running" ? (c.health === "starting" ? "warn" : "ok") : c.state === "exited" || c.state === "created" ? "paused" : c.state === "dead" ? "down" : "warn";
 
 /** Containers of one host, with resource usage and image update status. */

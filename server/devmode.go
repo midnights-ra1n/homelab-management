@@ -123,7 +123,7 @@ func (s *Server) simulateAgents(ctx context.Context) {
 						{Name: "tzdata", Current: "2024a-0+deb12u1", Candidate: "2024b-0+deb12u1"},
 						{Name: "curl", Current: "7.88.1-10+deb12u7", Candidate: "7.88.1-10+deb12u8"},
 					}
-					s.storeUpdates(h.ID, h.Name, &agentUpdates{Manager: "apt", Packages: pk[:i*2], RebootRequired: i == 2, ListsUpdatedAt: time.Now().Add(-3 * time.Hour).Unix()})
+					s.storeUpdates(h.ID, h.Name, &agentUpdates{Manager: "apt", Packages: pk[:min(i*2, len(pk))], RebootRequired: i == 2, ListsUpdatedAt: time.Now().Add(-3 * time.Hour).Unix()})
 				}
 			}
 		}

@@ -2,7 +2,7 @@
    .mm-app [sidebar | content], bottom bar under 640 px, ⌘K search and the alert strip. */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  AlertTriangle, ArrowDownUp, ArrowUpRight, ChevronsUpDown, Container, Plug, CornerDownLeft, Ellipsis, FileBarChart, Globe, HardDrive, LayoutDashboard,
+  AlertTriangle, ArrowDownUp, ArrowUpRight, ChevronsUpDown, Container, Plug, CornerDownLeft, Ellipsis, FileBarChart, Globe, HardDrive, LayoutDashboard, Network,
   PackageCheck, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Radar, ScrollText, Search, Server, Settings, Siren, X, type LucideIcon,
 } from "lucide-react";
 import { api, type Overview } from "./api";
@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Vue d'ensemble", short: "Accueil", icon: LayoutDashboard },
   { href: "/incidents", label: "Incidents", short: "Incidents", icon: Siren },
   { href: "/hosts", label: "Hôtes", short: "Hôtes", icon: Server },
+  { href: "/map", label: "Carte", short: "Carte", icon: Network },
   { href: "/containers", label: "Conteneurs", short: "Conteneurs", icon: Container },
   { href: "/disks", label: "Disques", short: "Disques", icon: HardDrive },
   { href: "/monitors", label: "Sondes", short: "Sondes", icon: Radar },
@@ -31,7 +32,7 @@ const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
 
 const NAV_SECTIONS: { label?: string; items: NavItem[] }[] = [
   { items: ["/", "/incidents"].map(byHref) },
-  { label: "Infrastructure", items: ["/hosts", "/containers", "/disks"].map(byHref) },
+  { label: "Infrastructure", items: ["/hosts", "/map", "/containers", "/disks"].map(byHref) },
   { label: "Surveillance", items: ["/monitors", "/bandwidth", "/updates", "/reports", "/energy", "/logs"].map(byHref) },
   { label: "Public", items: ["/status-page"].map(byHref) },
 ];
