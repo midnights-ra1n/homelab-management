@@ -15,6 +15,7 @@ export function useHostAction(onDone?: (h: Host) => void) {
       toast(action === "update_agent" ? `Mise à jour de l'agent demandée sur ${h.name}`
         : action === "apply_updates" ? `Installation des mises à jour lancée sur ${h.name}`
         : action === "update_container" ? `Mise à jour de ${target} lancée sur ${h.name}`
+        : action.startsWith("node_") ? `${target} : demande envoyée à ${h.name}`
         : `Vérification lancée sur ${h.name}`);
     } catch (e) {
       toast(`${h.name} : ${(e as Error).message}`, "error");

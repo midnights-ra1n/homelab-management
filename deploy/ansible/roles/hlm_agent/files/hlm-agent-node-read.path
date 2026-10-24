@@ -1,0 +1,10 @@
+[Unit]
+Description=Midnights Monitoring agent: Node.js apps reads (state, logs) requested by the agent
+Documentation=https://github.com/midnights-ra1n/homelab-management
+
+[Path]
+PathExists=/var/lib/hlm-agent/state/node-read
+Unit=hlm-agent-node-read.service
+
+[Install]
+WantedBy=paths.target

@@ -115,6 +115,12 @@ func (s *Server) simulateAgents(ctx context.Context) {
 						{ID: "d4e5f6a1b2c3", Name: "backup-job", Image: "restic/restic:0.17", State: "exited", ComposeProject: "backup", ComposeService: "restic", Update: "unknown"},
 						{ID: "e5f6a1b2c3d4", Name: "homepage", Image: "local/homepage:dev", State: "running", CPUPct: fp(0.1), MemUsed: fp(40 * mb), MemLimit: fp(512 * mb), Update: "local"},
 					}})
+					t0 := time.Now().Unix() - 3600
+					done := t0 + 58
+					s.storeNodeApps(h.ID, h.Name, &nodeSnapshot{UIPort: 8100, Actions: true, Apps: []nodeApp{
+						{Name: "mon-site", Port: 3000, Status: "online", MemoryMB: 84, Source: "git", Repo: "git@github.com:moi/site.git", Branch: "main", StartCommand: "next start", MigrateCommand: "pnpm exec prisma migrate deploy", AutoDeploy: true, AutoUpdate: true, DeployedCommit: "3f9c2a1d0e", History: []nodeOp{{ID: "20261023-141502-deploy", Kind: "deploy", Commit: "3f9c2a1d0e", Started: t0, Finished: &done, Result: "success"}}},
+						{Name: "api", Port: 3001, Status: "errored", Restarts: 14, MemoryMB: 0, Source: "git", Repo: "https://•••@github.com/moi/api.git", Branch: "main", StartCommand: "node dist/index.js", FailedCommit: "9b1e4c2", History: []nodeOp{{ID: "20261023-150210-auto-deploy", Kind: "auto-deploy", Commit: "9b1e4c2", Started: t0 + 600, Finished: &done, Result: "rolled_back"}}},
+					}, SSHKeys: []nodeKey{{ID: "github", Name: "github", Kind: "shared", Type: "ssh-ed25519", Fingerprint: "SHA256:abc", PublicKey: "ssh-ed25519 AAAA github@vm"}}})
 				}
 				if h.Updates == nil {
 					pk := []agentPackage{

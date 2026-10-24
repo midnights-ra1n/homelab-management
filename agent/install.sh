@@ -7,6 +7,8 @@
 #   SMART=false           skip SMART collection (smartmontools + hourly root timer)
 #   REMOTE_UPDATES=false  forbid the "check / install updates" buttons of the dashboard
 #   DOCKER=false|true     Docker monitoring (default: enabled when docker is installed)
+#   NODE_APPS=false|true  Node.js apps of the base-node playbook (default: enabled when
+#                         /usr/local/bin/node-app exists); NODE_APPS_ACTIONS=0 keeps them read-only
 #   LXC=all               on a Proxmox host, also install in every running Debian LXC container,
 #                         with the shared enrollment token LXC_TOKEN (enr_…, defaults to TOKEN)
 #   VERSION=v0.1.12       pin a release (default: latest)
@@ -25,7 +27,9 @@ STATE=/var/lib/hlm-agent
 FILES="install.sh hlm-agent.service hlm-agent-smart.service hlm-agent-smart.timer hlm-agent-smart.path smart-collect.sh
        hlm-agent-apt.path hlm-agent-apt.service apt-action.sh
        hlm-agent-docker.service hlm-agent-docker.timer hlm-agent-docker-update.path
-       hlm-agent-docker-update.service docker-helper.sh"
+       hlm-agent-docker-update.service docker-helper.sh
+       hlm-agent-node-read.path hlm-agent-node-read.service hlm-agent-node-action.path
+       hlm-agent-node-action.service node-app-helper.sh"
 
 die() { echo "hlm-agent install: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "must run as root"
@@ -124,6 +128,12 @@ helper "$docker" "$dockerunits" docker-helper.sh hlm-agent-docker.service hlm-ag
   hlm-agent-docker-update.path hlm-agent-docker-update.service
 [ "$docker" = true ] && [ "$remote" = false ] && systemctl disable --now hlm-agent-docker-update.path >/dev/null 2>&1
 [ "$docker" = true ] && { systemctl start hlm-agent-docker.service || true; }
+
+node=${NODE_APPS:-auto}
+if [ "$node" = auto ]; then if [ -x /usr/local/bin/node-app ]; then node=true; else node=false; fi; fi
+nodeact=false; [ "$node" = true ] && [ "${NODE_APPS_ACTIONS:-1}" != 0 ] && nodeact=true
+helper "$node" hlm-agent-node-read.path node-app-helper.sh hlm-agent-node-read.path hlm-agent-node-read.service
+helper "$nodeact" hlm-agent-node-action.path hlm-agent-node-action.path hlm-agent-node-action.service
 
 # Installed by the .deb: the package owns the binary, so the agent must not rewrite it.
 if [ "${INSTALL_METHOD:-}" = deb ]; then

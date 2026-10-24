@@ -1,0 +1,10 @@
+[Unit]
+Description=Midnights Monitoring agent: Node.js app actions requested from the dashboard
+Documentation=https://github.com/midnights-ra1n/homelab-management
+
+[Path]
+PathExists=/var/lib/hlm-agent/state/node-action
+Unit=hlm-agent-node-action.service
+
+[Install]
+WantedBy=paths.target

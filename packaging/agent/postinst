@@ -4,7 +4,7 @@
 # by Ansible, or by hand followed by: dpkg-reconfigure hlm-agent
 set -e
 if [ "$1" = configure ]; then
-  # Install options (SMART, REMOTE_UPDATES, DOCKER), written by the Ansible role.
+  # Install options (SMART, REMOTE_UPDATES, DOCKER, NODE_APPS…), written by the Ansible role.
   if [ -f /etc/hlm-agent/install.env ]; then set -a; . /etc/hlm-agent/install.env; set +a; fi
   if [ -f /etc/hlm-agent/agent.env ] || [ -n "${HUB_URL:-}" ]; then
     INSTALL_METHOD=deb BUNDLE=/usr/share/hlm-agent sh /usr/share/hlm-agent/install.sh \

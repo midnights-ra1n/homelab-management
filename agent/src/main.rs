@@ -8,6 +8,7 @@ mod actions;
 mod collect;
 mod docker;
 mod inventory;
+mod node;
 mod smart;
 mod update;
 mod updates;
@@ -194,6 +195,13 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // After a dashboard request, look for the new SMART file every 15 s for up to 10 minutes.
     let mut smart_until = 0u64;
     let mut smart_poll = tokio::time::interval(Duration::from_secs(15));
+    // Node.js apps (node-app): state every 30 s, every 5 s while a dashboard watches the host,
+    // and logs on demand, all read one at a time through the root helper.
+    let node_on = std::path::Path::new(node::HELPER).exists();
+    let mut node_reads = node::Reader::new();
+    let mut node_last = 0u64;
+    let mut node_tick = tokio::time::interval(Duration::from_secs(5));
+    let mut node_poll = tokio::time::interval(Duration::from_millis(250));
     // Live view: while a dashboard watches this host, stream metrics every 2 s (not stored).
     let mut live_until = 0u64;
     let mut live_tick = tokio::time::interval(Duration::from_secs(2));
@@ -249,6 +257,33 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                     }
                 }
             }
+            _ = node_tick.tick(), if node_on => {
+                let now = actions::now();
+                if live_until > now || now >= node_last + 30 {
+                    node_last = now;
+                    node_reads.collect();
+                }
+            }
+            _ = node_poll.tick(), if node_reads.active() => {
+                let m = match node_reads.poll() {
+                    None => None,
+                    Some((None, Ok(_))) => node::read_snapshot().map(|s| serde_json::json!({"type": "node_apps", "node_apps": s})),
+                    Some((None, Err(e))) => { eprintln!("hlm-agent: node-app: {e}"); None }
+                    Some((Some(id), res)) => Some(match res {
+                        Ok(a) if a.code == 0 => serde_json::json!({"type": "node_read", "read": {"id": id, "ok": true, "text": a.text, "offset": a.offset, "operation": a.operation}}),
+                        Ok(a) => {
+                            let tail: String = a.text.chars().rev().take(500).collect::<Vec<_>>().into_iter().rev().collect();
+                            serde_json::json!({"type": "node_read", "read": {"id": id, "ok": false, "error": tail.trim()}})
+                        }
+                        Err(e) => serde_json::json!({"type": "node_read", "read": {"id": id, "ok": false, "error": e}}),
+                    }),
+                };
+                if let Some(m) = m {
+                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                        return Failure::Retry(e.to_string());
+                    }
+                }
+            }
             _ = registry_tick.tick() => {
                 if let Some(snap) = docker::read_snapshot() {
                     let images = snap.images();
@@ -272,6 +307,14 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                     }
                     if action == "update_container" {
                         registry_tick.reset_immediately(); // re-check images now that one changed
+                    } else if action.starts_with("node_") {
+                        // The helper collected the new state before reporting.
+                        if let Some(s) = node::read_snapshot() {
+                            let m = serde_json::json!({"type": "node_apps", "node_apps": s});
+                            if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                                return Failure::Retry(e.to_string());
+                            }
+                        }
                     } else {
                         upd.reset_immediately(); // report the new package list right away
                     }
@@ -287,6 +330,18 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         live_tick.reset_immediately();
                         continue;
                     }
+                    if m["type"] == "node_read" {
+                        let id = m["id"].as_str().unwrap_or("").to_string();
+                        let args = m["args"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
+                        let refused = if node_on { node_reads.ask(id.clone(), args).map(|f| f.1.err().unwrap_or_default()) } else { Some("Applications Node.js non installées sur cette machine (node-app absent, ou relancez install.sh)".into()) };
+                        if let Some(e) = refused {
+                            let r = serde_json::json!({"type": "node_read", "read": {"id": id, "ok": false, "error": e}});
+                            if let Err(e) = ws.send(Message::Text(r.to_string().into())).await {
+                                return Failure::Retry(e.to_string());
+                            }
+                        }
+                        continue;
+                    }
                     if m["type"] != "action" { continue; }
                     let action = m["action"].as_str().unwrap_or("").to_string();
                     let (state, message) = match action.as_str() {
@@ -299,6 +354,10 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         }
                         "update_container" => match actions::request_container_update(m["target"].as_str().unwrap_or("")) {
                             Ok(()) => { apt_pending = Some((action.clone(), actions::now(), actions::DOCKER_OUTPUT)); ("running", String::new()) }
+                            Err(e) => ("failed", e),
+                        },
+                        a if a.starts_with("node_") => match node::request_action(&a[5..], m["target"].as_str().unwrap_or("")) {
+                            Ok(()) => { apt_pending = Some((action.clone(), actions::now(), node::ACTION_OUTPUT)); ("running", String::new()) }
                             Err(e) => ("failed", e),
                         },
                         "refresh_smart" => match actions::request_smart() {

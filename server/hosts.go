@@ -131,6 +131,9 @@ type agentMsg struct {
 	Updates *agentUpdates   `json:"updates,omitempty"`
 	Smart   *smartReport    `json:"smart,omitempty"`
 	Docker  *dockerSnapshot `json:"docker,omitempty"`
+	// node_apps and node_read (answer to a nodeRead)
+	NodeApps *nodeSnapshot   `json:"node_apps,omitempty"`
+	Read     *nodeReadResult `json:"read,omitempty"`
 	// action_result fields
 	Action  string `json:"action,omitempty"`
 	State   string `json:"state,omitempty"`
@@ -162,14 +165,15 @@ type Host struct {
 	Updates     *agentUpdates   `json:"updates"`
 	Action      *hostAction     `json:"action"`         // last dashboard action (updates, agent update)
 	Docker      *dockerSnapshot `json:"docker"`         // nil when the host has no Docker
+	NodeApps    *nodeSnapshot   `json:"node_apps"`      // nil without node-app (base-node playbook)
 	AgentLatest string          `json:"agent_latest"`   // latest published agent release, "" if unknown
 	Outdated    bool            `json:"agent_outdated"` // agent older than AgentLatest
 	CreatedAt   int64           `json:"created_at"`
 }
 
 type hostAction struct {
-	Action  string `json:"action"`           // check_updates, apply_updates, update_agent, update_container
-	Target  string `json:"target,omitempty"` // container name for update_container
+	Action  string `json:"action"`           // check_updates, apply_updates, update_agent, update_container, node_*
+	Target  string `json:"target,omitempty"` // container name for update_container, app name for node_*
 	State   string `json:"state"`            // pending, running, done, failed
 	Message string `json:"message"`
 	At      int64  `json:"at"`
@@ -321,7 +325,7 @@ func (s *Server) pingDownHosts(ctx context.Context, hosts []Host) {
 }
 
 func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
-	rows, err := s.db.Query(`SELECT id,name,last_seen,maintenance,public,info,latest,updates,action,docker,created_at FROM hosts `+where+` ORDER BY name COLLATE NOCASE`, args...)
+	rows, err := s.db.Query(`SELECT id,name,last_seen,maintenance,public,info,latest,updates,action,docker,node_apps,created_at FROM hosts `+where+` ORDER BY name COLLATE NOCASE`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -329,8 +333,8 @@ func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
 	hosts := []Host{}
 	for rows.Next() {
 		var h Host
-		var info, latest, updates, action, docker string
-		if err := rows.Scan(&h.ID, &h.Name, &h.LastSeen, &h.Maintenance, &h.Public, &info, &latest, &updates, &action, &docker, &h.CreatedAt); err != nil {
+		var info, latest, updates, action, docker, nodeApps string
+		if err := rows.Scan(&h.ID, &h.Name, &h.LastSeen, &h.Maintenance, &h.Public, &info, &latest, &updates, &action, &docker, &nodeApps, &h.CreatedAt); err != nil {
 			return nil, err
 		}
 		h.Info, h.Latest = json.RawMessage(info), json.RawMessage(latest)
@@ -345,6 +349,10 @@ func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
 		var d dockerSnapshot
 		if json.Unmarshal([]byte(docker), &d) == nil && d.CollectedAt > 0 {
 			h.Docker = &d
+		}
+		var na nodeSnapshot
+		if json.Unmarshal([]byte(nodeApps), &na) == nil && na.CollectedAt > 0 {
+			h.NodeApps = &na
 		}
 		var ai agentInfo
 		json.Unmarshal(h.Info, &ai)
@@ -709,6 +717,13 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 				slog.Error("store docker", "err", err)
 			}
 			events.publish("hosts")
+		case m.Type == "node_apps" && m.NodeApps != nil:
+			if err := s.storeNodeApps(id, hostName, m.NodeApps); err != nil {
+				slog.Error("store node apps", "err", err)
+			}
+			events.publish("hosts")
+		case m.Type == "node_read" && m.Read != nil:
+			deliverNodeRead(id, m.Read)
 		case m.Type == "smart" && m.Smart != nil:
 			if err := s.storeSmart(id, hostName, m.Smart); err != nil {
 				slog.Error("store smart", "err", err)

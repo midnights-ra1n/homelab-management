@@ -47,6 +47,7 @@ var settingDefs = map[string]string{
 	"notify_smart_level":      DiskReplace,
 	"notify_disk_pct":         "90",
 	"notify_docker_updates":   "false",
+	"notify_node_apps":        "true",
 	"report_monthly_enabled":  "false",
 	"report_weekly_enabled":   "false",
 	"report_energy":           "off",
@@ -161,7 +162,7 @@ func validateSettings(defs, in map[string]string) string {
 	if v, ok := in["notify_smart_level"]; ok && v != DiskWatch && v != DiskReplace && v != DiskFailing && v != "off" {
 		return "Le seuil d'alerte SMART doit être watch, replace, failing ou off"
 	}
-	for _, k := range []string{"smtp_enabled", "status_enabled", "api_enabled", "report_monthly_enabled", "report_weekly_enabled", "notify_security_updates", "notify_reboot", "notify_docker_updates"} {
+	for _, k := range []string{"smtp_enabled", "status_enabled", "api_enabled", "report_monthly_enabled", "report_weekly_enabled", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_node_apps"} {
 		if v, ok := in[k]; ok && v != "true" && v != "false" {
 			return k + " doit valoir true ou false"
 		}

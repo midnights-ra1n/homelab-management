@@ -1,0 +1,12 @@
+[Unit]
+Description=Midnights Monitoring agent: run a requested Node.js app action
+Documentation=https://github.com/midnights-ra1n/homelab-management
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Root-owned helper, closed list of node-app actions on one app; see node-app-helper.sh.
+# Deploys and updates are started with systemd-run, outside this unit.
+ExecStart=/usr/local/lib/hlm-agent/node-app-helper.sh action
+TimeoutStartSec=15min
+Nice=10

@@ -34,6 +34,7 @@ export interface Host {
   id: number; name: string; status: Status; last_seen: number; maintenance: boolean; public: boolean;
   connected: boolean; agent_down: boolean; reachable?: boolean; info: HostInfo; latest: HostLatest; updates: HostUpdates | null; created_at: number;
   action: HostAction | null; agent_latest: string; agent_outdated: boolean; docker: DockerSnapshot | null;
+  node_apps: NodeSnapshot | null;
 }
 
 /** Host status wording: tells a stopped agent apart from a machine that is down. */
@@ -46,7 +47,17 @@ export interface DockerContainer {
   compose_project: string; compose_service: string; update: ImageUpdate;
 }
 export interface DockerSnapshot { containers: DockerContainer[]; error?: string; collected_at: number; running: number; updates_available: number }
-export type HostActionName = "check_updates" | "apply_updates" | "update_agent" | "update_container";
+/** Node.js apps of the base-node playbook (node-app), see server/nodeapps.go. */
+export interface NodeOp { id: string; kind: string; commit: string; started: number; finished: number | null; result: "running" | "success" | "failed" | "rolled_back" | string }
+export interface NodeApp {
+  name: string; port: number; status: string; restarts: number; memory_mb: number; failed_commit: string;
+  source: string; repo: string; branch: string; start_command: string; migrate_command: string;
+  auto_deploy: boolean; auto_update: boolean; deployed_commit: string; deploy_key: string; managed_by_ansible: boolean; history: NodeOp[];
+}
+export interface NodeKey { id: string; name: string; kind: "shared" | "app" | string; type: string; comment: string; fingerprint: string; created: number }
+export interface NodeSnapshot { apps: NodeApp[]; ssh_keys: NodeKey[]; ui_port: number; actions: boolean; error?: string; collected_at: number; online: number; failing: number }
+export type NodeAction = "node_deploy" | "node_pull" | "node_update" | "node_restart" | "node_stop" | "node_remove" | "node_purge";
+export type HostActionName = "check_updates" | "apply_updates" | "update_agent" | "update_container" | NodeAction;
 export interface HostAction { action: HostActionName; target?: string; state: "pending" | "running" | "done" | "failed"; message: string; at: number }
 export const actionBusy = (h: Host) => !!h.action && (h.action.state === "pending" || h.action.state === "running") && Date.now() / 1000 - h.action.at < 7200;
 export interface Install { hub_url: string; key: string; token: string; command: string }

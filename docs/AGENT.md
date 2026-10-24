@@ -41,7 +41,7 @@ printf 'HUB_URL=https://monitoring.example.fr\nTOKEN=…\nKEY=…\n' | sudo tee 
 sudo apt install ./hlm-agent_*_$(dpkg --print-architecture).deb
 ```
 
-Le paquet installe exactement les mêmes fichiers que `install.sh` (il l'exécute depuis `/usr/share/hlm-agent`). Sans `agent.env`, il s'installe sans démarrer : créez le fichier puis `sudo dpkg-reconfigure hlm-agent`. Options d'installation (`SMART`, `REMOTE_UPDATES`, `DOCKER`) : dans `/etc/hlm-agent/install.env`. `apt remove hlm-agent` retire l'agent complètement.
+Le paquet installe exactement les mêmes fichiers que `install.sh` (il l'exécute depuis `/usr/share/hlm-agent`). Sans `agent.env`, il s'installe sans démarrer : créez le fichier puis `sudo dpkg-reconfigure hlm-agent`. Options d'installation (`SMART`, `REMOTE_UPDATES`, `DOCKER`, `NODE_APPS`, `NODE_APPS_ACTIONS`) : dans `/etc/hlm-agent/install.env`. `apt remove hlm-agent` retire l'agent complètement.
 
 Mise à jour : le bouton *Mettre à jour l'agent* passe par l'assistant root `apt-action.sh`, qui télécharge le `.deb` de la dernière release, vérifie son SHA-256 et l'installe (il faut `REMOTE_UPDATES` activé, valeur par défaut).
 
@@ -82,6 +82,16 @@ Si Docker est installé au moment de l'installation de l'agent, le suivi Docker 
   - « Inconnu » pour un registre privé ou injoignable.
 - **Mettre à jour un conteneur** depuis la page *Conteneurs* ou la fiche de l'hôte. Ce n'est possible que pour les conteneurs **Docker Compose**. Le helper root lit les labels Compose du conteneur et lance, dans son dossier, `docker compose pull <service>` puis `docker compose up -d <service>`. Les volumes sont conservés et le journal s'affiche au retour. Les conteneurs lancés avec `docker run` sont signalés, mais pas recréés : leur commande d'origine n'est pas connue. Comme pour apt, `REMOTE_UPDATES=false` retire cette possibilité.
 
+## Applications Node.js (playbook base-node)
+
+Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gère les applications Node.js (pnpm, PM2, déploiement git, retour arrière). Si `/usr/local/bin/node-app` existe à l'installation de l'agent, le suivi s'active tout seul (`NODE_APPS=true|false` pour le forcer). La fiche de l'hôte affiche alors une section *Applications Node.js*, comme le tableau de bord `node-app-ui`.
+
+- **État** : toutes les 30 secondes (5 secondes quand la fiche de l'hôte est ouverte), un helper root (`node-app-helper.sh`, lancé par `hlm-agent-node-read.path`) relève `node-app status`, les réglages de chaque app, ses 20 dernières opérations et les clés SSH. Les **variables d'environnement** (`.env`) ne sont jamais lues, et le jeton éventuel de l'URL du dépôt est masqué.
+- **Actions** : *Déployer* (`deploy --force`), *Nouveaux commits* (`deploy`), *Mettre à jour* (`update`), *Redémarrer*, *Arrêter* et *Supprimer* (avec ou sans le code). Les opérations longues sont lancées par `systemd-run`, hors de l'unité du helper, comme le fait `node-app-ui`. Le journal de l'opération se suit en direct depuis l'historique. `NODE_APPS_ACTIONS=0` garde l'hôte en lecture seule.
+- **Logs** de l'app (PM2) et journaux des déploiements, lus à la demande.
+- **Alerte** (*Paramètres → Notifications*, activée par défaut) : app en erreur, déploiement en échec ou dernière opération annulée par un retour arrière. Chaque problème est signalé une fois.
+- Les variables, la création d'app et l'import de clés SSH restent dans `node-app-ui` (bouton sur la fiche) : ces données sensibles ne passent pas par le monitoring.
+
 ## Options de install.sh
 
 `install.sh` est idempotent et non interactif. Relancé sans `TOKEN`, il met seulement à jour le binaire et les unités, sans toucher à la configuration.
@@ -96,6 +106,8 @@ Si Docker est installé au moment de l'installation de l'agent, le suivi Docker 
 | `SMART` | `true` | Installer smartmontools et la collecte SMART horaire |
 | `REMOTE_UPDATES` | `true` | Autoriser les boutons *Vérifier* et *Mettre à jour* (paquets apt et conteneurs Docker) |
 | `DOCKER` | `auto` | Suivi Docker : activé si `docker` est installé |
+| `NODE_APPS` | `auto` | Applications Node.js : activé si `/usr/local/bin/node-app` existe (playbook base-node) |
+| `NODE_APPS_ACTIONS` | `1` | `0` : applications Node.js en lecture seule (pas de déploiement ni de redémarrage) |
 | `LXC` | — | `all` sur un Proxmox : installer aussi dans chaque conteneur LXC Debian démarré |
 | `LXC_TOKEN` | `TOKEN` | Jeton commun `enr_…` utilisé par les conteneurs LXC |
 | `VERSION` | dernière | Installer une release précise (`v0.1.4`) |
@@ -127,6 +139,9 @@ Cela retire les services, le timer SMART, le binaire, la configuration, l'état 
 | `/etc/systemd/system/hlm-agent-docker.{service,timer}` | `root` | Relevé Docker chaque minute, **sans réseau** |
 | `/etc/systemd/system/hlm-agent-docker-update.{path,service}` | `root` | Mise à jour d'un conteneur demandée depuis le tableau de bord |
 | `/var/lib/hlm-agent/docker/` | `root:hlm-agent`, `0750` | Relevé Docker et journal de la dernière mise à jour |
+| `/usr/local/lib/hlm-agent/node-app-helper.sh` | `root`, `0755` | Lectures et actions `node-app` (liste fermée, jamais les `.env`) |
+| `/etc/systemd/system/hlm-agent-node-{read,action}.{path,service}` | `root` | Lancent le helper quand l'agent dépose une lecture ou une action |
+| `/var/lib/hlm-agent/node-apps/` | `root:hlm-agent`, `0750` | Relevé des applications, réponse de la dernière lecture et journal de la dernière action |
 
 Root n'exécute jamais le binaire de l'agent : l'agent peut le réécrire pour se mettre à jour, ce qui ouvrirait une élévation de privilèges.
 

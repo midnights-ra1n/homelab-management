@@ -10,6 +10,7 @@ import { AddHostWizard, InstallInstructions, UNINSTALL_COMMAND } from "./AddHost
 import { MassDeployDialog } from "./MassDeploy";
 import { AgentVersion, useHostAction } from "./AgentVersion";
 import { ContainersTable } from "./Containers";
+import { NodeAppsPanel } from "./NodeApps";
 
 export function HostsPage() {
   const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts"), 15000, [], ["hosts", "metrics"]);
@@ -219,6 +220,13 @@ export function HostDetailPage({ id }: { id: number }) {
             <Card flush title={`${h.docker.running}/${h.docker.containers.length} en cours`} sub={`Relevé ${fmtAgo(h.docker.collected_at)}`}>
               <ContainersTable h={h} onChanged={host.refresh} />
             </Card>
+          </section>
+        )}
+
+        {h.node_apps && (
+          <section aria-labelledby="node-title">
+            <SectionTitle id="node-title">Applications Node.js</SectionTitle>
+            <NodeAppsPanel h={h} onChanged={host.refresh} />
           </section>
         )}
 

@@ -15,7 +15,9 @@ import (
 	"github.com/coder/websocket/wsjson"
 )
 
-var hostActions = map[string]bool{"check_updates": true, "apply_updates": true, "update_agent": true, "update_container": true}
+var hostActions = map[string]bool{"check_updates": true, "apply_updates": true, "update_agent": true, "update_container": true,
+	// node-app (base-node playbook), on one app; see nodeapps.go.
+	"node_deploy": true, "node_pull": true, "node_update": true, "node_restart": true, "node_stop": true, "node_remove": true, "node_purge": true}
 
 func (s *Server) setHostAction(id int64, action, state, message string) {
 	s.setHostActionTarget(id, action, "", state, message)
@@ -52,8 +54,15 @@ func (s *Server) handleHostAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !hostActions[req.Action] {
-		writeErr(w, 400, "Action inconnue : check_updates, apply_updates, update_agent ou update_container")
+		writeErr(w, 400, "Action inconnue : check_updates, apply_updates, update_agent, update_container ou node_*")
 		return
+	}
+	if strings.HasPrefix(req.Action, "node_") && !nodeAppName.MatchString(req.Target) {
+		writeErr(w, 400, "Nom d'application invalide")
+		return
+	}
+	if req.Target != "" {
+		logName(r, req.Target+" ("+req.Action+")")
 	}
 	if req.Action == "update_container" && (req.Target == "" || len(req.Target) > 200 || strings.Trim(req.Target, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-") != "") {
 		writeErr(w, 400, "Nom de conteneur invalide")

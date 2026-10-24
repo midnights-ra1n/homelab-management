@@ -132,6 +132,7 @@ var migrations = []string{
 	`ALTER TABLE api_tokens ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;`,
 	remindersTable,
 	remindersRef,
+	`ALTER TABLE hosts ADD COLUMN node_apps TEXT NOT NULL DEFAULT '{}';`,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's

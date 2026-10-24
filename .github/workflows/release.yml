@@ -61,11 +61,13 @@ jobs:
           for f in hlm-agent.service hlm-agent-smart.service hlm-agent-smart.timer hlm-agent-smart.path smart-collect.sh \
                    hlm-agent-apt.path hlm-agent-apt.service apt-action.sh \
                    hlm-agent-docker.service hlm-agent-docker.timer hlm-agent-docker-update.path \
-                   hlm-agent-docker-update.service docker-helper.sh; do
+                   hlm-agent-docker-update.service docker-helper.sh \
+                   hlm-agent-node-read.path hlm-agent-node-read.service hlm-agent-node-action.path \
+                   hlm-agent-node-action.service node-app-helper.sh; do
             diff -u "agent/$f" "deploy/ansible/roles/hlm_agent/files/$f"
           done
       - name: Check shell scripts
-        run: for f in agent/*.sh packaging/*/postinst packaging/*/prerm packaging/server/update.sh; do sh -n "$f"; done
+        run: for f in agent/*.sh packaging/*/postinst packaging/*/prerm packaging/server/update.sh; do if head -n1 "$f" | grep -q bash; then bash -n "$f"; else sh -n "$f"; fi; done
 
   server:
     needs: [version, test]

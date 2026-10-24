@@ -26,5 +26,9 @@ hlm_auto_update: "{{ hlm_version == 'latest' }}"
 hlm_remote_updates: true
 # Docker monitoring: auto (when docker is installed), true or false.
 hlm_docker: auto
+# Node.js apps of the base-node playbook: auto (when /usr/local/bin/node-app exists), true or false.
+hlm_node_apps: auto
+# Deploy / restart / remove buttons for those apps; false keeps them read-only.
+hlm_node_apps_actions: true
 # SMART collection; off by default on virtual machines and containers.
 hlm_smart: "{{ ansible_facts.virtualization_role | default('host') != 'guest' }}"

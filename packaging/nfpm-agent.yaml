@@ -53,6 +53,17 @@ contents:
   - src: agent/docker-helper.sh
     dst: /usr/share/hlm-agent/docker-helper.sh
     file_info: { mode: 0755 }
+  - src: agent/hlm-agent-node-read.path
+    dst: /usr/share/hlm-agent/hlm-agent-node-read.path
+  - src: agent/hlm-agent-node-read.service
+    dst: /usr/share/hlm-agent/hlm-agent-node-read.service
+  - src: agent/hlm-agent-node-action.path
+    dst: /usr/share/hlm-agent/hlm-agent-node-action.path
+  - src: agent/hlm-agent-node-action.service
+    dst: /usr/share/hlm-agent/hlm-agent-node-action.service
+  - src: agent/node-app-helper.sh
+    dst: /usr/share/hlm-agent/node-app-helper.sh
+    file_info: { mode: 0755 }
 scripts:
   postinstall: packaging/agent/postinst
   preremove: packaging/agent/prerm

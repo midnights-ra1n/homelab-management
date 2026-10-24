@@ -114,7 +114,7 @@ export function SettingsPage({ version }: { version: string }) {
               try { await api.post("/api/settings/test-email"); toast("E-mail de test envoyé"); } catch (e) { setError((e as Error).message); }
               setBusy(undefined);
             }}>Envoyer un e-mail de test</Button>
-            <Button loading={busy === "smtp"} onClick={() => save("smtp", ["smtp_enabled", "smtp_host", "smtp_port", "smtp_tls", "smtp_user", "smtp_pass", "smtp_from", "smtp_to", "notify_window_s", "status_title", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_smart_level", "notify_disk_pct"])}>Enregistrer les notifications</Button>
+            <Button loading={busy === "smtp"} onClick={() => save("smtp", ["smtp_enabled", "smtp_host", "smtp_port", "smtp_tls", "smtp_user", "smtp_pass", "smtp_from", "smtp_to", "notify_window_s", "status_title", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_node_apps", "notify_smart_level", "notify_disk_pct"])}>Enregistrer les notifications</Button>
           </>}>
           <Switch label="Activer les notifications" checked={bool("smtp_enabled")} onChange={(c) => setDraft({ ...draft, smtp_enabled: String(c) })} />
           <div className="grid gap-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
@@ -143,6 +143,7 @@ export function SettingsPage({ version }: { version: string }) {
             <Checkbox label="Nouvelles mises à jour de sécurité" checked={bool("notify_security_updates")} onChange={(e) => setDraft({ ...draft, notify_security_updates: String(e.target.checked) })} />
             <Checkbox label="Redémarrage requis" checked={bool("notify_reboot")} onChange={(e) => setDraft({ ...draft, notify_reboot: String(e.target.checked) })} />
             <Checkbox label="Nouvelles images Docker disponibles" checked={bool("notify_docker_updates")} onChange={(e) => setDraft({ ...draft, notify_docker_updates: String(e.target.checked) })} />
+            <Checkbox label="Application Node.js en erreur ou déploiement en échec" checked={bool("notify_node_apps")} onChange={(e) => setDraft({ ...draft, notify_node_apps: String(e.target.checked) })} />
             <Field label="Santé des disques (SMART)" htmlFor="s-smartlvl" className="mt-2 sm:max-w-sm"
               hint="Chaque mise à jour, redémarrage, image ou disque n'est signalé qu'une fois, dans le même e-mail que les autres alertes de la fenêtre.">
               <select id="s-smartlvl" className={inputClass} value={v("notify_smart_level")} onChange={set("notify_smart_level")}>

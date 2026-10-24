@@ -157,6 +157,8 @@ Le rôle écrit `/etc/hlm-agent/agent.env` et `install.env`, télécharge `hlm-a
 | `hlm_smart` | `false` sur VM et conteneur | Collecte SMART (installe smartmontools) |
 | `hlm_remote_updates` | `true` | Boutons *Vérifier* / *Mettre à jour* du tableau de bord (helper root, actions apt et Docker fixes) |
 | `hlm_docker` | `auto` | Suivi Docker : `auto` (si docker est installé), `true` ou `false` |
+| `hlm_node_apps` | `auto` | Applications Node.js du playbook base-node : `auto` (si `node-app` est installé), `true` ou `false` |
+| `hlm_node_apps_actions` | `true` | Boutons *Déployer*, *Redémarrer*, *Supprimer*… de ces applications |
 
 Conteneurs LXC d'un Proxmox : ajoutez-les simplement à votre inventaire (Ansible s'y connecte en SSH comme à n'importe quelle machine), ou utilisez la commande `LXC=all` de l'assistant, qui les équipe depuis le Proxmox sans SSH.
 | `hlm_allow_insecure` | `true` si `http://` | Accepter un hub en HTTP |

@@ -19,7 +19,7 @@ fn state_file(name: &str) -> String {
     std::env::var("STATE_DIRECTORY").unwrap_or_else(|_| "/var/lib/hlm-agent/state".into()) + "/" + name
 }
 
-fn drop_request(file: &str, content: &str) -> Result<(), String> {
+pub fn drop_request(file: &str, content: &str) -> Result<(), String> {
     let path = state_file(file);
     let tmp = format!("{path}.tmp");
     std::fs::write(&tmp, content).and_then(|_| std::fs::rename(&tmp, &path)).map_err(|e| format!("{path}: {e}"))

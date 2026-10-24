@@ -224,6 +224,66 @@
         - /etc/systemd/system/hlm-agent-docker-update.service
       when: not _hlm_docker_on | bool
 
+- name: Look for node-app (base-node playbook)
+  ansible.builtin.stat:
+    path: /usr/local/bin/node-app
+  register: _hlm_has_node_app
+  when: hlm_node_apps == 'auto'
+
+- name: Node.js apps
+  vars:
+    _hlm_node_on: "{{ (hlm_node_apps == 'auto' and _hlm_has_node_app.stat.exists | default(false)) or hlm_node_apps | string | lower == 'true' }}"
+    _hlm_node_act: "{{ _hlm_node_on | bool and hlm_node_apps_actions | bool }}"
+  block:
+    - name: Install the root-owned node-app helper
+      ansible.builtin.copy:
+        src: node-app-helper.sh
+        dest: /usr/local/lib/hlm-agent/
+        owner: root
+        group: root
+        mode: "0755"
+        directory_mode: "0755"
+      when: _hlm_node_on | bool
+
+    - name: Install the node-app units
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /etc/systemd/system/
+        mode: "0644"
+      loop: [hlm-agent-node-read.path, hlm-agent-node-read.service, hlm-agent-node-action.path, hlm-agent-node-action.service]
+      register: _hlm_node_units
+      when: _hlm_node_on | bool
+
+    - name: Enable the node-app read and action triggers
+      ansible.builtin.systemd_service:
+        name: "{{ item.name }}"
+        enabled: "{{ item.on }}"
+        state: "{{ 'started' if item.on else 'stopped' }}"
+        daemon_reload: "{{ _hlm_node_units is changed }}"
+      loop:
+        - { name: hlm-agent-node-read.path, on: true }
+        - { name: hlm-agent-node-action.path, on: "{{ _hlm_node_act | bool }}" }
+      when: _hlm_node_on | bool
+
+    - name: Remove the node-app action units (read-only)
+      ansible.builtin.file:
+        path: "/etc/systemd/system/{{ item }}"
+        state: absent
+      loop: [hlm-agent-node-action.path, hlm-agent-node-action.service]
+      when: _hlm_node_on | bool and not _hlm_node_act | bool
+
+    - name: Remove the node-app helper
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /usr/local/lib/hlm-agent/node-app-helper.sh
+        - /etc/systemd/system/hlm-agent-node-read.path
+        - /etc/systemd/system/hlm-agent-node-read.service
+        - /etc/systemd/system/hlm-agent-node-action.path
+        - /etc/systemd/system/hlm-agent-node-action.service
+      when: not _hlm_node_on | bool
+
 - name: Enable and start hlm-agent
   ansible.builtin.systemd_service:
     name: hlm-agent

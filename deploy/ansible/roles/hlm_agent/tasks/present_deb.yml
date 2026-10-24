@@ -66,6 +66,8 @@
       SMART={{ hlm_smart | bool | lower }}
       REMOTE_UPDATES={{ hlm_remote_updates | bool | lower }}
       DOCKER={{ hlm_docker | string | lower }}
+      NODE_APPS={{ hlm_node_apps | string | lower }}
+      NODE_APPS_ACTIONS={{ hlm_node_apps_actions | bool | ternary('1', '0') }}
   notify: Reconfigure hlm-agent
 
 - name: Download the package (verified by SHA-256)

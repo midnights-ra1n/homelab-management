@@ -73,6 +73,8 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/hosts/{id}/metrics", auth(s.handleHostMetrics))
 	mux.HandleFunc("GET /api/hosts/{id}/live", auth(s.handleHostLive))
 	mux.HandleFunc("POST /api/hosts/{id}/action", auth(s.handleHostAction))
+	mux.HandleFunc("GET /api/hosts/{id}/node-apps/{app}/logs", auth(s.handleNodeLogs))
+	mux.HandleFunc("GET /api/hosts/{id}/node-apps/{app}/operations/{op}", auth(s.handleNodeOplog))
 
 	mux.HandleFunc("GET /api/monitors", auth(s.handleListMonitors))
 	mux.HandleFunc("POST /api/monitors", auth(s.handleCreateMonitor))
