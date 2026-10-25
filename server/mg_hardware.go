@@ -4,11 +4,15 @@ package main
 // and the machine each component is installed in. A machine can be linked to an inventory item.
 
 import (
+	"cmp"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
+	"strings"
 )
 
 var (
@@ -23,6 +27,17 @@ const hardwareSelect = `
   FROM hardware_items h
   LEFT JOIN hardware_items p ON p.id = h.parent_id
   LEFT JOIN assets a ON a.id = h.asset_id`
+
+// nextHLIDSQL is the next free homelab ID (HL-0001, HL-0002…), after the highest one in use.
+const nextHLIDSQL = `(SELECT printf('HL-%04d', COALESCE(MAX(CAST(SUBSTR(hl_id, 4) AS INTEGER)), 0) + 1)
+  FROM hardware_items WHERE UPPER(hl_id) GLOB 'HL-[0-9]*')`
+
+var hlIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
+
+func nextHLID(q execer) (id string, err error) {
+	err = q.QueryRow(`SELECT ` + nextHLIDSQL).Scan(&id)
+	return
+}
 
 func (s *Server) mgListHardware(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.rows(hardwareSelect + ` ORDER BY h.name COLLATE NOCASE, h.id`)
@@ -67,6 +82,20 @@ func (s *Server) mgSaveHardware(w http.ResponseWriter, r *http.Request) {
 		"purchase_price": f.optNum("purchase_price", false, 0, 1e7), "warranty_until": f.optDate("warranty_until"),
 		"notes": f.text("notes", 5000), "tags": f.tags("tags"),
 		"parent_id": f.optID("parent_id"), "asset_id": f.optID("asset_id"), "quantity": f.optNum("quantity", true, 1, 100000),
+		"hl_id": f.text("hl_id", 40),
+	}
+	if v := cols["hl_id"].(string); v != "" {
+		var other string
+		if !hlIDRe.MatchString(v) {
+			f.fail("hl_id", "Lettres, chiffres et . _ / - seulement")
+		} else if s.db.QueryRow(`SELECT name FROM hardware_items WHERE hl_id = ? COLLATE NOCASE AND id != ?`, v, id).Scan(&other) == nil {
+			f.fail("hl_id", "ID déjà attribué à « "+other+" »")
+		}
+	} else if next, err := nextHLID(s.db); err == nil {
+		cols["hl_id"] = next
+	} else {
+		serverErr(w, err)
+		return
 	}
 	if cols["quantity"] == nil {
 		cols["quantity"] = int64(1)
@@ -108,7 +137,14 @@ func (s *Server) mgSaveHardware(w http.ResponseWriter, r *http.Request) {
 			s.mgLog(r, "hardware", id, "update", fmt.Sprintf("Modification du matériel « %s »", cols["name"]))
 		}
 	} else if id, err = s.insertRow(s.db, "hardware_items", cols); err == nil {
-		s.mgLog(r, "hardware", id, "create", fmt.Sprintf("Nouveau matériel « %s »", cols["name"]))
+		summary := fmt.Sprintf("Nouveau matériel « %s »", cols["name"])
+		if a, ok := cols["asset_id"].(int64); ok && f.check("import_components") {
+			var n int
+			if n, err = s.importAssetComponents(id, a); n > 0 {
+				summary += fmt.Sprintf(", %d composant(s) repris de l'inventaire", n)
+			}
+		}
+		s.mgLog(r, "hardware", id, "create", summary)
 	}
 	if err != nil {
 		serverErr(w, err)
@@ -189,9 +225,9 @@ func (s *Server) splitInstall(id, parent int64, status string) error {
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(`INSERT INTO hardware_items (name, category, status, brand, model, specs, capacity_gb, parent_id,
-	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity)
+	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity, hl_id)
 	  SELECT name, category, ?, brand, model, specs, capacity_gb, ?, location, vendor, purchase_date, purchase_price,
-	    warranty_until, notes, tags, 1 FROM hardware_items WHERE id = ?`, status, parent, id); err != nil {
+	    warranty_until, notes, tags, 1, `+nextHLIDSQL+` FROM hardware_items WHERE id = ?`, status, parent, id); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`UPDATE hardware_items SET quantity = quantity - 1, updated_at = datetime('now') WHERE id = ?`, id); err != nil {
@@ -246,9 +282,9 @@ func (s *Server) mgDuplicateHardware(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := s.db.Exec(`INSERT INTO hardware_items (name, category, status, brand, model, specs, capacity_gb,
-	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity)
+	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity, hl_id)
 	  SELECT name, category, CASE WHEN status = 'in_use' THEN 'stock' ELSE status END, brand, model, specs, capacity_gb,
-	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity
+	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity, `+nextHLIDSQL+`
 	  FROM hardware_items WHERE id = ?`, id)
 	if err != nil {
 		serverErr(w, err)
@@ -263,4 +299,84 @@ func (s *Server) mgDuplicateHardware(w http.ResponseWriter, r *http.Request) {
 	s.db.QueryRow(`SELECT name FROM hardware_items WHERE id = ?`, nid).Scan(&name)
 	s.mgLog(r, "hardware", nid, "create", fmt.Sprintf("Copie du matériel « %s »", name))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// importAssetComponents adds to machine the CPU, RAM, GPU, disks and network cards that the
+// inventory item records (filled by hand or by the monitoring agent), as in-use components.
+func (s *Server) importAssetComponents(machine, asset int64) (int, error) {
+	var cpu, ramType, gpu, disks, nics, location string
+	var sockets, cores, threads sql.NullInt64
+	var ram sql.NullFloat64
+	if err := s.db.QueryRow(`SELECT cpu_model, cpu_sockets, cpu_cores, cpu_threads, ram_gb, ram_type, gpu, disks, nics, location
+	  FROM assets WHERE id = ?`, asset).Scan(&cpu, &sockets, &cores, &threads, &ram, &ramType, &gpu, &disks, &nics, &location); err != nil {
+		return 0, err
+	}
+	type part struct {
+		name, category, specs string
+		gb                    any
+		qty                   int64
+	}
+	var parts []part
+	if cpu != "" {
+		var spec []string
+		if cores.Valid {
+			spec = append(spec, fmt.Sprintf("%d cœurs", cores.Int64))
+		}
+		if threads.Valid {
+			spec = append(spec, fmt.Sprintf("%d threads", threads.Int64))
+		}
+		qty := int64(1)
+		if sockets.Valid && sockets.Int64 > 1 {
+			qty = sockets.Int64
+		}
+		parts = append(parts, part{cpu, "cpu", strings.Join(spec, ", "), nil, qty})
+	}
+	if ram.Valid && ram.Float64 > 0 {
+		parts = append(parts, part{strings.TrimSpace(fmt.Sprintf("RAM %s %s", ramType, formatGo(ram.Float64))), "ram", "Capacité totale de la machine", ram.Float64, 1})
+	}
+	if gpu != "" {
+		parts = append(parts, part{gpu, "gpu", "", nil, 1})
+	}
+	var ds []struct {
+		Name       string   `json:"name"`
+		Type       string   `json:"type"`
+		CapacityGB *float64 `json:"capacity_gb"`
+	}
+	json.Unmarshal([]byte(disks), &ds)
+	for _, d := range ds {
+		var gb any
+		if d.CapacityGB != nil {
+			gb = *d.CapacityGB
+		}
+		parts = append(parts, part{cmp.Or(d.Name, "Disque"), "disk", strings.ToUpper(d.Type), gb, 1})
+	}
+	var ns []struct{ Name, MAC, Speed string }
+	json.Unmarshal([]byte(nics), &ns)
+	for _, n := range ns {
+		parts = append(parts, part{cmp.Or(n.Name, "Carte réseau"), "nic", strings.Trim(strings.Join([]string{n.Speed, n.MAC}, " · "), " ·"), nil, 1})
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	for _, p := range parts {
+		id, err := nextHLID(tx)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := s.insertRow(tx, "hardware_items", map[string]any{"name": clip(p.name, 200), "category": p.category, "status": "in_use",
+			"specs": clip(p.specs, 500), "capacity_gb": p.gb, "quantity": p.qty, "parent_id": machine, "location": location, "hl_id": id}); err != nil {
+			return 0, err
+		}
+	}
+	return len(parts), tx.Commit()
+}
+
+func formatGo(gb float64) string {
+	if gb >= 1024 && int(gb)%1024 == 0 {
+		return fmt.Sprintf("%d To", int(gb)/1024)
+	}
+	return strings.TrimSuffix(strings.TrimSuffix(fmt.Sprintf("%.1f", gb), "0"), ".") + " Go"
 }

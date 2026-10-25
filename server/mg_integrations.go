@@ -26,7 +26,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-var integrationTypes = []string{"proxmox", "webmin", "hlm"}
+var integrationTypes = []string{"proxmox", "webmin", "hlm", "nextcloud"}
 
 type integrationConfig struct {
 	Username    string `json:"username,omitempty"`
@@ -207,6 +207,13 @@ func integrationForm(f *form, prev *integration) (integration, bool) {
 				f.fail("token_secret", "Le secret du jeton est requis")
 			}
 		}
+	case "nextcloud":
+		if c.Username == "" {
+			f.fail("username", "L'identifiant Nextcloud est requis")
+		}
+		if c.Password == "" {
+			f.fail("password", "Le mot de passe d'application est requis")
+		}
 	case "hlm":
 		if c.Username != "" || c.TokenSecret == "" {
 			c.TokenSecret = ""
@@ -322,6 +329,12 @@ func (s *Server) testIntegration(ctx context.Context, i *integration) (string, e
 		return s.testProxmox(ctx, i)
 	case "webmin":
 		return s.testWebmin(ctx, i)
+	case "nextcloud":
+		todos, err := caldavList(ctx, i)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%d tâche(s) dans cette liste", len(todos)), nil
 	case "hlm":
 		before := i.Config.LoginToken
 		d, err := s.hlmData(ctx, i)

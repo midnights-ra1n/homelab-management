@@ -1,4 +1,4 @@
-import { postForm, write } from "../lib/client";
+import { act, postForm, write } from "../lib/client";
 import type { TaskStatus } from "../lib/constants";
 import type { FormState } from "../lib/validation";
 
@@ -7,3 +7,4 @@ export const moveTaskAction = (id: number, status: TaskStatus, beforeId: number 
   write("POST", `/api/mg/tasks/${id}/move`, { status, before: beforeId });
 export const deleteTaskAction = (id: number) => write("DELETE", `/api/mg/tasks/${id}`);
 export const clearDoneTasksAction = () => write("POST", "/api/mg/tasks/clear-done");
+export const syncTasksAction = () => act("POST", "/api/mg/tasks/sync");

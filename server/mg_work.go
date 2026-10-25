@@ -423,7 +423,8 @@ func (s *Server) mgSaveTask(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if id > 0 {
 		if err = s.updateRow(s.db, "tasks", id, cols); err == nil {
-			s.db.Exec(`UPDATE tasks SET completed_at = CASE WHEN status = 'done' THEN COALESCE(completed_at, datetime('now')) ELSE NULL END WHERE id = ?`, id)
+			s.db.Exec(`UPDATE tasks SET caldav_dirty = caldav_dirty + 1,
+			  completed_at = CASE WHEN status = 'done' THEN COALESCE(completed_at, datetime('now')) ELSE NULL END WHERE id = ?`, id)
 			s.mgLog(r, "task", id, "update", fmt.Sprintf("Modification de la tâche « %s »", cols["title"]))
 		}
 	} else {
@@ -496,8 +497,8 @@ func (s *Server) mgMoveTask(w http.ResponseWriter, r *http.Request) {
 	for pos, t := range ids {
 		tx.Exec(`UPDATE tasks SET position = ? WHERE id = ?`, pos, t)
 	}
-	tx.Exec(`UPDATE tasks SET status = ?, updated_at = datetime('now'),
-	   completed_at = CASE WHEN ? = 'done' THEN COALESCE(completed_at, datetime('now')) ELSE NULL END WHERE id = ?`, in.Status, in.Status, id)
+	tx.Exec(`UPDATE tasks SET caldav_dirty = caldav_dirty + (status != ?), status = ?, updated_at = datetime('now'),
+	   completed_at = CASE WHEN ? = 'done' THEN COALESCE(completed_at, datetime('now')) ELSE NULL END WHERE id = ?`, in.Status, in.Status, in.Status, id)
 	if err := tx.Commit(); err != nil {
 		serverErr(w, err)
 		return
@@ -511,7 +512,18 @@ func (s *Server) mgMoveTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) mgClearDoneTasks(w http.ResponseWriter, r *http.Request) {
-	res, err := s.db.Exec(`DELETE FROM tasks WHERE status = 'done'`)
+	tx, err := s.db.Begin()
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	defer tx.Rollback()
+	// Completed reminders already sent stay in Nextcloud (the sync never imports finished ones).
+	tx.Exec(`UPDATE tasks SET caldav_href = '' WHERE status = 'done' AND caldav_dirty = 0`)
+	res, err := tx.Exec(`DELETE FROM tasks WHERE status = 'done'`)
+	if err == nil {
+		err = tx.Commit()
+	}
 	if err != nil {
 		serverErr(w, err)
 		return

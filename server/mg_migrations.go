@@ -426,7 +426,43 @@ var mgMigrations = []string{
 	`ALTER TABLE hardware_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 1);`,
 	remindersTable,
 	remindersRef,
+	// Homelab ID: an internal serial number per hardware item, numbered for the existing ones.
+	`
+  ALTER TABLE hardware_items ADD COLUMN hl_id TEXT NOT NULL DEFAULT '';
+  UPDATE hardware_items SET hl_id = printf('HL-%04d', id);
+  CREATE UNIQUE INDEX hardware_hl_id ON hardware_items(hl_id COLLATE NOCASE) WHERE hl_id != '';
+	`,
+	caldavMigration,
 }
+
+// caldavMigration adds the Nextcloud integration type (rebuilding integrations for its CHECK) and
+// the CalDAV link of each task. caldav_dirty counts local edits not yet sent; a deleted linked
+// task leaves its href in caldav_deleted so the sync deletes it on the server too.
+const caldavMigration = `
+  CREATE TABLE integrations_new (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    type       TEXT NOT NULL CHECK (type IN ('proxmox','webmin','hlm','nextcloud')),
+    name       TEXT NOT NULL,
+    url        TEXT NOT NULL,
+    config     TEXT NOT NULL DEFAULT '',
+    enabled    INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  INSERT INTO integrations_new SELECT id, type, name, url, config, enabled, created_at, updated_at FROM integrations;
+  DROP TABLE integrations;
+  ALTER TABLE integrations_new RENAME TO integrations;
+
+  ALTER TABLE tasks ADD COLUMN caldav_href TEXT NOT NULL DEFAULT '';
+  ALTER TABLE tasks ADD COLUMN caldav_etag TEXT NOT NULL DEFAULT '';
+  ALTER TABLE tasks ADD COLUMN caldav_data TEXT NOT NULL DEFAULT '';
+  ALTER TABLE tasks ADD COLUMN caldav_dirty INTEGER NOT NULL DEFAULT 1;
+  CREATE TABLE caldav_deleted (href TEXT PRIMARY KEY);
+  CREATE TRIGGER tasks_caldav_deleted AFTER DELETE ON tasks WHEN old.caldav_href != ''
+  BEGIN
+    INSERT OR IGNORE INTO caldav_deleted (href) VALUES (old.caldav_href);
+  END;
+`
 
 // mgFusionMigration (010) moves homelab.db to the Go server: Go session format, only the
 // Proxmox / Webmin / Homelab Monitoring integrations, no built-in probes (homelab-monitoring

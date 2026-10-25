@@ -65,6 +65,7 @@ func (s *Server) initManagement() error {
 func (s *Server) startManagement(ctx context.Context) {
 	go s.runAssetStatus(ctx)
 	go s.runInventorySync(ctx)
+	go s.runTaskSync(ctx)
 }
 
 // loadSecretKey returns sha256(APP_SECRET or DATA_DIR/secret.key), as homelab-management did.

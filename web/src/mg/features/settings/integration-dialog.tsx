@@ -15,6 +15,8 @@ const HELP: Record<IntegrationType, string> = {
   proxmox:
     "Jeton API : Datacenter → Permissions → API Tokens, décoche « Privilege Separation » ou donne au jeton le rôle PVEAuditor (lecture) / PVEVMAdmin (actions) sur « / ». Compte : utilisateur@royaume (ex. root@pam), sans double authentification. La migration vers un autre nœud demande un jeton sur le nœud cible.",
   hlm: "Le compte avec lequel tu te connectes au monitoring. L'API publique du monitoring peut rester désactivée : la gestion obtient elle-même son accès, visible et révocable dans Réglages → API du monitoring. Les hôtes équipés de l'agent sont reliés à l'inventaire automatiquement.",
+  nextcloud:
+    "URL : dans Nextcloud Tâches (ou Agenda), menu ⋯ de la liste → « Copier le lien privé ». Mot de passe : Paramètres personnels → Sécurité → « Créer un mot de passe d'application ». Pour Rappels sur iPhone/Mac : Réglages → Rappels → Comptes → Ajouter un compte → Autre → Compte CalDAV, avec le même serveur et le même mot de passe d'application ; les rappels de cette liste arrivent alors ici. Synchronisation chaque minute.",
   webmin:
     "URL de l'interface Webmin. Pour l'état système, choisis une clé SSH (Paramètres → Clés SSH) et ajoute sa clé publique dans ~/.ssh/authorized_keys de l'utilisateur. Un compte non-root suffit : tout est en lecture seule.",
 };
@@ -130,7 +132,7 @@ export function IntegrationDialog({
         )}
 
 
-        {type === "hlm" && account}
+        {(type === "hlm" || type === "nextcloud") && account}
         {legacyToken && (
           <p className="text-xs text-meta sm:col-span-2">
             {tr("Cette intégration utilise encore un jeton d'API saisi à la main. Renseigne un compte pour le remplacer.")}

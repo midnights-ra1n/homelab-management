@@ -5,6 +5,8 @@ import type { HardwareCategory, HardwareStatus } from "../constants";
 export type HardwareItem = {
   id: number;
   name: string;
+  /** ID homelab unique (HL-0001…), attribué au matériel seulement. */
+  hl_id: string;
   category: HardwareCategory;
   status: HardwareStatus;
   brand: string;

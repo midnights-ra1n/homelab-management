@@ -121,6 +121,7 @@ export function MachineCard({ machine, parts, free, options }: { machine: Hardwa
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <StatusBadge item={machine} />
+        <span className="font-mono text-xs text-meta">{machine.hl_id}</span>
         {ram > 0 && <Tag>RAM {formatGb(ram)}</Tag>}
         {disk > 0 && <Tag>{tr("Disques")} {formatGb(disk)}</Tag>}
         {machine.asset_id && (
@@ -190,12 +191,11 @@ export function ComponentTable({ items, options }: { items: HardwareItem[]; opti
                 {c.warranty_until && <span className="text-meta">{tr("Garantie")} <Warranty date={c.warranty_until} /></span>}
                 {cost && <span className="font-mono text-meta tabular-nums">{cost}</span>}
               </div>
-              {(c.serial_number || c.tags.length > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 pl-7 text-xs text-meta">
-                  {c.serial_number && <span className="font-mono">S/N {c.serial_number}</span>}
-                  {c.tags.map((t) => <Tag key={t}>{t}</Tag>)}
-                </div>
-              )}
+              <div className="flex flex-wrap items-center gap-1.5 pl-7 text-xs text-meta">
+                <span className="font-mono">{c.hl_id}</span>
+                {c.serial_number && <span className="font-mono">S/N {c.serial_number}</span>}
+                {c.tags.map((t) => <Tag key={t}>{t}</Tag>)}
+              </div>
             </li>
           );
         })}
@@ -224,12 +224,11 @@ export function ComponentTable({ items, options }: { items: HardwareItem[]; opti
                       <Icon size={15} className="shrink-0 text-meta" aria-hidden="true" />
                       <div className="min-w-0">
                         <p className="truncate text-h1">{c.name}<Qty item={c} /></p>
-                        {(details(c) || c.serial_number) && (
-                          <p className="truncate text-xs text-meta">
-                            {details(c)}
-                            {c.serial_number && <span className="font-mono"> · S/N {c.serial_number}</span>}
-                          </p>
-                        )}
+                        <p className="truncate text-xs text-meta">
+                          <span className="font-mono">{c.hl_id}</span>
+                          {details(c) && ` · ${details(c)}`}
+                          {c.serial_number && <span className="font-mono"> · S/N {c.serial_number}</span>}
+                        </p>
                         {c.tags.length > 0 && <p className="mt-0.5 flex gap-1">{c.tags.map((t) => <Tag key={t}>{t}</Tag>)}</p>}
                       </div>
                     </div>

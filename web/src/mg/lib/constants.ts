@@ -112,7 +112,7 @@ export const LINK_KIND_META: Record<LinkKind, { label: string; tone: Tone; dashe
   logical: { label: "Logique", tone: "muted", dashed: true },
 };
 
-export const INTEGRATION_TYPES = ["proxmox", "hlm", "webmin"] as const;
+export const INTEGRATION_TYPES = ["proxmox", "hlm", "webmin", "nextcloud"] as const;
 export type IntegrationType = (typeof INTEGRATION_TYPES)[number];
 
 export const INTEGRATION_META: Record<
@@ -136,6 +136,12 @@ export const INTEGRATION_META: Record<
     description: "Ton instance de monitoring : hôtes équipés de l'agent, sondes et mises à jour. Les agents alimentent aussi l'inventaire.",
     icon: "/icons/homelab-monitoring.svg",
     urlPlaceholder: "https://monitoring.lan",
+  },
+  nextcloud: {
+    label: "Nextcloud",
+    description: "Une liste de tâches Nextcloud synchronisée dans les deux sens avec les tâches, et par elle avec Rappels sur iPhone, iPad et Mac.",
+    icon: "nextcloud",
+    urlPlaceholder: "https://cloud.exemple.fr/remote.php/dav/calendars/moi/rappels/",
   },
 };
 

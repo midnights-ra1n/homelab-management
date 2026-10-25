@@ -156,3 +156,35 @@ func TestRemindersAPIAndNotify(t *testing.T) {
 		t.Fatalf("notifications %+v", s.notifier.pending)
 	}
 }
+
+// Every item gets the next homelab ID unless one is typed; a machine linked to the inventory can
+// take its components from it.
+func TestHardwareHomelabIDAndImport(t *testing.T) {
+	s, ts, tok := newMgTestServer(t)
+	s.db.Exec(`INSERT INTO assets (kind, display_name, cpu_model, cpu_cores, ram_gb, ram_type, disks, nics)
+	  VALUES ('physical', 'pve-01', 'Xeon E5-2680 v4', 14, 64, 'DDR4', '[{"name":"sda","type":"ssd","capacity_gb":960,"usage":""}]', '[{"name":"eno1","mac":"aa:bb","speed":"1G"}]')`)
+	ok := func(out string) {
+		t.Helper()
+		if !strings.Contains(out, `"ok":true`) {
+			t.Fatal(out)
+		}
+	}
+	ok(postForm(t, ts, tok, "/api/mg/hardware", url.Values{"name": {"PVE-01"}, "category": {"server"}, "status": {"in_use"}, "asset_id": {"1"}, "import_components": {"on"}}))
+	ok(postForm(t, ts, tok, "/api/mg/hardware", url.Values{"name": {"Clé USB"}, "category": {"other"}, "status": {"stock"}, "hl_id": {"HL-0100"}}))
+	ok(postForm(t, ts, tok, "/api/mg/hardware", url.Values{"name": {"Câble"}, "category": {"other"}, "status": {"stock"}}))
+	if out := postForm(t, ts, tok, "/api/mg/hardware", url.Values{"name": {"Autre"}, "category": {"other"}, "status": {"stock"}, "hl_id": {"hl-0100"}}); !strings.Contains(out, "déjà attribué") {
+		t.Fatal("duplicate ID accepted:", out)
+	}
+	var n int
+	var last string
+	s.db.QueryRow(`SELECT COUNT(*) FROM hardware_items WHERE parent_id = 1 AND status = 'in_use'`).Scan(&n)
+	s.db.QueryRow(`SELECT hl_id FROM hardware_items WHERE name = 'Câble'`).Scan(&last)
+	if n != 4 || last != "HL-0101" {
+		t.Fatalf("components %d (want cpu, ram, disk, nic), next ID %q", n, last)
+	}
+	var ram float64
+	s.db.QueryRow(`SELECT capacity_gb FROM hardware_items WHERE category = 'ram'`).Scan(&ram)
+	if ram != 64 {
+		t.Fatalf("RAM %v", ram)
+	}
+}

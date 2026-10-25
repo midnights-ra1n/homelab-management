@@ -49,7 +49,7 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
     (!category || h.category === category) &&
     (!status || h.status === status) &&
     (!q ||
-      [h.name, h.brand, h.model, h.serial_number, h.specs, h.location, h.parent_name ?? "", ...h.tags].some((v) => v.toLowerCase().includes(q)));
+      [h.hl_id, h.name, h.brand, h.model, h.serial_number, h.specs, h.location, h.parent_name ?? "", ...h.tags].some((v) => v.toLowerCase().includes(q)));
   const isMachine = (h: (typeof all)[number]) => HARDWARE_MACHINES.includes(h.category);
   const machines = all.filter((h) => isMachine(h) && matches(h));
   const components = all.filter((h) => !isMachine(h) && matches(h));
@@ -104,7 +104,7 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
         <FilterBar
           className="flex-1"
-          placeholder={tr("Nom, marque, modèle, n° de série, emplacement…")}
+          placeholder={tr("ID homelab, nom, marque, modèle, n° de série…")}
           selects={[
             { name: "category", label: tr("Toutes les catégories"), options: HARDWARE_CATEGORIES.map((c) => ({ value: c, label: tr(HARDWARE_CATEGORY_META[c].label) })) },
             { name: "status", label: tr("Tous les états"), options: HARDWARE_STATUSES.map((s) => ({ value: s, label: tr(HARDWARE_STATUS_META[s].label) })) },

@@ -187,6 +187,14 @@ func (s *Server) importBackup(ctx context.Context, doc *backupDoc) error {
 			}
 		}
 	}
+	// Emptying tasks queued their Nextcloud copies for deletion: the restored tasks keep them.
+	if _, err := tx.Exec(`DELETE FROM caldav_deleted`); err != nil {
+		return err
+	}
+	// Backups made before the homelab ID existed.
+	if _, err := tx.Exec(`UPDATE hardware_items SET hl_id = printf('HL-%04d', id) WHERE hl_id = ''`); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 

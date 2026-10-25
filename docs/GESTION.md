@@ -99,6 +99,8 @@ Ce qui doit être installé, et où ça en est.
 
 Un tableau Kanban (*à faire*, *en cours*, *fait*) pour la maintenance, les idées et les corrections : priorité, échéance, étiquettes, lien vers un élément ou un déploiement. Glissez les cartes d'une colonne à l'autre ; *Vider* retire les tâches terminées.
 
+**Nextcloud et Rappels (iOS, macOS).** Paramètres → Intégrations → Nextcloud : l'URL CalDAV d'une liste de tâches (« Copier le lien privé » dans Nextcloud Tâches), l'identifiant et un mot de passe d'application. La synchronisation tourne chaque minute dans les deux sens (bouton *Synchroniser* sur le tableau) : titre, description, état, priorité, échéance et étiquettes. Pour Rappels, ajoutez le même compte Nextcloud en CalDAV sur l'iPhone ou le Mac (Réglages → Rappels → Comptes → Autre → Compte CalDAV) : les rappels de cette liste passent par Nextcloud. Les alarmes et l'heure d'un rappel sont conservées quand la tâche est modifiée ici. Les rappels déjà terminés ne sont pas importés, et *Vider* ne les supprime pas de Nextcloud.
+
 ## Proxmox VE
 
 Agrège des nœuds Proxmox **autonomes**, sans cluster ni Proxmox Datacenter Manager : pas de quorum à maintenir.

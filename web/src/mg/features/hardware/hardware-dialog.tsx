@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { saveHardwareAction } from "@/actions/hardware";
 import { FormDialog } from "@/components/ui/form-dialog";
-import { SelectField, TextAreaField, TextField } from "@/components/ui/form";
+import { SelectField, Switch, TextAreaField, TextField } from "@/components/ui/form";
 import {
   HARDWARE_CATEGORIES,
   HARDWARE_CATEGORY_META,
@@ -12,7 +12,31 @@ import {
   type HardwareCategory,
 } from "@/lib/constants";
 import type { HardwareItem } from "@/lib/data/hardware";
+import { getAsset } from "@/lib/data/assets";
+import { formatGb } from "@/lib/utils";
 import { useT } from "@/i18n/client";
+
+/** Reprend de l'inventaire ce qu'il sait de la machine, sans écraser ce qui est déjà saisi. */
+function prefill(form: HTMLFormElement | null, id: number) {
+  getAsset(id).then((a) => {
+    if (!form || !a) return;
+    const set = (name: string, v: string | false | null | undefined) => {
+      const el = form.elements.namedItem(name) as HTMLInputElement | null;
+      if (el && !el.value.trim() && v) el.value = v;
+    };
+    const cpu = a.cpu_model && ((a.cpu_sockets ?? 1) > 1 ? `${a.cpu_sockets} × ${a.cpu_model}` : a.cpu_model);
+    const ram = a.ram_gb && `${formatGb(a.ram_gb)} ${a.ram_type}`.trim();
+    const disks = a.disks.length > 0 && `${a.disks.length} disque(s)`;
+    set("name", a.display_name);
+    set("brand", a.manufacturer);
+    set("model", a.model);
+    set("serial_number", a.serial_number);
+    set("location", a.location);
+    set("specs", [cpu, ram, disks, a.gpu].filter(Boolean).join(", "));
+    const status = form.elements.namedItem("status") as HTMLSelectElement | null;
+    if (status && a.status === "online") status.value = "in_use";
+  });
+}
 
 export type HardwareOptions = {
   machines: { id: number; name: string }[];
@@ -37,6 +61,7 @@ export function HardwareDialog({
 }) {
   const tr = useT();
   const [category, setCategory] = useState<HardwareCategory>(item?.category ?? defaultCategory);
+  const [assetId, setAssetId] = useState(item?.asset_id ? String(item.asset_id) : "");
   const machine = HARDWARE_MACHINES.includes(category);
   const icon = !item && !variant;
   return (
@@ -51,7 +76,16 @@ export function HardwareDialog({
       size="lg"
     >
       <div className="grid gap-5 sm:grid-cols-3">
-        <TextField label={tr("Nom")} name="name" defaultValue={item?.name} placeholder={tr("Samsung 990 Pro 2 To")} required autoFocus className="sm:col-span-3" />
+        <TextField label={tr("Nom")} name="name" defaultValue={item?.name} placeholder={tr("Samsung 990 Pro 2 To")} required autoFocus className="sm:col-span-2" />
+        <TextField
+          label={tr("ID homelab")}
+          name="hl_id"
+          defaultValue={item?.hl_id}
+          placeholder={tr("Automatique")}
+          hint={item ? undefined : tr("Vide : numéro suivant (HL-…)")}
+          className="font-mono"
+          autoComplete="off"
+        />
         <SelectField
           label={tr("Catégorie")}
           name="category"
@@ -69,8 +103,13 @@ export function HardwareDialog({
           <SelectField
             label={tr("Élément de l'inventaire")}
             name="asset_id"
-            defaultValue={item?.asset_id ?? ""}
+            value={assetId}
+            onChange={(e) => {
+              setAssetId(e.target.value);
+              if (!item && e.target.value) prefill(e.currentTarget.form, Number(e.target.value));
+            }}
             placeholder={tr("— Aucun —")}
+            hint={item ? undefined : tr("Pré-remplit la fiche avec ce que l'inventaire connaît")}
             options={options.assets.map((a) => ({ value: a.id, label: a.display_name }))}
           />
         ) : (
@@ -83,6 +122,14 @@ export function HardwareDialog({
           />
         )}
       </div>
+      {machine && !item && assetId && (
+        <Switch
+          name="import_components"
+          label={tr("Ajouter aussi ses composants")}
+          hint={tr("Processeur, RAM, disques, GPU et cartes réseau connus de l'inventaire, installés dans cette machine")}
+          defaultChecked
+        />
+      )}
       <div className="grid gap-5 sm:grid-cols-3">
         <TextField label={tr("Marque")} name="brand" defaultValue={item?.brand} placeholder="Samsung" />
         <TextField label={tr("Modèle")} name="model" defaultValue={item?.model} placeholder="MZ-V9P2T0BW" />

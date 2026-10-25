@@ -84,6 +84,7 @@ func (s *Server) mgRoutes(mux *http.ServeMux) {
 	h("GET /api/mg/tasks", s.mgListTasks)
 	h("POST /api/mg/tasks", s.mgSaveTask)
 	h("POST /api/mg/tasks/clear-done", s.mgClearDoneTasks)
+	h("POST /api/mg/tasks/sync", s.mgSyncTasks)
 	h("POST /api/mg/tasks/{id}", s.mgSaveTask)
 	h("DELETE /api/mg/tasks/{id}", s.mgDelete("tasks", "task", "title", "Suppression de la tâche « %s »"))
 	h("POST /api/mg/tasks/{id}/move", s.mgMoveTask)

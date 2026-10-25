@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FilterBar } from "@/components/filter-bar";
 import { TaskBoard } from "@/features/tasks/task-board";
 import { TaskDialog } from "@/features/tasks/task-dialog";
+import { TaskSync } from "@/features/tasks/task-sync";
+import { listIntegrations } from "@/lib/data/integrations";
 import { Archive } from "lucide-react";
 import { getT } from "@/i18n/server";
 
@@ -34,6 +36,7 @@ function Board({ searchParams }: { searchParams: PageProps<"/[lang]/taches">["se
   const tag = typeof sp.tag === "string" ? sp.tag : undefined;
   const tasks = use(listTasks({ q, tag }));
   const counts = use(taskCounts());
+  const synced = use(listIntegrations("nextcloud", true)).length > 0;
   const options = {
     assets: use(assetOptions()).map((a) => ({ id: a.id, display_name: a.display_name })),
     deployments: use(deploymentOptions()),
@@ -60,6 +63,7 @@ function Board({ searchParams }: { searchParams: PageProps<"/[lang]/taches">["se
             >
               {tr("Archiver terminées")}</ConfirmButton>
           )}
+          {synced && <TaskSync />}
           <TaskDialog options={options} />
         </div>
       </div>
