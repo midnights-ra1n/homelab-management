@@ -15,22 +15,24 @@ import {
   type DeploymentKind,
 } from "@/lib/constants";
 import type { AssetOption } from "@/lib/data/assets";
+import type { HardwareItem } from "@/lib/data/hardware";
 import type { getDeployment } from "@/lib/data/deployments";
 import { cn } from "@/lib/utils";
 import { STEP_TEMPLATES } from "./templates";
+import { KIND_FIELDS } from "./kind-fields";
 import { useT } from "@/i18n/client";
 
 type Step = { label: string; done: boolean };
 
 export function DeploymentForm({
   deployment,
-  hosts,
   assets,
+  hardware,
   subnets,
 }: {
   deployment?: NonNullable<Awaited<ReturnType<typeof getDeployment>>>;
-  hosts: AssetOption[];
   assets: AssetOption[];
+  hardware: HardwareItem[];
   subnets: { id: number; name: string; cidr: string }[];
 }) {
   const tr = useT();
@@ -40,6 +42,11 @@ export function DeploymentForm({
     deployment?.steps.map((s) => ({ label: s.label, done: !!s.done })) ?? [],
   );
   const [draft, setDraft] = useState("");
+  const fields = KIND_FIELDS[kind];
+  const machines = hardware.filter((h) => h.category === "server" || h.category === "pc");
+  // A stock machine gives its memory and storage: the installed RAM and disks, lots included.
+  const total = (m: number, cat: string) =>
+    hardware.filter((h) => h.parent_id === m && h.category === cat).reduce((n, h) => n + (h.capacity_gb ?? 0) * h.quantity, 0);
 
   const addDraft = () => {
     if (!draft.trim()) return;
@@ -113,15 +120,40 @@ export function DeploymentForm({
         </div>
       </Fieldset>
 
-      <Fieldset legend={tr("Cible & ressources prévues")} description={tr("Où sera déployé l'élément et ce qu'il consommera.")}>
+      <Fieldset legend={tr("Cible & ressources prévues")} description={tr(fields.help)}>
         <div className="grid gap-5 md:grid-cols-3">
-          <SelectField
-            label={tr("Hôte / nœud cible")}
-            name="target_host_id"
-            defaultValue={deployment?.target_host_id ?? ""}
-            placeholder={tr("— À définir —")}
-            options={hosts.map((h) => ({ value: h.id, label: `${h.display_name} · ${tr(ASSET_KIND_META[h.kind].label)}` }))}
-          />
+          {fields.stock && (
+            <SelectField
+              key="stock"
+              label={tr("Machine du stock")}
+              name="hardware_id"
+              defaultValue={deployment?.hardware_id ?? ""}
+              placeholder={tr("— À choisir —")}
+              options={machines.map((m) => ({ value: m.id, label: `${m.name} · ${m.hl_id}` }))}
+              hint={machines.length ? undefined : tr("Aucun serveur ni PC dans le stock matériel")}
+              onChange={(e) => {
+                const m = Number(e.target.value);
+                const form = e.currentTarget.form;
+                if (!m || !form) return;
+                for (const [name, v] of [["planned_ram_gb", total(m, "ram")], ["planned_disk_gb", total(m, "disk")]] as const) {
+                  const el = form.elements.namedItem(name) as HTMLInputElement | null;
+                  if (el && v) el.value = String(v);
+                }
+              }}
+            />
+          )}
+          {fields.host && (
+            <SelectField
+              key={kind}
+              label={tr(fields.host.label)}
+              name="target_host_id"
+              defaultValue={deployment?.target_host_id ?? ""}
+              placeholder={tr("— À définir —")}
+              options={assets
+                .filter((h) => fields.host!.kinds.includes(h.kind))
+                .map((h) => ({ value: h.id, label: `${h.display_name} · ${tr(ASSET_KIND_META[h.kind].label)}` }))}
+            />
+          )}
           <SelectField
             label={tr("Sous-réseau")}
             name="subnet_id"
@@ -129,19 +161,25 @@ export function DeploymentForm({
             placeholder="—"
             options={subnets.map((s) => ({ value: s.id, label: `${s.name} · ${s.cidr}` }))}
           />
-          <TextField
-            label={tr("ID (VMID)")}
-            name="vmid"
-            type="number"
-            min={1}
-            defaultValue={deployment?.vmid ?? ""}
-            placeholder="3103"
-            className="font-mono"
-          />
+          {fields.id && (
+            <TextField
+              label={tr(fields.id)}
+              name="vmid"
+              type="number"
+              min={1}
+              defaultValue={deployment?.vmid ?? ""}
+              placeholder="3103"
+              className="font-mono"
+            />
+          )}
           <TextField label={tr("IP prévue")} name="planned_ip" defaultValue={deployment?.planned_ip} placeholder="192.168.10.50" className="font-mono" />
-          <TextField label={tr("vCPU / cœurs")} name="planned_cpu" type="number" min={1} defaultValue={deployment?.planned_cpu ?? ""} />
-          <TextField label={tr("Mémoire (Go)")} name="planned_ram_gb" type="number" min={0} step="0.5" defaultValue={deployment?.planned_ram_gb ?? ""} />
-          <TextField label={tr("Disque (Go)")} name="planned_disk_gb" type="number" min={0} defaultValue={deployment?.planned_disk_gb ?? ""} />
+          {fields.cpu && (
+            <>
+              <TextField label={tr(fields.cpu)} name="planned_cpu" type="number" min={1} defaultValue={deployment?.planned_cpu ?? ""} />
+              <TextField label={tr("Mémoire (Go)")} name="planned_ram_gb" type="number" min={0} step="0.5" defaultValue={deployment?.planned_ram_gb ?? ""} />
+              <TextField label={tr(fields.disk!)} name="planned_disk_gb" type="number" min={0} defaultValue={deployment?.planned_disk_gb ?? ""} />
+            </>
+          )}
           <SelectField
             label={tr("Élément d'inventaire lié")}
             name="asset_id"

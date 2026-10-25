@@ -433,7 +433,48 @@ var mgMigrations = []string{
   CREATE UNIQUE INDEX hardware_hl_id ON hardware_items(hl_id COLLATE NOCASE) WHERE hl_id != '';
 	`,
 	caldavMigration,
+	hardwareNetworkMigration,
 }
+
+// hardwareNetworkMigration adds network equipment to the stock (rebuilding hardware_items for its
+// CHECK) and links a physical deployment to the stock machine it will run on.
+const hardwareNetworkMigration = `
+  CREATE TABLE hardware_items_new (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name           TEXT NOT NULL,
+    category       TEXT NOT NULL CHECK (category IN ('server','pc','router','wifi_router','switch','ap','cpu','ram','disk','motherboard','gpu','psu','nic','case','cooling','other')),
+    status         TEXT NOT NULL DEFAULT 'stock' CHECK (status IN ('in_use','stock','ordered','repair','faulty','retired')),
+    brand          TEXT NOT NULL DEFAULT '',
+    model          TEXT NOT NULL DEFAULT '',
+    serial_number  TEXT NOT NULL DEFAULT '',
+    specs          TEXT NOT NULL DEFAULT '',
+    capacity_gb    REAL,
+    parent_id      INTEGER REFERENCES hardware_items(id) ON DELETE SET NULL,
+    asset_id       INTEGER REFERENCES assets(id) ON DELETE SET NULL,
+    location       TEXT NOT NULL DEFAULT '',
+    vendor         TEXT NOT NULL DEFAULT '',
+    purchase_date  TEXT,
+    purchase_price REAL,
+    warranty_until TEXT,
+    notes          TEXT NOT NULL DEFAULT '',
+    tags           TEXT NOT NULL DEFAULT '[]',
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    quantity       INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 1),
+    hl_id          TEXT NOT NULL DEFAULT ''
+  );
+  INSERT INTO hardware_items_new (id, name, category, status, brand, model, serial_number, specs, capacity_gb, parent_id,
+    asset_id, location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, created_at, updated_at, quantity, hl_id)
+  SELECT id, name, category, status, brand, model, serial_number, specs, capacity_gb, parent_id,
+    asset_id, location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, created_at, updated_at, quantity, hl_id
+  FROM hardware_items;
+  DROP TABLE hardware_items;
+  ALTER TABLE hardware_items_new RENAME TO hardware_items;
+  CREATE INDEX hardware_parent ON hardware_items(parent_id);
+  CREATE UNIQUE INDEX hardware_hl_id ON hardware_items(hl_id COLLATE NOCASE) WHERE hl_id != '';
+
+  ALTER TABLE deployments ADD COLUMN hardware_id INTEGER REFERENCES hardware_items(id) ON DELETE SET NULL;
+`
 
 // caldavMigration adds the Nextcloud integration type (rebuilding integrations for its CHECK) and
 // the CalDAV link of each task. caldav_dirty counts local edits not yet sent; a deleted linked

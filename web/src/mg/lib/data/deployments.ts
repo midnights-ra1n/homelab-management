@@ -17,6 +17,10 @@ export type Deployment = {
   target_host_name: string | null;
   asset_id: number | null;
   asset_name: string | null;
+  /** Machine du stock (déploiement physique). */
+  hardware_id: number | null;
+  hardware_name: string | null;
+  hardware_hl_id: string | null;
   planned_cpu: number | null;
   planned_ram_gb: number | null;
   planned_disk_gb: number | null;

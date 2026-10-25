@@ -32,7 +32,7 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
                 <Link href={`/deploiements/${d.id}`} className="min-w-0">
                   <span className="block truncate font-medium text-h1">{d.title}</span>
                   <span className="mt-0.5 block truncate font-mono text-xs text-meta">
-                    {[tr(DEPLOYMENT_KIND_META[d.kind].label), d.target_host_name, d.vmid].filter(Boolean).join(" · ")}
+                    {[tr(DEPLOYMENT_KIND_META[d.kind].label), d.target_host_name ?? d.hardware_name, d.vmid].filter(Boolean).join(" · ")}
                   </span>
                 </Link>
                 <ButtonLink
@@ -104,7 +104,7 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
                         {d.target_host_name}
                       </Link>
                     ) : (
-                      <span className="text-meta">—</span>
+                      <span className={d.hardware_name ? undefined : "text-meta"}>{d.hardware_name ?? "—"}</span>
                     )}
                   </td>
                   <td className="px-3 py-3 font-mono text-h2">{d.vmid ?? <span className="text-meta">—</span>}</td>

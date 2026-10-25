@@ -208,14 +208,18 @@ export const FW_PROTOCOLS = ["any", "tcp", "udp", "icmp"] as const;
 export type FwProtocol = (typeof FW_PROTOCOLS)[number];
 export const FW_PROTOCOL_LABEL: Record<FwProtocol, string> = { any: "Tous", tcp: "TCP", udp: "UDP", icmp: "ICMP (ping)" };
 
-export const HARDWARE_CATEGORIES = ["server", "pc", "cpu", "ram", "disk", "motherboard", "gpu", "psu", "nic", "case", "cooling", "other"] as const;
+export const HARDWARE_CATEGORIES = ["server", "pc", "router", "wifi_router", "switch", "ap", "cpu", "ram", "disk", "motherboard", "gpu", "psu", "nic", "case", "cooling", "other"] as const;
 export type HardwareCategory = (typeof HARDWARE_CATEGORIES)[number];
-/** Catégories qui reçoivent des composants. */
-export const HARDWARE_MACHINES: HardwareCategory[] = ["server", "pc"];
+/** Équipements : se lient à un élément de l'inventaire et reçoivent des composants. */
+export const HARDWARE_MACHINES: HardwareCategory[] = ["server", "pc", "router", "wifi_router", "switch", "ap"];
 
 export const HARDWARE_CATEGORY_META: Record<HardwareCategory, { label: string; plural: string }> = {
   server: { label: "Serveur", plural: "Serveurs" },
   pc: { label: "PC", plural: "PC" },
+  router: { label: "Routeur", plural: "Routeurs" },
+  wifi_router: { label: "Routeur Wi-Fi", plural: "Routeurs Wi-Fi" },
+  switch: { label: "Switch", plural: "Switchs" },
+  ap: { label: "Borne Wi-Fi", plural: "Bornes Wi-Fi" },
   cpu: { label: "Processeur", plural: "Processeurs" },
   ram: { label: "Mémoire RAM", plural: "Mémoire" },
   disk: { label: "Disque", plural: "Disques" },

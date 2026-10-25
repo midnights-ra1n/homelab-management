@@ -8,7 +8,7 @@ import { useT } from "@/i18n/client";
 
 const GLYPH = { error: "✕", warning: "!", info: "✓" } as const;
 
-/** Vérifie une IP pendant la saisie : doublon, plage DHCP, passerelle, réseau/broadcast… */
+/** Vérifie une IP pendant la saisie : doublon, passerelle, réseau/broadcast… */
 export function IpHint({
   address,
   subnetId,

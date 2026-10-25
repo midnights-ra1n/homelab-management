@@ -164,13 +164,6 @@ export function checkIp(
   if (subnet.gateway && subnet.gateway === ip) {
     issues.push({ level: "warning", code: "gateway", message: `C'est la passerelle de « ${subnet.name} »` });
   }
-  if (subnet.dhcp_start && subnet.dhcp_end && ipInRange(ip, subnet.dhcp_start, subnet.dhcp_end)) {
-    issues.push({
-      level: "warning",
-      code: "dhcp",
-      message: `Dans la plage DHCP (${subnet.dhcp_start} → ${subnet.dhcp_end}) : risque de conflit de bail`,
-    });
-  }
   if (!issues.length) {
     issues.push({
       level: "info",
@@ -223,9 +216,6 @@ export function diagnose(snap: NetSnapshot): Issue[] {
     if (s) {
       const edge = isNetworkOrBroadcast(s.cidr, ip.address);
       if (edge) out.push({ level: "error", code: "ip-edge", message: `${ip.address}${who} est l'adresse ${edge === "network" ? "réseau" : "de broadcast"}`, href: net(s.id) });
-      if (ip.status !== "dhcp" && s.dhcp_start && s.dhcp_end && ipInRange(ip.address, s.dhcp_start, s.dhcp_end)) {
-        out.push({ level: "warning", code: "ip-dhcp", message: `${ip.address}${who} est fixe mais dans la plage DHCP de « ${s.name} »`, href: net(s.id) });
-      }
       if (s.gateway === ip.address && ip.asset_id) {
         const a = snap.assets.find((x) => x.id === ip.asset_id);
         if (a && a.kind !== "network") {

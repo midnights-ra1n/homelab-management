@@ -1,7 +1,7 @@
 import { use, useTransition } from "react";
 import Link from "next/link";
 import {
-  Box, CircuitBoard, Copy, Cpu, Fan, Gpu, HardDrive, MemoryStick, Monitor, Network, Package, Server, Undo2, Zap, type LucideIcon,
+  Box, CircuitBoard, Copy, Cpu, EthernetPort, Fan, Gpu, HardDrive, MemoryStick, Monitor, Network, Package, RadioTower, Router, Server, Undo2, Wifi, Zap, type LucideIcon,
 } from "lucide-react";
 import { deleteHardwareAction, duplicateHardwareAction, installHardwareAction } from "@/actions/hardware";
 import { ActionButton } from "@/components/ui/action-button";
@@ -12,14 +12,14 @@ import { inputClass } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toaster";
 import { HARDWARE_CATEGORY_META, HARDWARE_MACHINES, HARDWARE_STATUS_META, type HardwareCategory } from "@/lib/constants";
 import { listHardware, type HardwareItem } from "@/lib/data/hardware";
-import { assetOptions } from "@/lib/data/assets";
+import { assetOptions, type Asset } from "@/lib/data/assets";
 import { daysUntil, formatDate, formatGb } from "@/lib/utils";
 import { useT } from "@/i18n/client";
 import { HardwareDialog, type HardwareOptions } from "./hardware-dialog";
 
 export const CATEGORY_ICON: Record<HardwareCategory, LucideIcon> = {
-  server: Server, pc: Monitor, cpu: Cpu, ram: MemoryStick, disk: HardDrive, motherboard: CircuitBoard, gpu: Gpu,
-  psu: Zap, nic: Network, case: Box, cooling: Fan, other: Package,
+  server: Server, pc: Monitor, router: Router, wifi_router: Wifi, switch: Network, ap: RadioTower, cpu: Cpu, ram: MemoryStick, disk: HardDrive, motherboard: CircuitBoard, gpu: Gpu,
+  psu: Zap, nic: EthernetPort, case: Box, cooling: Fan, other: Package,
 };
 
 function StatusBadge({ item }: { item: HardwareItem }) {
@@ -71,7 +71,7 @@ function ItemActions({ item, options }: { item: HardwareItem; options: HardwareO
   );
 }
 
-/** Liste déroulante « Installer un composant » d'une machine : les composants libres du stock. */
+/** Liste déroulante « Installer un composant » d'un équipement : les composants libres du stock. */
 function InstallSelect({ machine, free }: { machine: HardwareItem; free: HardwareItem[] }) {
   const tr = useT();
   const toast = useToast();
@@ -102,7 +102,7 @@ function InstallSelect({ machine, free }: { machine: HardwareItem; free: Hardwar
   );
 }
 
-/** Carte d'une machine : ses composants, leur retrait et l'installation depuis le stock. */
+/** Carte d'un équipement : ses composants, leur retrait et l'installation depuis le stock. */
 export function MachineCard({ machine, parts, free, options }: { machine: HardwareItem; parts: HardwareItem[]; free: HardwareItem[]; options: HardwareOptions }) {
   const tr = useT();
   const Icon = CATEGORY_ICON[machine.category];
@@ -155,7 +155,9 @@ export function MachineCard({ machine, parts, free, options }: { machine: Hardwa
           })}
         </ul>
       ) : (
-        <p className="border-t border-line pt-3 text-sm text-meta">{tr("Aucun composant enregistré.")}</p>
+        (machine.category === "server" || machine.category === "pc") && (
+          <p className="border-t border-line pt-3 text-sm text-meta">{tr("Aucun composant enregistré.")}</p>
+        )
       )}
       <InstallSelect machine={machine} free={free} />
     </Card>
@@ -250,24 +252,31 @@ export function ComponentTable({ items, options }: { items: HardwareItem[]; opti
   );
 }
 
-/** Fiche inventaire : les machines du stock liées à cet élément, avec leurs composants. */
-export function AssetHardware({ assetId, physical }: { assetId: number; physical: boolean }) {
+/** Fiche inventaire : les équipements du stock liés à cet élément, ou de quoi l'y ajouter pré-rempli. */
+export function AssetHardware({ asset }: { asset: Asset }) {
   const tr = useT();
   const all = use(listHardware());
-  const assets = use(assetOptions(["physical"]));
-  const machines = all.filter((h) => h.asset_id === assetId);
-  if (!machines.length) {
-    return physical ? (
-      <Card className="flex items-center justify-between gap-3 p-5 text-sm">
-        <span className="text-meta">{tr("Aucune machine du stock liée.")}</span>
-        <Link href="/stock" className="text-accent-text hover:underline">{tr("Stock matériel")}</Link>
-      </Card>
-    ) : null;
-  }
+  const assets = use(assetOptions(["physical", "network"]));
+  const machines = all.filter((h) => h.asset_id === asset.id);
   const options: HardwareOptions = {
     machines: all.filter((h) => HARDWARE_MACHINES.includes(h.category)).map((h) => ({ id: h.id, name: h.name })),
     assets: assets.map((a) => ({ id: a.id, display_name: a.display_name })),
   };
+  if (!machines.length) {
+    if (asset.kind !== "physical" && asset.kind !== "network") return null;
+    return (
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm">
+        <span className="text-meta">{tr("Pas encore dans le stock matériel.")}</span>
+        <HardwareDialog
+          options={options}
+          asset={asset}
+          defaultCategory={asset.kind === "network" ? "switch" : "server"}
+          label="Ajouter au stock"
+          variant="ghost"
+        />
+      </Card>
+    );
+  }
   const free = all.filter((h) => !HARDWARE_MACHINES.includes(h.category) && h.parent_id == null && h.status !== "retired" && h.status !== "faulty");
   return (
     <>

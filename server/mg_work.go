@@ -25,14 +25,15 @@ var (
 )
 
 const deploymentSelect = `
-  SELECT d.*, h.display_name AS target_host_name, a.display_name AS asset_name,
+  SELECT d.*, h.display_name AS target_host_name, a.display_name AS asset_name, hw.name AS hardware_name, hw.hl_id AS hardware_hl_id,
     s.name AS subnet_name, s.cidr AS subnet_cidr,
     (SELECT COUNT(*) FROM deployment_steps st WHERE st.deployment_id = d.id) AS steps_total,
     (SELECT COUNT(*) FROM deployment_steps st WHERE st.deployment_id = d.id AND st.done = 1) AS steps_done
   FROM deployments d
   LEFT JOIN assets h ON h.id = d.target_host_id
   LEFT JOIN assets a ON a.id = d.asset_id
-  LEFT JOIN subnets s ON s.id = d.subnet_id`
+  LEFT JOIN subnets s ON s.id = d.subnet_id
+  LEFT JOIN hardware_items hw ON hw.id = d.hardware_id`
 
 const deploymentOrder = ` ORDER BY
   CASE d.status WHEN 'blocked' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'testing' THEN 2 WHEN 'preparing' THEN 3
@@ -143,7 +144,7 @@ func deploymentForm(f *form) (map[string]any, []stepIn) {
 	if len(steps) > 64 {
 		f.fail("steps", "64 étapes maximum")
 	}
-	return map[string]any{
+	cols := map[string]any{
 		"title": f.required("title", "Le titre", 160), "kind": f.enum("kind", deploymentKinds...),
 		"status": f.enum("status", deploymentStatuses...), "priority": f.enum("priority", priorities...),
 		"description": f.text("description", 5000), "target_host_id": f.optID("target_host_id"), "asset_id": f.optID("asset_id"),
@@ -152,7 +153,19 @@ func deploymentForm(f *form) (map[string]any, []stepIn) {
 		"subnet_id": f.optID("subnet_id"), "target_date": f.optDate("target_date"), "notes": f.text("notes", 10000),
 		"tags": f.tags("tags"), "vmid": f.optNum("vmid", true, 1, 999999999), "apps": f.text("apps", 2000),
 		"local_fqdn": f.text("local_fqdn", 253), "public_fqdn": f.text("public_fqdn", 253),
-	}, steps
+		"hardware_id": f.optID("hardware_id"),
+	}
+	// Only the fields that make sense for the kind are kept (the form hides the others).
+	switch cols["kind"] {
+	case "physical":
+		cols["target_host_id"], cols["vmid"] = nil, nil
+	case "docker", "application":
+		cols["vmid"], cols["planned_cpu"], cols["planned_ram_gb"], cols["planned_disk_gb"] = nil, nil, nil, nil
+	}
+	if cols["kind"] != "physical" {
+		cols["hardware_id"] = nil
+	}
+	return cols, steps
 }
 
 func (s *Server) mgSaveDeployment(w http.ResponseWriter, r *http.Request) {
@@ -165,6 +178,12 @@ func (s *Server) mgSaveDeployment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cols, steps := deploymentForm(f)
+	if hw, ok := cols["hardware_id"].(int64); ok {
+		var cat string
+		if s.db.QueryRow(`SELECT category FROM hardware_items WHERE id = ?`, hw).Scan(&cat) != nil || !slices.Contains(hardwareMachines, cat) {
+			f.fail("hardware_id", "Choisis un équipement du stock")
+		}
+	}
 	if !f.valid() {
 		formInvalid(w, f)
 		return
@@ -330,10 +349,11 @@ func (s *Server) mgPromoteDeployment(w http.ResponseWriter, r *http.Request) {
 	if apps, _ := d["apps"].(string); apps != "" {
 		cols["notes"] = "Conteneurs / apps : " + apps
 	}
-	if gb, ok := d["planned_disk_gb"].(float64); ok {
-		b, _ := json.Marshal([]map[string]any{{"name": "disk0", "type": "virtual", "capacity_gb": gb, "usage": ""}})
-		cols["disks"] = string(b)
-	} else if gb, ok := d["planned_disk_gb"].(int64); ok {
+	hw, _ := d["hardware_id"].(int64)
+	if hw > 0 {
+		s.hardwareAssetCols(hw, cols)
+	}
+	if gb := d["planned_disk_gb"]; gb != nil && cols["disks"] == "[]" { // a stock machine brings its own disks
 		b, _ := json.Marshal([]map[string]any{{"name": "disk0", "type": "virtual", "capacity_gb": gb, "usage": ""}})
 		cols["disks"] = string(b)
 	}
@@ -358,6 +378,9 @@ func (s *Server) mgPromoteDeployment(w http.ResponseWriter, r *http.Request) {
 		tx.Exec(`RELEASE ip`)
 	}
 	tx.Exec(`UPDATE deployments SET asset_id = ?, updated_at = datetime('now') WHERE id = ?`, assetID, id)
+	if hw > 0 {
+		tx.Exec(`UPDATE hardware_items SET asset_id = ?, updated_at = datetime('now') WHERE id = ? AND asset_id IS NULL`, assetID, hw)
+	}
 	if err := tx.Commit(); err != nil {
 		serverErr(w, err)
 		return
@@ -534,4 +557,59 @@ func (s *Server) mgClearDoneTasks(w http.ResponseWriter, r *http.Request) {
 		logSkip(r)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// hardwareAssetCols fills an inventory item from a stock machine: its identity and the
+// components installed in it (processor, RAM, disks), over the planned resources.
+func (s *Server) hardwareAssetCols(hw int64, cols map[string]any) {
+	var brand, model, serial, location string
+	if s.db.QueryRow(`SELECT brand, model, serial_number, location FROM hardware_items WHERE id = ?`, hw).Scan(&brand, &model, &serial, &location) != nil {
+		return
+	}
+	cols["manufacturer"], cols["model"], cols["serial_number"], cols["location"] = brand, model, serial, location
+	rows, err := s.db.Query(`SELECT name, category, specs, capacity_gb, quantity FROM hardware_items WHERE parent_id = ? ORDER BY id`, hw)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	var ram float64
+	var disks []map[string]any
+	for rows.Next() {
+		var name, cat, specs string
+		var gb sql.NullFloat64
+		var qty int64
+		if rows.Scan(&name, &cat, &specs, &gb, &qty) != nil {
+			continue
+		}
+		switch cat {
+		case "cpu":
+			cols["cpu_model"], cols["cpu_sockets"] = name, qty
+		case "ram":
+			ram += gb.Float64 * float64(qty)
+		case "disk":
+			typ := "other"
+			if i := slices.IndexFunc(diskTypes, func(t string) bool { return strings.Contains(strings.ToLower(specs), t) }); i >= 0 {
+				typ = diskTypes[i]
+			}
+			for range qty {
+				disks = append(disks, map[string]any{"name": name, "type": typ, "capacity_gb": nilIfNull(gb), "usage": ""})
+			}
+		case "gpu":
+			cols["gpu"] = name
+		}
+	}
+	if ram > 0 {
+		cols["ram_gb"] = ram
+	}
+	if len(disks) > 0 {
+		b, _ := json.Marshal(disks)
+		cols["disks"] = string(b)
+	}
+}
+
+func nilIfNull(v sql.NullFloat64) any {
+	if !v.Valid {
+		return nil
+	}
+	return v.Float64
 }

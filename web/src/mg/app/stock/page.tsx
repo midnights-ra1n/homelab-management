@@ -25,7 +25,7 @@ export default function StockPage({ searchParams }: PageProps<"/[lang]/stock">) 
     <>
       <PageHeader
         title={tr("Stock matériel")}
-        description={tr("Serveurs, PC et composants : ce qui est installé où, ce qui attend en stock et ce qui est en panne.")}
+        description={tr("Serveurs, PC, matériel réseau et composants : ce qui est installé où, ce qui attend en stock et ce qui est en panne.")}
       />
       <Suspense fallback={<Skeleton className="h-[28rem] rounded-3xl" />}>
         <Stock searchParams={searchParams} />
@@ -42,7 +42,7 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
   const all = use(listHardware());
   const options = {
     machines: all.filter((h) => HARDWARE_MACHINES.includes(h.category)).map((h) => ({ id: h.id, name: h.name })),
-    assets: use(assetOptions(["physical"])).map((a) => ({ id: a.id, display_name: a.display_name })),
+    assets: use(assetOptions(["physical", "network"])).map((a) => ({ id: a.id, display_name: a.display_name })),
   };
 
   const matches = (h: (typeof all)[number]) =>
@@ -69,7 +69,7 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
       <EmptyState
         icon={<Warehouse size={18} />}
         title={tr("Le stock est vide")}
-        action={<HardwareDialog options={options} defaultCategory="server" label="Ajouter une machine" />}
+        action={<HardwareDialog options={options} defaultCategory="server" label="Ajouter un équipement" />}
       >
         {tr("Commence par un serveur ou un PC, puis ajoute ses composants : processeur, RAM, disques…")}
       </EmptyState>
@@ -83,9 +83,9 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
           label={tr("Matériel")}
           value={pieces(all)}
           icon={<Package size={16} />}
-          detail={value > 0 ? tr("{v} € d'achats", { v: value.toLocaleString(tr.locale, { maximumFractionDigits: 0 }) }) : tr("{n} machine(s)", { n: options.machines.length })}
+          detail={value > 0 ? tr("{v} € d'achats", { v: value.toLocaleString(tr.locale, { maximumFractionDigits: 0 }) }) : tr("{n} équipement(s)", { n: options.machines.length })}
         />
-        <Stat label={tr("En service")} value={count("in_use")} icon={<CheckCircle2 size={16} />} tone="green" detail={tr("{n} machine(s)", { n: options.machines.length })} />
+        <Stat label={tr("En service")} value={count("in_use")} icon={<CheckCircle2 size={16} />} tone="green" detail={tr("{n} équipement(s)", { n: options.machines.length })} />
         <Stat
           label={tr("En stock")}
           value={count("stock")}
@@ -115,8 +115,8 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
 
       {machines.length > 0 && (
         <section>
-          <SectionTitle actions={<HardwareDialog options={options} defaultCategory="server" label="Ajouter une machine" variant="ghost" />}>
-            {tr("Machines")}
+          <SectionTitle actions={<HardwareDialog options={options} defaultCategory="server" label="Ajouter un équipement" variant="ghost" />}>
+            {tr("Équipements")}
           </SectionTitle>
           <div className="grid gap-[var(--mm-grid-gap)] md:grid-cols-2 xl:grid-cols-3">
             {machines.map((m) => (
@@ -132,7 +132,7 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
           <ComponentTable items={components} options={options} />
         ) : (
           <EmptyState icon={<Package size={18} />} title={tr("Aucun composant")}>
-            {q || category || status ? tr("Rien ne correspond aux filtres.") : tr("Ajoute des processeurs, barrettes de RAM, disques… puis installe-les dans une machine.")}
+            {q || category || status ? tr("Rien ne correspond aux filtres.") : tr("Ajoute des processeurs, barrettes de RAM, disques… puis installe-les dans un équipement.")}
           </EmptyState>
         )}
       </section>

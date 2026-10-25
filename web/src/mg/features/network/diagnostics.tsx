@@ -20,7 +20,7 @@ export function Diagnostics({ issues }: { issues: Issue[] }) {
         <CheckCircle2 size={28} className="text-green" />
         <p className="mt-3 font-semibold text-h1">{tr("Aucun problème détecté")}</p>
         <p className="mt-1 text-sm text-meta">
-          {tr("Pas de chevauchement de sous-réseaux, de doublon d'adresse ou de MAC, d'IP fixe dans une plage DHCP ni de règle orpheline.")}</p>
+          {tr("Pas de chevauchement de sous-réseaux, de doublon d'adresse ou de MAC ni de règle orpheline.")}</p>
       </div>
     );
   }

@@ -389,7 +389,7 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
 
           {/* Stock matériel */}
           <Suspense fallback={null}>
-            <AssetHardware assetId={id} physical={asset.kind === "physical"} />
+            <AssetHardware asset={asset} />
           </Suspense>
 
           {/* Proxmox */}

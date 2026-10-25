@@ -25,7 +25,7 @@ func TestHardwareStock(t *testing.T) {
 	if status != "in_use" {
 		t.Fatalf("installed component status %q", status)
 	}
-	if out := postForm(t, ts, tok, "/api/mg/hardware/2", url.Values{"name": {"PVE-02"}, "category": {"server"}, "status": {"stock"}, "parent_id": {"1"}}); !strings.Contains(out, "machine ne s'installe") {
+	if out := postForm(t, ts, tok, "/api/mg/hardware/2", url.Values{"name": {"PVE-02"}, "category": {"server"}, "status": {"stock"}, "parent_id": {"1"}}); !strings.Contains(out, "équipement ne s'installe") {
 		t.Fatal("machine in machine accepted:", out)
 	}
 	if out := postForm(t, ts, tok, "/api/mg/hardware/1", url.Values{"name": {"PVE-01"}, "category": {"ram"}, "status": {"in_use"}}); !strings.Contains(out, "Retire d'abord") {
@@ -186,5 +186,37 @@ func TestHardwareHomelabIDAndImport(t *testing.T) {
 	s.db.QueryRow(`SELECT capacity_gb FROM hardware_items WHERE category = 'ram'`).Scan(&ram)
 	if ram != 64 {
 		t.Fatalf("RAM %v", ram)
+	}
+}
+
+// A physical deployment runs on a stock machine: promoting it creates the inventory item from the
+// machine's components and links the machine to it; fields of other kinds are dropped.
+func TestPhysicalDeploymentFromStock(t *testing.T) {
+	s, ts, tok := newMgTestServer(t)
+	ok := func(out string) {
+		t.Helper()
+		if !strings.Contains(out, `"ok":true`) {
+			t.Fatal(out)
+		}
+	}
+	ok(postForm(t, ts, tok, "/api/mg/hardware", url.Values{"name": {"R730"}, "category": {"server"}, "status": {"stock"}, "brand": {"Dell"}}))
+	ok(postForm(t, ts, tok, "/api/mg/hardware", url.Values{"name": {"DDR4 32 Go"}, "category": {"ram"}, "status": {"stock"}, "parent_id": {"1"}, "capacity_gb": {"32"}, "quantity": {"2"}}))
+	ok(postForm(t, ts, tok, "/api/mg/hardware", url.Values{"name": {"Switch 24p"}, "category": {"switch"}, "status": {"stock"}}))
+	postForm(t, ts, tok, "/api/mg/deployments", url.Values{"title": {"pve-02"}, "kind": {"physical"}, "status": {"done"}, "priority": {"medium"},
+		"hardware_id": {"1"}, "vmid": {"100"}, "steps": {"[]"}})
+	var vmid any
+	var hw int64
+	s.db.QueryRow(`SELECT vmid, hardware_id FROM deployments WHERE id = 1`).Scan(&vmid, &hw)
+	if vmid != nil || hw != 1 {
+		t.Fatalf("physical deployment: vmid %v, hardware %d", vmid, hw)
+	}
+	postForm(t, ts, tok, "/api/mg/deployments/1/promote", url.Values{})
+	var ram float64
+	var maker string
+	var linked int64
+	s.db.QueryRow(`SELECT ram_gb, manufacturer FROM assets WHERE display_name = 'pve-02'`).Scan(&ram, &maker)
+	s.db.QueryRow(`SELECT asset_id FROM hardware_items WHERE id = 1`).Scan(&linked)
+	if ram != 64 || maker != "Dell" || linked == 0 {
+		t.Fatalf("promoted: ram %v, maker %q, machine linked to %d", ram, maker, linked)
 	}
 }

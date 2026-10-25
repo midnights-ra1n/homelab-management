@@ -15,6 +15,7 @@ import { Meter } from "@/components/ui/meter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checklist } from "@/features/deployments/checklist";
 import { StatusSwitcher } from "@/features/deployments/status-switcher";
+import { KIND_FIELDS } from "@/features/deployments/kind-fields";
 import { TaskDialog } from "@/features/tasks/task-dialog";
 import { cn, formatDate, formatDateTime, isOverdue, pct, timeAgo } from "@/lib/utils";
 import { getT } from "@/i18n/server";
@@ -41,6 +42,7 @@ function Detail({ params }: { params: PageProps<"/[lang]/deploiements/[id]">["pa
   const id = Number((use(params)).id);
   const d = use(getDeployment(id));
   if (!d) notFound();
+  const fields = KIND_FIELDS[d.kind];
   const tasks = use(listTasks({ deployment: id }));
   const progress = pct(d.steps_done, d.steps_total);
   const late = d.status !== "done" && d.status !== "cancelled" && isOverdue(d.target_date);
@@ -157,22 +159,40 @@ function Detail({ params }: { params: PageProps<"/[lang]/deploiements/[id]">["pa
 
         <div className="grid min-w-0 content-start gap-6">
           <Card>
-            <CardHeader overline={tr("Cible")} title={d.target_host_name ?? tr("Hôte à définir")} />
+            <CardHeader
+              overline={tr("Cible")}
+              title={(fields.stock ? d.hardware_name : d.target_host_name) ?? tr(fields.stock ? "Machine à choisir" : "Hôte à définir")}
+            />
             <CardBody>
               <dl>
-                {d.target_host_id && (
-                  <Row label={tr("Hôte")}>
+                {fields.stock && d.hardware_id && (
+                  <Row label={tr("Machine du stock")}>
+                    <Link href={`/stock?q=${encodeURIComponent(d.hardware_hl_id ?? "")}`} className="hover:text-accent-text">
+                      {d.hardware_name} <span className="font-mono text-meta">{d.hardware_hl_id}</span>
+                    </Link>
+                  </Row>
+                )}
+                {fields.host && d.target_host_id && (
+                  <Row label={tr(fields.host.label)}>
                     <Link href={`/inventaire/${d.target_host_id}`} className="hover:text-accent-text">
                       {d.target_host_name}
                     </Link>
                   </Row>
                 )}
-                <Row label={tr("ID (VMID)")}>
-                  <span className="font-mono">{d.vmid ?? "—"}</span>
-                </Row>
-                <Row label={tr("vCPU / cœurs")}>{d.planned_cpu ?? "—"}</Row>
-                <Row label={tr("Mémoire")}>{d.planned_ram_gb ? tr("{planned_ram_gb} Go", { planned_ram_gb: d.planned_ram_gb }) : "—"}</Row>
-                <Row label={tr("Disque")}>{d.planned_disk_gb ? tr("{planned_disk_gb} Go", { planned_disk_gb: d.planned_disk_gb }) : "—"}</Row>
+                {fields.id && (
+                  <Row label={tr(fields.id)}>
+                    <span className="font-mono">{d.vmid ?? "—"}</span>
+                  </Row>
+                )}
+                {fields.cpu ? (
+                  <>
+                    <Row label={tr(fields.cpu)}>{d.planned_cpu ?? "—"}</Row>
+                    <Row label={tr("Mémoire")}>{d.planned_ram_gb ? tr("{planned_ram_gb} Go", { planned_ram_gb: d.planned_ram_gb }) : "—"}</Row>
+                    <Row label={tr(fields.disk!.replace(" (Go)", ""))}>{d.planned_disk_gb ? tr("{planned_disk_gb} Go", { planned_disk_gb: d.planned_disk_gb }) : "—"}</Row>
+                  </>
+                ) : (
+                  <Row label={tr("Ressources")}>{tr("Celles de l'hôte")}</Row>
+                )}
                 <Row label={tr("IP prévue")}>
                   <span className="font-mono">{d.planned_ip || "—"}</span>
                 </Row>
@@ -206,7 +226,7 @@ function Detail({ params }: { params: PageProps<"/[lang]/deploiements/[id]">["pa
               ) : (
                 <form action={promoteDeploymentAction.bind(null, id)}>
                   <p className="mb-4 text-sm text-body">
-                    {tr("Crée l'élément d'inventaire à partir des ressources prévues (IP réservée dans l'IPAM).")}</p>
+                    {tr(fields.stock && d.hardware_id ? "Crée l'élément d'inventaire à partir de la machine du stock (identité, processeur, RAM, disques) et l'y relie ; IP réservée dans l'IPAM." : "Crée l'élément d'inventaire à partir des ressources prévues (IP réservée dans l'IPAM).")}</p>
                   <Button type="submit" variant="primary" className="w-full" icon={<PackagePlus size={15} />}>
                     {tr("Créer dans l'inventaire")}</Button>
                 </form>

@@ -16,9 +16,10 @@ import (
 )
 
 var (
-	hardwareCategories = []string{"server", "pc", "cpu", "ram", "disk", "motherboard", "gpu", "psu", "nic", "case", "cooling", "other"}
-	hardwareMachines   = []string{"server", "pc"}
-	hardwareStatuses   = []string{"in_use", "stock", "ordered", "repair", "faulty", "retired"}
+	hardwareCategories = []string{"server", "pc", "router", "wifi_router", "switch", "ap", "cpu", "ram", "disk", "motherboard", "gpu", "psu", "nic", "case", "cooling", "other"}
+	// Equipment: linked to an inventory item, receives components.
+	hardwareMachines = []string{"server", "pc", "router", "wifi_router", "switch", "ap"}
+	hardwareStatuses = []string{"in_use", "stock", "ordered", "repair", "faulty", "retired"}
 )
 
 const hardwareSelect = `
@@ -47,11 +48,11 @@ func (s *Server) mgListHardware(w http.ResponseWriter, r *http.Request) {
 // hardwareParentError checks that item id (of the given category) can go into machine parent.
 func hardwareParentError(q execer, id int64, category string, parent int64) string {
 	if slices.Contains(hardwareMachines, category) {
-		return "Une machine ne s'installe pas dans une autre"
+		return "Un équipement ne s'installe pas dans un autre"
 	}
 	var pc string
 	if parent == id || q.QueryRow(`SELECT category FROM hardware_items WHERE id = ?`, parent).Scan(&pc) != nil || !slices.Contains(hardwareMachines, pc) {
-		return "Choisis un serveur ou un PC du stock"
+		return "Choisis un équipement du stock"
 	}
 	return ""
 }

@@ -38,9 +38,9 @@ export function DeploymentCard({ d }: { d: Deployment }) {
         )}
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-meta">
           {d.priority !== "medium" && <Badge tone={PRIORITY_META[d.priority].tone}>{tr(PRIORITY_META[d.priority].label)}</Badge>}
-          {d.target_host_name && (
+          {(d.target_host_name ?? d.hardware_name) && (
             <span className="flex items-center gap-1.5">
-              <Server size={13} aria-hidden="true" /> {d.target_host_name}
+              <Server size={13} aria-hidden="true" /> {d.target_host_name ?? d.hardware_name}
             </span>
           )}
           {d.target_date && (
