@@ -6,10 +6,13 @@ import { Field, inputClass, SelectField, Switch, TextAreaField, TextField } from
 import {
   HARDWARE_CATEGORIES,
   HARDWARE_CATEGORY_META,
+  HARDWARE_CONDITIONS,
+  HARDWARE_CONDITION_META,
   HARDWARE_MACHINES,
   HARDWARE_STATUSES,
   HARDWARE_STATUS_META,
   type HardwareCategory,
+  type HardwareCondition,
 } from "@/lib/constants";
 import type { HardwareItem } from "@/lib/data/hardware";
 import { getAsset, type Asset } from "@/lib/data/assets";
@@ -72,6 +75,7 @@ export function HardwareDialog({
   const tr = useT();
   const [category, setCategory] = useState<HardwareCategory>(item?.category ?? defaultCategory);
   const [assetId, setAssetId] = useState(String(item?.asset_id ?? asset?.id ?? ""));
+  const [condition, setCondition] = useState<HardwareCondition>(item?.condition ?? "ok");
   const machine = HARDWARE_MACHINES.includes(category);
   const seed = !item && asset ? fromAsset(asset) : {};
   const v = (k: keyof HardwareItem) => (item ? (item[k] as string | number | null) ?? "" : (seed[k] ?? ""));
@@ -152,21 +156,28 @@ export function HardwareDialog({
         <TextField label={tr("Modèle")} name="model" defaultValue={v("model")} placeholder={machine ? "PowerEdge R730" : "MZ-V9P2T0BW"} />
         <TextField label={tr("N° de série")} name="serial_number" defaultValue={v("serial_number")} className="font-mono" />
       </div>
-      <div className="grid gap-5 sm:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2">
         <SelectField
-          label={tr("État")}
+          label={tr("Statut")}
           name="status"
           defaultValue={v("status") || (defaultParent ? "in_use" : "stock")}
           options={HARDWARE_STATUSES.map((s) => ({ value: s, label: tr(HARDWARE_STATUS_META[s].label) }))}
         />
-        <TextField
-          label={tr("Caractéristiques")}
-          name="specs"
-          defaultValue={v("specs")}
-          placeholder={machine ? tr("2U, 2 × Xeon, 8 baies") : tr("NVMe PCIe 4.0")}
-          className="sm:col-span-2"
+        <SelectField
+          label={tr("État")}
+          name="condition"
+          value={condition}
+          onChange={(e) => setCondition(e.target.value as HardwareCondition)}
+          options={HARDWARE_CONDITIONS.map((c) => ({ value: c, label: tr(HARDWARE_CONDITION_META[c].label) }))}
+          hint={condition === "warning" ? tr("Décris ce qui est à surveiller dans les notes") : undefined}
         />
       </div>
+      <TextField
+        label={tr("Caractéristiques")}
+        name="specs"
+        defaultValue={v("specs")}
+        placeholder={machine ? tr("2U, 2 × Xeon, 8 baies") : tr("NVMe PCIe 4.0")}
+      />
       {!machine && (
         <div className="grid gap-5 sm:grid-cols-2">
           {sized && (
@@ -191,7 +202,7 @@ export function HardwareDialog({
       )}
 
       {/* 3. Le reste, replié */}
-      <details className="grid gap-5" open={!!(item && (item.vendor || item.purchase_date || item.purchase_price || item.warranty_until || item.notes || item.location))}>
+      <details className="grid gap-5" open={condition === "warning" || !!(item && (item.vendor || item.purchase_date || item.purchase_price || item.warranty_until || item.notes || item.location))}>
         <summary className="cursor-pointer text-sm font-medium text-h2">{tr("Emplacement, achat, garantie et notes")}</summary>
         <div className="mt-5 grid gap-5">
           <div className="grid gap-5 sm:grid-cols-2">
@@ -204,7 +215,7 @@ export function HardwareDialog({
             <TextField label={tr("Fin de garantie")} name="warranty_until" type="date" defaultValue={item?.warranty_until ?? ""} />
           </div>
           <TextField label={tr("Tags")} name="tags" defaultValue={item?.tags.join(", ")} placeholder={tr("nas, occasion")} hint={tr("Séparés par des virgules")} />
-          <TextAreaField label={tr("Notes")} name="notes" defaultValue={item?.notes} rows={3} />
+          <TextAreaField label={tr("Notes")} name="notes" defaultValue={item?.notes} rows={3} required={condition === "warning"} />
         </div>
       </details>
     </FormDialog>

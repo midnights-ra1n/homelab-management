@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { inputClass } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toaster";
-import { HARDWARE_CATEGORY_META, HARDWARE_MACHINES, HARDWARE_STATUS_META, type HardwareCategory } from "@/lib/constants";
+import { HARDWARE_CATEGORY_META, HARDWARE_CONDITION_META, HARDWARE_MACHINES, HARDWARE_STATUS_META, type HardwareCategory } from "@/lib/constants";
 import { listHardware, type HardwareItem } from "@/lib/data/hardware";
 import { assetOptions, type Asset } from "@/lib/data/assets";
 import { daysUntil, formatDate, formatGb } from "@/lib/utils";
@@ -26,6 +26,14 @@ function StatusBadge({ item }: { item: HardwareItem }) {
   const tr = useT();
   const meta = HARDWARE_STATUS_META[item.status];
   return <Badge tone={meta.tone} dot>{tr(meta.label)}</Badge>;
+}
+
+/** État physique, montré seulement s'il y a un souci ; les notes s'affichent au survol. */
+function ConditionBadge({ item }: { item: HardwareItem }) {
+  const tr = useT();
+  if (item.condition === "ok") return null;
+  const meta = HARDWARE_CONDITION_META[item.condition];
+  return <span title={item.notes || undefined}><Badge tone={meta.tone}>{tr(meta.label)}</Badge></span>;
 }
 
 /** Capacité totale (Go) des pièces d'une catégorie, lots compris. */
@@ -121,6 +129,7 @@ export function MachineCard({ machine, parts, free, options }: { machine: Hardwa
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <StatusBadge item={machine} />
+        <ConditionBadge item={machine} />
         <span className="font-mono text-xs text-meta">{machine.hl_id}</span>
         {ram > 0 && <Tag>RAM {formatGb(ram)}</Tag>}
         {disk > 0 && <Tag>{tr("Disques")} {formatGb(disk)}</Tag>}
@@ -143,6 +152,7 @@ export function MachineCard({ machine, parts, free, options }: { machine: Hardwa
                   {details(p) && <span className="text-meta"> · {details(p)}</span>}
                 </span>
                 {p.status !== "in_use" && <StatusBadge item={p} />}
+                <ConditionBadge item={p} />
                 <ActionButton
                   action={() => installHardwareAction(p.id, null)}
                   variant="subtle"
@@ -188,6 +198,7 @@ export function ComponentTable({ items, options }: { items: HardwareItem[]; opti
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-7 text-sm">
                 <StatusBadge item={c} />
+                <ConditionBadge item={c} />
                 {c.parent_name && <span className="text-body">{tr("dans {name}", { name: c.parent_name })}</span>}
                 {c.location && <span className="text-meta">{c.location}</span>}
                 {c.warranty_until && <span className="text-meta">{tr("Garantie")} <Warranty date={c.warranty_until} /></span>}
@@ -208,7 +219,7 @@ export function ComponentTable({ items, options }: { items: HardwareItem[]; opti
             <tr>
               <th>{tr("Composant")}</th>
               <th>{tr("Catégorie")}</th>
-              <th>{tr("État")}</th>
+              <th>{tr("Statut")}</th>
               <th>{tr("Installé dans")}</th>
               <th>{tr("Emplacement")}</th>
               <th>{tr("Garantie")}</th>
@@ -236,7 +247,7 @@ export function ComponentTable({ items, options }: { items: HardwareItem[]; opti
                     </div>
                   </td>
                   <td>{tr(HARDWARE_CATEGORY_META[c.category].label)}</td>
-                  <td><StatusBadge item={c} /></td>
+                  <td><span className="flex flex-wrap gap-1.5"><StatusBadge item={c} /><ConditionBadge item={c} /></span></td>
                   <td>{c.parent_name ?? <span className="text-meta">—</span>}</td>
                   <td>{c.location || <span className="text-meta">—</span>}</td>
                   <td><Warranty date={c.warranty_until} /></td>
@@ -277,7 +288,7 @@ export function AssetHardware({ asset }: { asset: Asset }) {
       </Card>
     );
   }
-  const free = all.filter((h) => !HARDWARE_MACHINES.includes(h.category) && h.parent_id == null && h.status !== "retired" && h.status !== "faulty");
+  const free = all.filter((h) => !HARDWARE_MACHINES.includes(h.category) && h.parent_id == null && h.status !== "retired" && h.status !== "faulty" && h.condition !== "faulty");
   return (
     <>
       {machines.map((m) => (

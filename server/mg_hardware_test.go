@@ -220,3 +220,33 @@ func TestPhysicalDeploymentFromStock(t *testing.T) {
 		t.Fatalf("promoted: ram %v, maker %q, machine linked to %d", ram, maker, linked)
 	}
 }
+
+// The condition defaults to ok, "warning" needs notes, and a copy keeps it.
+func TestHardwareCondition(t *testing.T) {
+	s, ts, tok := newMgTestServer(t)
+	postForm(t, ts, tok, "/api/mg/hardware", url.Values{"name": {"HDD 4 To"}, "category": {"disk"}, "status": {"stock"}})
+	var condition string
+	s.db.QueryRow(`SELECT condition FROM hardware_items WHERE id = 1`).Scan(&condition)
+	if condition != "ok" {
+		t.Fatalf("default condition %q", condition)
+	}
+	if out := postForm(t, ts, tok, "/api/mg/hardware/1", url.Values{"name": {"HDD 4 To"}, "category": {"disk"}, "status": {"stock"}, "condition": {"warning"}}); !strings.Contains(out, "à surveiller") {
+		t.Fatal("warning without notes accepted:", out)
+	}
+	if out := postForm(t, ts, tok, "/api/mg/hardware/1", url.Values{"name": {"HDD 4 To"}, "category": {"disk"}, "status": {"stock"}, "condition": {"broken"}}); strings.Contains(out, `"ok":true`) {
+		t.Fatal("unknown condition accepted:", out)
+	}
+	if out := postForm(t, ts, tok, "/api/mg/hardware/1", url.Values{"name": {"HDD 4 To"}, "category": {"disk"}, "status": {"stock"}, "condition": {"warning"}, "notes": {"Secteurs réalloués"}}); !strings.Contains(out, `"ok":true`) {
+		t.Fatal(out)
+	}
+	req, _ := http.NewRequest("POST", ts.URL+"/api/mg/hardware/1/duplicate", nil)
+	req.Header.Set("Origin", ts.URL)
+	req.AddCookie(&http.Cookie{Name: mgSessionCookie, Value: tok})
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != 204 {
+		t.Fatal("duplicate", err)
+	}
+	s.db.QueryRow(`SELECT condition FROM hardware_items WHERE id = 2`).Scan(&condition)
+	if condition != "warning" {
+		t.Fatalf("copy condition %q", condition)
+	}
+}

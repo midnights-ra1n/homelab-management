@@ -1,6 +1,6 @@
 // Hardware stock: machines and components, with the machine each component is installed in.
 import { get } from "../client";
-import type { HardwareCategory, HardwareStatus } from "../constants";
+import type { HardwareCategory, HardwareCondition, HardwareStatus } from "../constants";
 
 export type HardwareItem = {
   id: number;
@@ -9,6 +9,7 @@ export type HardwareItem = {
   hl_id: string;
   category: HardwareCategory;
   status: HardwareStatus;
+  condition: HardwareCondition;
   brand: string;
   model: string;
   serial_number: string;

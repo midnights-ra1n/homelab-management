@@ -18,8 +18,9 @@ import (
 var (
 	hardwareCategories = []string{"server", "pc", "router", "wifi_router", "switch", "ap", "cpu", "ram", "disk", "motherboard", "gpu", "psu", "nic", "case", "cooling", "other"}
 	// Equipment: linked to an inventory item, receives components.
-	hardwareMachines = []string{"server", "pc", "router", "wifi_router", "switch", "ap"}
-	hardwareStatuses = []string{"in_use", "stock", "ordered", "repair", "faulty", "retired"}
+	hardwareMachines   = []string{"server", "pc", "router", "wifi_router", "switch", "ap"}
+	hardwareStatuses   = []string{"in_use", "stock", "ordered", "repair", "faulty", "retired"}
+	hardwareConditions = []string{"ok", "warning", "faulty"}
 )
 
 const hardwareSelect = `
@@ -100,6 +101,13 @@ func (s *Server) mgSaveHardware(w http.ResponseWriter, r *http.Request) {
 	}
 	if cols["quantity"] == nil {
 		cols["quantity"] = int64(1)
+	}
+	cols["condition"] = "ok" // older clients send no condition
+	if f.raw("condition") != "" {
+		cols["condition"] = f.enum("condition", hardwareConditions...)
+	}
+	if cols["condition"] == "warning" && cols["notes"] == "" {
+		f.fail("notes", "Décris ce qui est à surveiller")
 	}
 	category := cols["category"].(string)
 	if parent, ok := cols["parent_id"].(int64); ok && f.valid() {
@@ -225,9 +233,9 @@ func (s *Server) splitInstall(id, parent int64, status string) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`INSERT INTO hardware_items (name, category, status, brand, model, specs, capacity_gb, parent_id,
+	if _, err := tx.Exec(`INSERT INTO hardware_items (name, category, status, condition, brand, model, specs, capacity_gb, parent_id,
 	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity, hl_id)
-	  SELECT name, category, ?, brand, model, specs, capacity_gb, ?, location, vendor, purchase_date, purchase_price,
+	  SELECT name, category, ?, condition, brand, model, specs, capacity_gb, ?, location, vendor, purchase_date, purchase_price,
 	    warranty_until, notes, tags, 1, `+nextHLIDSQL+` FROM hardware_items WHERE id = ?`, status, parent, id); err != nil {
 		return err
 	}
@@ -282,9 +290,9 @@ func (s *Server) mgDuplicateHardware(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	res, err := s.db.Exec(`INSERT INTO hardware_items (name, category, status, brand, model, specs, capacity_gb,
+	res, err := s.db.Exec(`INSERT INTO hardware_items (name, category, status, condition, brand, model, specs, capacity_gb,
 	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity, hl_id)
-	  SELECT name, category, CASE WHEN status = 'in_use' THEN 'stock' ELSE status END, brand, model, specs, capacity_gb,
+	  SELECT name, category, CASE WHEN status = 'in_use' THEN 'stock' ELSE status END, condition, brand, model, specs, capacity_gb,
 	    location, vendor, purchase_date, purchase_price, warranty_until, notes, tags, quantity, `+nextHLIDSQL+`
 	  FROM hardware_items WHERE id = ?`, id)
 	if err != nil {

@@ -434,6 +434,11 @@ var mgMigrations = []string{
 	`,
 	caldavMigration,
 	hardwareNetworkMigration,
+	// Physical condition of a piece, apart from where it is: ok, warning (see notes) or faulty.
+	`
+  ALTER TABLE hardware_items ADD COLUMN condition TEXT NOT NULL DEFAULT 'ok' CHECK (condition IN ('ok','warning','faulty'));
+  UPDATE hardware_items SET condition = 'faulty' WHERE status = 'faulty';
+	`,
 }
 
 // hardwareNetworkMigration adds network equipment to the stock (rebuilding hardware_items for its

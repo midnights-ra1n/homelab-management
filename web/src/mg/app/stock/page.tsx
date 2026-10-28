@@ -5,6 +5,8 @@ import { assetOptions } from "@/lib/data/assets";
 import {
   HARDWARE_CATEGORIES,
   HARDWARE_CATEGORY_META,
+  HARDWARE_CONDITIONS,
+  HARDWARE_CONDITION_META,
   HARDWARE_MACHINES,
   HARDWARE_STATUSES,
   HARDWARE_STATUS_META,
@@ -38,7 +40,7 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
   const tr = use(getT());
   const sp = use(searchParams);
   const pick = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : "");
-  const [q, category, status] = [pick("q").toLowerCase(), pick("category"), pick("status")];
+  const [q, category, status, condition] = [pick("q").toLowerCase(), pick("category"), pick("status"), pick("condition")];
   const all = use(listHardware());
   const options = {
     machines: all.filter((h) => HARDWARE_MACHINES.includes(h.category)).map((h) => ({ id: h.id, name: h.name })),
@@ -48,12 +50,13 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
   const matches = (h: (typeof all)[number]) =>
     (!category || h.category === category) &&
     (!status || h.status === status) &&
+    (!condition || h.condition === condition) &&
     (!q ||
       [h.hl_id, h.name, h.brand, h.model, h.serial_number, h.specs, h.location, h.parent_name ?? "", ...h.tags].some((v) => v.toLowerCase().includes(q)));
   const isMachine = (h: (typeof all)[number]) => HARDWARE_MACHINES.includes(h.category);
   const machines = all.filter((h) => isMachine(h) && matches(h));
   const components = all.filter((h) => !isMachine(h) && matches(h));
-  const free = all.filter((h) => !isMachine(h) && h.parent_id == null && h.status !== "retired" && h.status !== "faulty");
+  const free = all.filter((h) => !isMachine(h) && h.parent_id == null && h.status !== "retired" && h.status !== "faulty" && h.condition !== "faulty");
 
   // Pieces, not rows: a lot of 4 RAM sticks counts 4.
   const pieces = (list: typeof all) => list.reduce((n, h) => n + h.quantity, 0);
@@ -62,7 +65,8 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
   const stockGb = (c: "ram" | "disk") => totalGb(inStock, c);
   const value = all.reduce((n, h) => n + (h.purchase_price ?? 0) * h.quantity, 0);
   const warrantySoon = all.filter((h) => h.status !== "retired" && h.warranty_until && daysUntil(h.warranty_until) >= 0 && daysUntil(h.warranty_until) <= 30).length;
-  const broken = count("faulty") + count("repair");
+  const broken = pieces(all.filter((h) => h.status === "repair" || h.status === "faulty" || h.condition === "faulty"));
+  const watch = pieces(all.filter((h) => h.condition === "warning" && h.status !== "retired"));
 
   if (!all.length) {
     return (
@@ -94,10 +98,10 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
         />
         <Stat
           label={tr("À surveiller")}
-          value={broken + warrantySoon}
+          value={broken + watch + warrantySoon}
           icon={<AlertTriangle size={16} />}
-          tone={broken ? "red" : warrantySoon ? "yellow" : undefined}
-          detail={tr("{b} en panne ou en réparation · {w} garantie(s) sous 30 j", { b: broken, w: warrantySoon })}
+          tone={broken ? "red" : watch || warrantySoon ? "yellow" : undefined}
+          detail={tr("{b} en panne ou en réparation · {a} à surveiller · {w} garantie(s) sous 30 j", { b: broken, a: watch, w: warrantySoon })}
         />
       </div>
 
@@ -107,7 +111,8 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
           placeholder={tr("ID homelab, nom, marque, modèle, n° de série…")}
           selects={[
             { name: "category", label: tr("Toutes les catégories"), options: HARDWARE_CATEGORIES.map((c) => ({ value: c, label: tr(HARDWARE_CATEGORY_META[c].label) })) },
-            { name: "status", label: tr("Tous les états"), options: HARDWARE_STATUSES.map((s) => ({ value: s, label: tr(HARDWARE_STATUS_META[s].label) })) },
+            { name: "status", label: tr("Tous les statuts"), options: HARDWARE_STATUSES.map((s) => ({ value: s, label: tr(HARDWARE_STATUS_META[s].label) })) },
+            { name: "condition", label: tr("Tous les états"), options: HARDWARE_CONDITIONS.map((c) => ({ value: c, label: tr(HARDWARE_CONDITION_META[c].label) })) },
           ]}
         />
         <HardwareDialog options={options} />
@@ -132,7 +137,7 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
           <ComponentTable items={components} options={options} />
         ) : (
           <EmptyState icon={<Package size={18} />} title={tr("Aucun composant")}>
-            {q || category || status ? tr("Rien ne correspond aux filtres.") : tr("Ajoute des processeurs, barrettes de RAM, disques… puis installe-les dans un équipement.")}
+            {q || category || status || condition ? tr("Rien ne correspond aux filtres.") : tr("Ajoute des processeurs, barrettes de RAM, disques… puis installe-les dans un équipement.")}
           </EmptyState>
         )}
       </section>

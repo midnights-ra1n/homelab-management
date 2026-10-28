@@ -243,3 +243,13 @@ export const HARDWARE_STATUS_META: Record<HardwareStatus, { label: string; tone:
   faulty: { label: "Défectueux", tone: "red" },
   retired: { label: "Retiré", tone: "muted" },
 };
+
+/** État physique de la pièce, indépendant de sa place (en service, en stock…). */
+export const HARDWARE_CONDITIONS = ["ok", "warning", "faulty"] as const;
+export type HardwareCondition = (typeof HARDWARE_CONDITIONS)[number];
+
+export const HARDWARE_CONDITION_META: Record<HardwareCondition, { label: string; tone: Tone }> = {
+  ok: { label: "Opérationnel", tone: "green" },
+  warning: { label: "À surveiller", tone: "yellow" },
+  faulty: { label: "Défectueux", tone: "red" },
+};
