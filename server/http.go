@@ -92,6 +92,7 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/settings", auth(s.handleGetSettings))
 	mux.HandleFunc("PUT /api/settings", auth(s.handlePutSettings))
 	mux.HandleFunc("POST /api/settings/test-email", auth(s.handleTestEmail))
+	mux.HandleFunc("POST /api/settings/test-matrix", auth(s.handleTestMatrix))
 	mux.HandleFunc("POST /api/settings/preview-email", auth(s.handlePreviewEmail))
 	mux.HandleFunc("GET /api/export", auth(s.handleExport))
 	mux.HandleFunc("POST /api/import", auth(s.handleImport))

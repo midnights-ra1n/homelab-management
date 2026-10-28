@@ -168,6 +168,7 @@ var journalLabels = map[string]journalLabel{
 	"PUT /api/monitors/{id}":                jl("monitor", "update", "Sonde modifiée"),
 	"DELETE /api/monitors/{id}":             jl("monitor", "delete", "Sonde supprimée"),
 	"POST /api/settings/test-email":         jl("settings", "test", "E-mail de test envoyé"),
+	"POST /api/settings/test-matrix":        jl("settings", "test", "Message Matrix de test envoyé"),
 	"POST /api/reports/monthly/send":        jl("report", "send", "Rapport mensuel envoyé"),
 	"POST /api/reports/weekly/send":         jl("report", "send", "Rapport hebdomadaire envoyé"),
 	"POST /api/reports/energy/send":         jl("report", "send", "Rapport de consommation envoyé"),

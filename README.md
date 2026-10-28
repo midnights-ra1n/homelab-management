@@ -12,7 +12,7 @@ Dépôt : [midnights-ra1n/homelab-management](https://github.com/midnights-ra1n/
 Gestion et supervision d'un homelab, réunies dans un seul projet issu de la fusion de **homelab-management** et **homelab-monitoring** :
 
 - un **serveur** en Go, un seul binaire avec **deux rôles** déployés séparément :
-  - **monitoring**, en général sur un VPS dédié : les agents s'y connectent, sondes HTTP/TCP/UDP/ping/DNS/SSL/SNMP/TrueNAS rangées par catégories, alertes e-mail groupées (dont SMART et espace disque, seuil réglable), page de statut publique, rapports mensuels et état de santé hebdomadaire facultatif, API ouverte ;
+  - **monitoring**, en général sur un VPS dédié : les agents s'y connectent, sondes HTTP/TCP/UDP/ping/DNS/SSL/SNMP/TrueNAS rangées par catégories, alertes groupées par e-mail et Matrix (dont SMART et espace disque, seuil réglable), page de statut publique, rapports mensuels et état de santé hebdomadaire facultatif, API ouverte ;
   - **gestion**, sur une VM ou un CT : inventaire, IPAM (VLAN, sous-réseaux, VPN, pare-feu, simulation de flux), noms de domaine, déploiements, tâches (Kanban), carte, page d'applications, Proxmox multi-nœuds sans cluster, Webmin ;
 - un **agent** en Rust (binaire statique, `.deb` ou script `curl`), qui alimente à la fois le monitoring et l'inventaire ;
 - deux interfaces **React + Tailwind**, PWA et optimisées mobile, avec le même design (Midnights Classic : mêmes polices, tailles, icônes et composants), mais séparées : chaque rôle a la sienne.

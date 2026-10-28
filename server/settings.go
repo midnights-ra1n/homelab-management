@@ -14,7 +14,7 @@ import (
 )
 
 // settingDefs lists every user-editable setting with its default value.
-// Secrets (smtp_pass, meross_key) are write-only: never sent back to the browser or exported.
+// Secrets (smtp_pass, matrix_token, meross_key) are write-only: never sent back to the browser or exported.
 var settingDefs = map[string]string{
 	"agent_interval_s":        "30",
 	"retention_metrics_days":  "30",
@@ -29,6 +29,10 @@ var settingDefs = map[string]string{
 	"smtp_pass":               "",
 	"smtp_from":               "",
 	"smtp_to":                 "",
+	"matrix_enabled":          "false",
+	"matrix_homeserver":       "",
+	"matrix_token":            "",
+	"matrix_room":             "",
 	"email_subject":           defaultSubject,
 	"email_html":              defaultEmailHTML,
 	"status_enabled":          "false",
@@ -55,7 +59,7 @@ var settingDefs = map[string]string{
 	"db_max_mb":               "0",
 }
 
-var secretSettings = []string{"smtp_pass", "meross_key"}
+var secretSettings = []string{"smtp_pass", "matrix_token", "meross_key"}
 
 func dropSecrets(m map[string]string) {
 	for _, k := range secretSettings {
@@ -141,6 +145,15 @@ func validateSettings(defs, in map[string]string) string {
 			return msg
 		}
 	}
+	if v := strings.TrimSpace(in["matrix_homeserver"]); v != "" {
+		u, err := url.Parse(v)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "" {
+			return "Le serveur Matrix doit ressembler à https://matrix.example.fr"
+		}
+	}
+	if v := in["matrix_room"]; v != "" && (!strings.HasPrefix(v, "!") || strings.ContainsAny(v, " /")) {
+		return "Le salon Matrix doit être un identifiant interne (!abc…:example.fr), visible dans ses paramètres avancés"
+	}
 	if v := strings.TrimSpace(in["agent_hub_url"]); v != "" {
 		u, err := url.Parse(v)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || strings.ContainsAny(v, "'\" \\`$") {
@@ -162,7 +175,7 @@ func validateSettings(defs, in map[string]string) string {
 	if v, ok := in["notify_smart_level"]; ok && v != DiskWatch && v != DiskReplace && v != DiskFailing && v != "off" {
 		return "Le seuil d'alerte SMART doit être watch, replace, failing ou off"
 	}
-	for _, k := range []string{"smtp_enabled", "status_enabled", "api_enabled", "report_monthly_enabled", "report_weekly_enabled", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_node_apps"} {
+	for _, k := range []string{"smtp_enabled", "matrix_enabled", "status_enabled", "api_enabled", "report_monthly_enabled", "report_weekly_enabled", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_node_apps"} {
 		if v, ok := in[k]; ok && v != "true" && v != "false" {
 			return k + " doit valoir true ou false"
 		}

@@ -121,6 +121,25 @@ La page *Énergie* montre la puissance instantanée, la consommation par jour, s
 - alertes supplémentaires : nouvelles mises à jour de sécurité, redémarrage requis, nouvelles images Docker, santé SMART (à partir de *à surveiller*, *à remplacer* ou *défaillant*), espace disque au-delà d'un seuil (90 % par défaut). Chacune n'est signalée qu'une fois ;
 - **modèle d'e-mail** composé par blocs, ou en HTML avancé, avec aperçu.
 
+**Matrix** (*Paramètres → Notifications Matrix*) : mêmes alertes, même regroupement, envoyées dans un salon, sur matrix.org ou sur votre propre serveur (Synapse, Conduit, Dendrite…). Le titre reprend l'objet du modèle d'e-mail. Mise en place :
+
+1. Créez un compte dédié aux alertes (par exemple `@homelab:example.fr`) et connectez-vous-y avec Element.
+2. Créez un salon **non chiffré** (les messages chiffrés ne sont pas pris en charge) et invitez-y votre compte personnel. Pour un salon existant, invitez le compte d'alertes et acceptez l'invitation depuis ce compte : il doit avoir rejoint le salon.
+3. Identifiant du salon : dans Element, *Paramètres du salon → Avancé → Identifiant interne du salon* (`!abc…:example.fr`). Un alias `#salon:example.fr` ne convient pas.
+4. Jeton d'accès : dans Element, *Paramètres → Aide et à propos → Avancé → Jeton d'accès*. Il reste valable tant que la session n'est pas déconnectée ; ne vous déconnectez donc pas d'Element sur cette session, ou créez une session réservée au monitoring :
+
+   ```sh
+   curl -s -X POST https://matrix.example.fr/_matrix/client/v3/login \
+     -H 'Content-Type: application/json' \
+     -d '{"type":"m.login.password","identifier":{"type":"m.id.user","user":"homelab"},"password":"…","initial_device_display_name":"Homelab Tools"}'
+   ```
+
+   La réponse contient `access_token`.
+5. **Serveur** : l'adresse de l'API client de votre nœud, par exemple `https://matrix.example.fr` (pour matrix.org : `https://matrix-client.matrix.org`). Si votre domaine délègue Matrix à un autre hôte, la bonne adresse figure dans `https://example.fr/.well-known/matrix/client` (`m.homeserver.base_url`).
+6. Enregistrez, puis *Envoyer un message de test*. En cas d'échec, le code renvoyé par le serveur s'affiche : `M_FORBIDDEN` signifie en général que le compte n'a pas rejoint le salon, `M_UNKNOWN_TOKEN` que le jeton a été révoqué.
+
+Le jeton n'est jamais renvoyé au navigateur ni exporté. Les rapports restent envoyés par e-mail uniquement.
+
 **Notifications push** vers l'app iOS / macOS : mêmes événements, même regroupement ([guide des applications natives](API-APPLE.md)).
 
 ## Page de statut publique
@@ -139,7 +158,7 @@ La page *Énergie* montre la puissance instantanée, la consommation par jour, s
 | Apparence | thème clair, sombre ou automatique |
 | Collecte et rétention | intervalle des agents ; durée de conservation des mesures (30 j), des résultats de sondes (30 j) et de la disponibilité journalière (365 j) |
 | Base de données | taille, nettoyage, compactage, taille maximale ([détails](../README.md#journaux-base-de-données-mises-à-jour)) |
-| Notifications par e-mail, modèle d'e-mail | voir [Alertes](#alertes) |
+| Notifications par e-mail, notifications Matrix, modèle d'e-mail | voir [Alertes](#alertes) |
 | Page de statut, rapports, prises Meross | voir les sections ci-dessus |
 | API | API publique pour les scripts et outils tiers, jetons, appareils inscrits aux notifications ([API](API.md)) |
 | Sauvegarde & restauration | export / import JSON de la configuration (sondes, réglages, hôtes par nom), sans secrets ; les hôtes importés demandent un nouveau jeton d'agent |

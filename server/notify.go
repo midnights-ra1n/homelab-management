@@ -88,6 +88,11 @@ func (n *Notifier) flush() {
 		return
 	}
 	n.s.push(evs)
+	if n.s.getSetting("matrix_enabled", "false") == "true" {
+		if err := n.s.sendMatrixAlert(evs, ""); err != nil {
+			slog.Error("send alert to Matrix", "err", err, "events", len(evs))
+		}
+	}
 	if n.s.getSetting("smtp_enabled", "false") != "true" {
 		return
 	}

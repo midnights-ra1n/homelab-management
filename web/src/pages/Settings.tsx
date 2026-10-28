@@ -19,7 +19,7 @@ export function SettingsPage({ version }: { version: string }) {
   const [busy, setBusy] = useState<string>();
   const toast = useToast();
 
-  useEffect(() => { api.get<SettingsResp>("/api/settings").then((d) => { setData(d); setDraft({ ...d.settings, smtp_pass: "" }); }, (e) => setError(e.message)); }, []);
+  useEffect(() => { api.get<SettingsResp>("/api/settings").then((d) => { setData(d); setDraft({ ...d.settings, smtp_pass: "", matrix_token: "" }); }, (e) => setError(e.message)); }, []);
   if (!data) return error ? <Alert kind="error" title={error} /> : <Skeleton className="h-[40rem]" />;
 
   const v = (k: string) => draft[k] ?? "";
@@ -32,7 +32,7 @@ export function SettingsPage({ version }: { version: string }) {
       const body = Object.fromEntries(keys.map((k) => [k, draft[k] ?? ""]));
       const d = await api.put<SettingsResp>("/api/settings", body);
       setData(d);
-      setDraft((x) => ({ ...x, ...d.settings, smtp_pass: "" }));
+      setDraft((x) => ({ ...x, ...d.settings, smtp_pass: "", matrix_token: "" }));
       toast("Réglages enregistrés");
     } catch (e) {
       setError((e as Error).message);
@@ -155,6 +155,24 @@ export function SettingsPage({ version }: { version: string }) {
             </Field>
             {input("notify_disk_pct", "Espace disque : seuil d'alerte (%)", { type: "number", min: 0, max: 99 }, "Alerte quand une partition dépasse ce taux d'occupation ; 0 : jamais")}
           </fieldset>
+        </SettingsSection>
+
+        <SettingsSection id="matrix" title="Notifications Matrix"
+          description="Envoie les mêmes alertes regroupées dans un salon Matrix, sur matrix.org ou sur votre propre serveur. Le compte du jeton doit avoir rejoint le salon ; mise en place détaillée dans le guide du monitoring (docs/MONITORING.md, section Alertes)."
+          actions={<>
+            <Button variant="secondary" icon={<Send size={16} />} loading={busy === "testmx"} onClick={async () => {
+              setBusy("testmx");
+              try { await api.post("/api/settings/test-matrix"); toast("Message Matrix de test envoyé"); } catch (e) { setError((e as Error).message); }
+              setBusy(undefined);
+            }}>Envoyer un message de test</Button>
+            <Button loading={busy === "matrix"} onClick={() => save("matrix", ["matrix_enabled", "matrix_homeserver", "matrix_token", "matrix_room"])}>Enregistrer Matrix</Button>
+          </>}>
+          <Switch label="Activer les notifications Matrix" checked={bool("matrix_enabled")} onChange={(c) => setDraft({ ...draft, matrix_enabled: String(c) })} />
+          <div className={FIELD_ROW}>
+            {input("matrix_homeserver", "Serveur (homeserver)", { placeholder: "https://matrix.example.fr" }, "Adresse de l'API client de votre nœud")}
+            {input("matrix_room", "Identifiant du salon", { placeholder: "!abcdef:example.fr" }, "Paramètres du salon › Avancé")}
+          </div>
+          {input("matrix_token", "Jeton d'accès", { type: "password", autoComplete: "new-password", placeholder: data.settings.matrix_token_set === "true" ? "Inchangé" : "" }, "Celui d'un compte dédié aux alertes, de préférence")}
         </SettingsSection>
 
         <section id="email" aria-labelledby="email-title">
