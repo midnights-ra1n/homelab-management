@@ -68,7 +68,7 @@ Il affiche ensuite un bilan (`CT 101 (nextcloud): installed`…). Relancez la m�
 
 Dans un conteneur non privilégié sans *nesting*, systemd ne peut pas toujours mettre en place l'isolation du service (espaces de noms). Le script le détecte et ajoute alors `/etc/systemd/system/hlm-agent.service.d/container.conf`, qui retire ces protections **dans ce conteneur uniquement**.
 
-Désinstaller partout : `curl -fsSL …/uninstall.sh | sudo LXC=all sh` sur le Proxmox.
+Désinstaller : `uninstall.sh` lancé sur le Proxmox retire aussi l'agent des conteneurs LXC démarrés qui l'ont (`LXC=none` pour les garder). Les conteneurs arrêtés ne sont pas touchés.
 
 ## Docker
 
@@ -119,7 +119,7 @@ Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gèr
 curl -fsSL https://raw.githubusercontent.com/midnights-ra1n/homelab-management/stable/agent/uninstall.sh | sudo sh
 ```
 
-Cela retire les services, le timer SMART, le binaire, la configuration, l'état et l'utilisateur `hlm-agent` ; smartmontools reste installé. Supprimez ensuite l'hôte dans le tableau de bord (la commande est rappelée dans la fenêtre de suppression). Avec Ansible : `hlm_agent_state: absent` ([docs/ANSIBLE.md](ANSIBLE.md#6-désinstaller)).
+Cela retire les services, le timer SMART, le binaire, la configuration, l'état et l'utilisateur `hlm-agent` ; smartmontools reste installé. Sur un Proxmox, l'agent est aussi retiré des conteneurs LXC démarrés (`LXC=none` pour l'éviter). Supprimez ensuite l'hôte dans le tableau de bord (la commande est rappelée dans la fenêtre de suppression). Avec Ansible : `hlm_agent_state: absent` ([docs/ANSIBLE.md](ANSIBLE.md#6-désinstaller)).
 
 ## Ce qui est installé
 

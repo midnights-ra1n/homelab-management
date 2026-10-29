@@ -58,16 +58,30 @@ else
   if [ -n "${VERSION:-}" ]; then BASE="https://github.com/$REPO/releases/download/$VERSION"
   else BASE="https://github.com/$REPO/releases/latest/download"; fi
   TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+  # $3 = bar: progress bar on a terminal (not under Ansible or in a log file).
   fetch() {
-    if command -v curl >/dev/null; then curl -fsSL --proto '=https' --tlsv1.2 -o "$2" "$1"
-    elif command -v wget >/dev/null; then wget -q --https-only -O "$2" "$1"
+    bar=; [ "${3:-}" = bar ] && [ -t 2 ] && bar=1
+    if command -v curl >/dev/null; then
+      if [ -n "$bar" ]; then curl -fL -# --proto '=https' --tlsv1.2 -o "$2" "$1"
+      else curl -fsSL --proto '=https' --tlsv1.2 -o "$2" "$1"; fi
+    elif command -v wget >/dev/null; then
+      if [ -n "$bar" ]; then wget -q --show-progress --https-only -O "$2" "$1"
+      else wget -q --https-only -O "$2" "$1"; fi
     else die "curl or wget is required"; fi
   }
   say "downloading hlm-agent ($ARCH) from $BASE"
-  fetch "$BASE/hlm-agent-linux-$ARCH" "$TMP/hlm-agent"
+  fetch "$BASE/hlm-agent-linux-$ARCH" "$TMP/hlm-agent" bar
   fetch "$BASE/hlm-agent-linux-$ARCH.sha256" "$TMP/sum"
   RAW="https://raw.githubusercontent.com/$REPO/${VERSION:-stable}/agent"
-  for f in $FILES; do fetch "$RAW/$f" "$TMP/$f"; done
+  n=$(echo $FILES | wc -w); i=0
+  for f in $FILES; do
+    i=$((i + 1))
+    [ -t 2 ] && printf '\rhlm-agent install: downloading the install files [%-20s] %d/%d' \
+      "$(printf '%*s' $((i * 20 / n)) '' | tr ' ' '#')" "$i" "$n" >&2
+    fetch "$RAW/$f" "$TMP/$f"
+  done
+  [ -t 2 ] && echo >&2
+  say "downloaded $n install files"
 fi
 ( cd "$TMP" && echo "$(cut -d' ' -f1 sum)  hlm-agent" | sha256sum -c - >/dev/null ) || die "checksum mismatch"
 say "checksum OK"
@@ -198,7 +212,13 @@ if [ "${LXC:-}" = all ]; then
     fi
     echo "  CT $ct ($name): pushing the files"
     pct exec "$ct" -- sh -c 'rm -rf /tmp/hlm-bundle && mkdir -m 0700 /tmp/hlm-bundle'
-    for f in hlm-agent sum $FILES; do pct push "$ct" "$TMP/$f" "/tmp/hlm-bundle/$f"; done
+    all="hlm-agent sum $FILES"; n=$(echo $all | wc -w); i=0
+    for f in $all; do
+      i=$((i + 1))
+      [ -t 1 ] && printf '\r      [%-20s] %d/%d' "$(printf '%*s' $((i * 20 / n)) '' | tr ' ' '#')" "$i" "$n"
+      pct push "$ct" "$TMP/$f" "/tmp/hlm-bundle/$f"
+    done
+    [ -t 1 ] && echo
     # pct exec keeps the host environment: blank what must not reach the container,
     # LXC above all (the container has no pct and would fail on LXC=all).
     { pct exec "$ct" -- env LXC= LXC_TOKEN= DOCKER= NODE_APPS= INSTALL_METHOD= \

@@ -277,7 +277,7 @@ export function HostDetailPage({ id }: { id: number }) {
         footer={<><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annuler</Button>
           <Button variant="danger" onClick={() => api.del(`/api/hosts/${id}`).then(() => { toast("Hôte supprimé"); navigate("/hosts"); })}>Supprimer l'hôte</Button></>}>
         <div className="grid gap-4">
-          <p className="text-sm leading-relaxed text-body">L'hôte et tout son historique de métriques seront supprimés définitivement. L'agent ne pourra plus se connecter ; pour le retirer aussi de la machine :</p>
+          <p className="text-sm leading-relaxed text-body">L'hôte et tout son historique de métriques seront supprimés définitivement. L'agent ne pourra plus se connecter ; pour le retirer aussi de la machine (sur un Proxmox, aussi de ses conteneurs LXC) :</p>
           <CodeBlock text={UNINSTALL_COMMAND} />
         </div>
       </Dialog>

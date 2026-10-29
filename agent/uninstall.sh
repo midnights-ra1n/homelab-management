@@ -1,8 +1,8 @@
 #!/bin/sh
 # Removes hlm-agent completely: services, timers, binary, configuration, state and user.
 #   curl -fsSL https://raw.githubusercontent.com/midnights-ra1n/homelab-management/stable/agent/uninstall.sh | sudo sh
-# On a Proxmox host, add LXC=all to remove it from every running LXC container too:
-#   curl -fsSL …/uninstall.sh | sudo LXC=all sh
+# On a Proxmox host it is also removed from every running LXC container that has it;
+# LXC=none keeps the containers' agents.
 # smartmontools is left installed (other tools may use it). The hosts stay listed in the
 # dashboard until you delete them there.
 set -eu
@@ -26,10 +26,17 @@ EOS
 
 sh -c "$REMOVE"
 
-if [ "${LXC:-}" = all ] && command -v pct >/dev/null 2>&1; then
+if [ "${LXC:-}" != none ] && command -v pct >/dev/null 2>&1; then
+  echo "Proxmox host: removing hlm-agent from the running LXC containers (LXC=none to skip)"
+  removed=0; failed=0
   for ct in $(pct list | awk 'NR > 1 && $2 == "running" { print $1 }'); do
-    if pct exec "$ct" -- test -d /opt/hlm-agent 2>/dev/null; then
-      printf '%s\n' "$REMOVE" | pct exec "$ct" -- sh -s || echo "  CT $ct: removal failed"
+    name=$(pct config "$ct" | sed -n 's/^hostname: //p')
+    pct exec "$ct" -- test -d /opt/hlm-agent 2>/dev/null || continue
+    if printf '%s\n' "$REMOVE" | pct exec "$ct" -- sh -s >/dev/null 2>&1; then
+      echo "  CT $ct ($name): removed"; removed=$((removed + 1))
+    else
+      echo "  CT $ct ($name): removal FAILED (pct enter $ct)"; failed=$((failed + 1))
     fi
   done
+  echo "LXC containers: $removed removed, $failed failed (stopped containers are not checked)"
 fi
