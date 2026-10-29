@@ -63,6 +63,7 @@ Dans l'assistant, le type *Serveur Proxmox* propose **Installer aussi dans les c
 2. pour chaque conteneur démarré (`pct list`), vérifie qu'il s'agit d'une Debian avec systemd. Les autres conteneurs sont ignorés ;
 3. copie le binaire, déjà vérifié, et les fichiers d'installation dans le conteneur avec `pct push`. **Aucun accès Internet n'est nécessaire dans les conteneurs**, seulement l'accès au hub ;
 4. lance l'installation dans le conteneur, sans SMART. Chaque conteneur s'inscrit sous son nom avec le jeton commun.
+5. écrit dans la configuration du conteneur son ID (`PVE_CTID`) et le nom du Proxmox (`PVE_NODE`). Dans **Hôtes**, le Proxmox se déplie alors sur ses conteneurs, triés par ID ; sur la **Carte**, ils sont placés sous lui. Pour les conteneurs déjà équipés, relancez la même ligne sur le Proxmox : ils ne sont pas réinscrits, seule leur configuration est complétée.
 
 Il affiche ensuite un bilan (`CT 101 (nextcloud): installed`…). Relancez la même ligne pour équiper les conteneurs créés depuis : ceux qui ont déjà l'agent ne sont pas réinscrits. Les conteneurs arrêtés et les machines virtuelles (QEMU) ne sont pas concernés ; installez l'agent dans une VM comme sur n'importe quelle machine.
 

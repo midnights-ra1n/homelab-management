@@ -20,6 +20,11 @@ pub struct Info {
     mem_total: u64,
     agent_version: &'static str,
     boot_time: u64,
+    // Proxmox LXC container: node name and CT ID, written to agent.env by install.sh (LXC=all).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pve_node: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pve_ctid: Option<u32>,
     #[serde(flatten)]
     inventory: crate::inventory::Inventory,
 }
@@ -141,6 +146,8 @@ impl Collector {
             mem_total: self.sys.total_memory(),
             agent_version: crate::VERSION,
             boot_time: System::boot_time(),
+            pve_node: std::env::var("PVE_NODE").ok().filter(|n| !n.is_empty()),
+            pve_ctid: std::env::var("PVE_CTID").ok().and_then(|id| id.parse().ok()),
             inventory: crate::inventory::collect(),
         }
     }

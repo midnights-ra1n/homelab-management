@@ -1,5 +1,5 @@
-/* Monitoring map: the hub, the SNMP devices, the hosts (VPS, physical servers, VMs) with their
-   containers and the probes that target them, and the WireGuard tunnels between hosts, live. Columns are dragged as a whole; their place is kept in the
+/* Monitoring map: the hub, the SNMP devices, the hosts (VPS, physical servers, VMs, Proxmox
+   nodes with their LXC containers on a row below) with their containers and the probes that target them, and the WireGuard tunnels between hosts, live. Columns are dragged as a whole; their place is kept in the
    preferences shared with the apps (key "map_positions"). */
 import "@xyflow/react/dist/style.css";
 import {
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { api, fmtBytes, fmtMbps, fmtMs, fmtPct, hostStatusLabel, pct, savePrefs, statusLabel, type Host, type Monitor, type MonitorType, type Overview, type Preferences } from "../api";
 import { containerKind } from "./Containers";
+import { proxmoxTree } from "./Hosts";
 import { Alert, Badge, ButtonLink, EmptyState, IconButton, Link, Logo, Meter, PageHeader, Skeleton, StatusIcon, cn, inputClass, kindTone, statusKind, usePoll, type StatusKind, type Tone } from "../ui";
 
 type Variant = "hub" | "host" | "device" | "group" | "container" | "monitor";
@@ -95,7 +96,7 @@ export function wireguardTunnels(hosts: Host[]): Tunnel[] {
   });
 }
 
-type Column = { head: MapNode; kids: MapNode[] };
+type Column = { head: MapNode; kids: MapNode[]; parent?: string }; // parent: head id of the Proxmox node
 
 /** Overview → columns (head + children) and the hub. */
 function buildGraph(o: Overview, show: { containers: boolean; monitors: boolean }) {
@@ -127,7 +128,9 @@ function buildGraph(o: Overview, show: { containers: boolean; monitors: boolean 
   const hosts = new Map<number, Column>();
   const hostByName = new Map<string, number>();
   const roleOf = new Map(o.hosts.map((h) => [h.id, hostRole(h.info)]));
-  const sorted = [...o.hosts].sort((a, b) => ROLE_ORDER.indexOf(roleOf.get(a.id)!) - ROLE_ORDER.indexOf(roleOf.get(b.id)!) || a.name.localeCompare(b.name));
+  const pve = proxmoxTree(o.hosts);
+  const sorted = [...o.hosts].sort((a, b) => ROLE_ORDER.indexOf(roleOf.get(a.id)!) - ROLE_ORDER.indexOf(roleOf.get(b.id)!)
+    || (a.info.pve_ctid ?? 0) - (b.info.pve_ctid ?? 0) || a.name.localeCompare(b.name));
   for (const h of sorted) {
     const l = h.latest;
     const role = ROLE[roleOf.get(h.id)!];
@@ -135,9 +138,12 @@ function buildGraph(o: Overview, show: { containers: boolean; monitors: boolean 
     const hw = [h.info.manufacturer, h.info.model].filter(Boolean).join(" ");
     for (const k of [h.name, h.info.hostname, h.info.hostname?.split(".")[0]]) if (k) hostByName.set(k.toLowerCase(), h.id);
     const cs = h.docker?.containers ?? [];
+    const parent = pve.parentOf.get(h.id);
     hosts.set(h.id, {
+      parent: parent && `h${parent.id}`,
       head: node(`h${h.id}`, {
-        variant: "host", kind: statusKind(h.status), title: h.name, tag: role.label, icon: <role.Icon size={17} />, href: `/hosts/${h.id}`,
+        variant: "host", kind: statusKind(h.status), title: h.name,
+        tag: h.info.pve_ctid ? `${role.label} · ${h.info.pve_ctid}` : pve.kids.has(h.id) ? `Proxmox VE · ${pve.kids.get(h.id)!.length} CT` : role.label, icon: <role.Icon size={17} />, href: `/hosts/${h.id}`,
         sub: (roleOf.get(h.id) === "physical" && hw) || ips.find((a) => !a.iface.startsWith("wg"))?.address || h.info.os || h.info.hostname,
         meters: h.connected || l.cpu != null ? [
           { label: "CPU", value: l.cpu ?? null }, { label: "RAM", value: pct(l.mem_used, l.mem_total) }, { label: "Disque", value: pct(l.disk_used, l.disk_total) },
@@ -195,11 +201,22 @@ function buildGraph(o: Overview, show: { containers: boolean; monitors: boolean 
   return { hub, columns, tunnels: wireguardTunnels(o.hosts) };
 }
 
-/** Default places: the hub on top, one column per device, host and probe category. */
+/** Default places: the hub on top, one column per device, host and probe category; a Proxmox
+    node's LXC containers on a row below it, by CT ID, with the node centred above them. */
 function autoLayout(columns: Column[]): Pos {
   const pos: Pos = {};
-  columns.forEach((c, i) => (pos[c.head.id] = { x: i * COL_W, y: HEAD_Y }));
-  pos.hub = { x: Math.max(0, (columns.length * COL_W - COL_W) / 2), y: 0 };
+  const height = (c: Column) => HEAD_H[c.head.data.variant] + (c.head.data.rows?.length ?? 0) * 20 + 28 + c.kids.length * KID_DY;
+  const below = new Map<string, Column[]>();
+  for (const c of columns) if (c.parent) below.set(c.parent, [...(below.get(c.parent) ?? []), c]);
+  let x = 0;
+  for (const c of columns) {
+    if (c.parent) continue;
+    const ks = below.get(c.head.id) ?? [];
+    ks.forEach((k, i) => (pos[k.head.id] = { x: x + i * COL_W, y: HEAD_Y + height(c) + 60 }));
+    pos[c.head.id] = { x: x + ((Math.max(ks.length, 1) - 1) * COL_W) / 2, y: HEAD_Y };
+    x += Math.max(ks.length, 1) * COL_W;
+  }
+  pos.hub = { x: Math.max(0, (x - COL_W) / 2), y: 0 };
   return pos;
 }
 
@@ -353,7 +370,7 @@ function Flow({ o, saved: initial }: { o: Overview; saved: Pos }) {
 
   const dimOf = new Map(nodes.map((n) => [n.id, n.data.dim]));
   const links: { source: string; target: MapNode; kids?: boolean }[] = columns.flatMap((c) => [
-    { source: "hub", target: c.head }, ...c.kids.map((k) => ({ source: c.head.id, target: k, kids: true })),
+    { source: c.parent ?? "hub", target: c.head }, ...c.kids.map((k) => ({ source: c.head.id, target: k, kids: true })),
   ]);
   const edges: Edge[] = links.map(({ source, target: { id: target, data: { kind } }, kids }) => ({
       id: `e-${target}`,

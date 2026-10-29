@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, Server, Thermometer, Trash2, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, Server, Thermometer, Trash2, Users } from "lucide-react";
 import { api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostLatest, type HostSeries, type Install } from "../api";
 import {
-  Alert, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
-  Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, usePoll, useTitle, useToast,
+  Alert, Badge, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
+  Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, statusKind, usePoll, useTitle, useToast,
 } from "../ui";
 import { DiskCard, type HostDisks } from "./Disks";
 import { AddHostWizard, InstallInstructions, UNINSTALL_COMMAND } from "./AddHostWizard";
@@ -12,11 +12,50 @@ import { AgentVersion, useHostAction } from "./AgentVersion";
 import { ContainersTable } from "./Containers";
 import { NodeAppsPanel } from "./NodeApps";
 
+/** Proxmox: LXC hosts under the host whose hostname is their node, sorted by CT ID. */
+export function proxmoxTree(hosts: Host[]) {
+  const short = (n: string) => n.split(".")[0].toLowerCase();
+  const byName = new Map(hosts.filter((h) => h.info.hostname).map((h) => [short(h.info.hostname!), h]));
+  const parentOf = new Map<number, Host>();
+  const kids = new Map<number, Host[]>();
+  for (const h of hosts) {
+    const p = h.info.pve_ctid && h.info.pve_node ? byName.get(short(h.info.pve_node)) : undefined;
+    if (!p || p.id === h.id) continue;
+    parentOf.set(h.id, p);
+    kids.set(p.id, [...(kids.get(p.id) ?? []), h]);
+  }
+  for (const k of kids.values()) k.sort((a, b) => a.info.pve_ctid! - b.info.pve_ctid!);
+  return { parentOf, kids };
+}
+
 export function HostsPage() {
   const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts"), 15000, [], ["hosts", "metrics"]);
   const [adding, setAdding] = useState(false);
   const [mass, setMass] = useState(false);
+  const [open, setOpen] = useState<Set<number>>(new Set());
   const online = data?.filter((h) => h.connected).length ?? 0;
+  // Proxmox hosts unfold into their LXC containers.
+  const { kids, rows } = useMemo(() => {
+    const { parentOf, kids } = proxmoxTree(data ?? []);
+    const rows = (data ?? []).filter((h) => !parentOf.has(h.id)).flatMap((h) => [{ h, child: false }, ...(open.has(h.id) ? (kids.get(h.id) ?? []).map((k) => ({ h: k, child: true })) : [])]);
+    return { kids, rows };
+  }, [data, open]);
+  const toggle = (id: number) => setOpen((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
+  const fold = (h: Host) => {
+    const ks = kids.get(h.id);
+    if (!ks) return null;
+    const down = ks.filter((k) => statusKind(k.status) === "down").length;
+    return (
+      <span className="flex shrink-0 items-center gap-1.5">
+        <button type="button" aria-expanded={open.has(h.id)} aria-label={`${open.has(h.id) ? "Replier" : "Déplier"} les conteneurs de ${h.name}`}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(h.id); }}
+          className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-normal text-meta hover:bg-box hover:text-h1">
+          {open.has(h.id) ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}{ks.length} CT
+        </button>
+        {down > 0 && <Badge tone="red" dot>{down} en panne</Badge>}
+      </span>
+    );
+  };
   return (
     <>
       <PageHeader title="Hôtes" description="Machines virtuelles, serveurs Proxmox, serveurs physiques et postes équipés de l'agent."
@@ -35,35 +74,40 @@ export function HostsPage() {
       {data && data.length > 0 && (
         <Card flush title="Hôtes" sub={`${data.length} hôte(s) · ${online} agent(s) connecté(s)`}>
           <ul className="mm-list sm:hidden">
-            {data.map((h) => (
-              <li key={h.id}>
-                <Link to={`/hosts/${h.id}`} className="mm-list__item items-center no-underline">
+            {rows.map(({ h, child }) => (
+              <li key={h.id} className="flex items-center">
+                <Link to={`/hosts/${h.id}`} className={cn("mm-list__item min-w-0 flex-1 items-center no-underline", child && "pl-8")}>
                   <span className="flex min-w-0 items-center gap-3">
                     <StatusIcon status={h.status} size={18} />
                     <span className="min-w-0">
-                      <span className="mm-list__title block">{h.name}</span>
+                      <span className="mm-list__title flex items-center gap-2">{h.info.pve_ctid && <span className="font-mono text-xs text-meta">{h.info.pve_ctid}</span>}<span className="truncate">{h.name}</span></span>
                       <span className="mm-list__meta block truncate font-mono">CPU {fmtPct(h.latest.cpu)} · RAM {fmtPct(pct(h.latest.mem_used, h.latest.mem_total))}</span>
                     </span>
                   </span>
                   <StatusBadge status={h.status} label={hostStatusLabel(h)} />
                 </Link>
+                {fold(h)}
               </li>
             ))}
           </ul>
           <div className="mm-table-wrap hidden sm:block">
             <table className="mm-table min-w-[60rem]">
-              <thead><tr><th scope="col">Nom</th><th scope="col">État</th><th scope="col">Système</th><th scope="col" className="mm-col-num">CPU</th><th scope="col" className="mm-col-num">Mémoire</th><th scope="col" className="mm-col-num">Disque</th><th scope="col" className="mm-col-num">Réseau ↓ / ↑</th><th scope="col">Agent</th><th scope="col">Dernier contact</th></tr></thead>
+              <thead><tr><th scope="col" className="mm-col-num">ID</th><th scope="col">Nom</th><th scope="col">État</th><th scope="col">Système</th><th scope="col" className="mm-col-num">CPU</th><th scope="col" className="mm-col-num">Mémoire</th><th scope="col" className="mm-col-num">Disque</th><th scope="col" className="mm-col-num">Réseau ↓ / ↑</th><th scope="col">Agent</th><th scope="col">Dernier contact</th></tr></thead>
               <tbody>
-                {data.map((h) => (
+                {rows.map(({ h, child }) => (
                   <tr key={h.id} className="cursor-pointer" onClick={() => navigate(`/hosts/${h.id}`)}>
+                    <td className="mm-col-num font-mono text-xs">{h.info.pve_ctid ?? ""}</td>
                     <td className="mm-col-strong">
-                      <Link to={`/hosts/${h.id}`} className="flex min-w-0 items-center gap-2.5 text-inherit no-underline hover:text-accent-text">
-                        <StatusIcon status={h.status} />
-                        <span className="min-w-0">
-                          <span className="block truncate">{h.name}</span>
-                          {h.info.hostname && h.info.hostname !== h.name && <span className="block truncate font-mono text-xs font-normal text-meta">{h.info.hostname}</span>}
-                        </span>
-                      </Link>
+                      <span className={cn("flex min-w-0 items-center gap-2", child && "pl-6")}>
+                        <Link to={`/hosts/${h.id}`} className="flex min-w-0 items-center gap-2.5 text-inherit no-underline hover:text-accent-text">
+                          <StatusIcon status={h.status} />
+                          <span className="min-w-0">
+                            <span className="block truncate">{h.name}</span>
+                            {h.info.hostname && h.info.hostname !== h.name && <span className="block truncate font-mono text-xs font-normal text-meta">{h.info.hostname}</span>}
+                          </span>
+                        </Link>
+                        {fold(h)}
+                      </span>
                     </td>
                     <td><span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} />{h.agent_down && !h.maintenance && <Tag>Agent hors ligne</Tag>}</span></td>
                     <td className="mm-col-muted max-w-56 truncate">{h.info.os || "—"}</td>
@@ -135,7 +179,7 @@ export function HostDetailPage({ id }: { id: number }) {
       <PageHeader
         crumbs={<><Link to="/hosts" className="text-meta no-underline hover:text-accent-text">Hôtes</Link><ChevronRight size={14} aria-hidden /><span className="text-h2">{h.name}</span></>}
         title={<span className="flex items-center gap-3"><StatusIcon status={h.status} size={26} />{h.name}</span>}
-        description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.info.os && <Tag>{h.info.os}</Tag>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
+        description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.info.os && <Tag>{h.info.os}</Tag>}{h.info.pve_ctid && <Tag>CT {h.info.pve_ctid}{h.info.pve_node ? ` · ${h.info.pve_node}` : ""}</Tag>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
         actions={<>
           <Switch label="Maintenance" checked={h.maintenance} onChange={(v) => update({ maintenance: v })} />
           <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setRename(h.name)}>Renommer</Button>

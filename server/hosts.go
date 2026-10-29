@@ -31,6 +31,8 @@ type agentInfo struct {
 	MemTotal     uint64 `json:"mem_total"`
 	AgentVersion string `json:"agent_version"`
 	BootTime     int64  `json:"boot_time"`
+	PveNode      string `json:"pve_node,omitempty"` // Proxmox LXC container: node hostname and CT ID
+	PveCTID      int    `json:"pve_ctid,omitempty"`
 	// Inventory, read by the management role to fill its items (see mg_sync.go).
 	OSVersion      string          `json:"os_version,omitempty"`
 	CPUThreads     int             `json:"cpu_threads,omitempty"`

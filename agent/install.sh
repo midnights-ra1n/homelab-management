@@ -10,7 +10,8 @@
 #   NODE_APPS=false|true  Node.js apps of the base-node playbook (default: enabled when
 #                         /usr/local/bin/node-app exists); NODE_APPS_ACTIONS=0 keeps them read-only
 #   LXC=all               on a Proxmox host, also install in every running Debian LXC container,
-#                         with the shared enrollment token LXC_TOKEN (enr_…, defaults to TOKEN)
+#                         with the shared enrollment token LXC_TOKEN (enr_…, defaults to TOKEN);
+#                         each container gets PVE_CTID and PVE_NODE to be shown under this host
 #   VERSION=v0.1.12       pin a release (default: latest)
 #   REPO=owner/name       GitHub repository hosting the releases
 #   INSTALL_METHOD=deb    set by the hlm-agent .deb: no self-update, updates go through the package
@@ -101,6 +102,7 @@ if [ -n "${TOKEN:-}" ] || [ ! -f "$CONF" ]; then
     [ -n "${ALLOW_INSECURE:-}" ] && echo "ALLOW_INSECURE=$ALLOW_INSECURE"
     [ -n "${AUTO_UPDATE:-}" ] && echo "AUTO_UPDATE=$AUTO_UPDATE"
     [ "$REPO" != "midnights-ra1n/homelab-management" ] && echo "UPDATE_REPO=$REPO"
+    [ -n "${PVE_CTID:-}" ] && echo "PVE_CTID=$PVE_CTID" && echo "PVE_NODE=$PVE_NODE"
     true
   } > "$CONF.tmp"
   chown root:hlm-agent "$CONF.tmp"; chmod 0640 "$CONF.tmp"; mv "$CONF.tmp" "$CONF"
@@ -221,7 +223,7 @@ if [ "${LXC:-}" = all ]; then
     [ -t 1 ] && echo
     # pct exec keeps the host environment: blank what must not reach the container,
     # LXC above all (the container has no pct and would fail on LXC=all).
-    { pct exec "$ct" -- env LXC= LXC_TOKEN= DOCKER= NODE_APPS= INSTALL_METHOD= \
+    { pct exec "$ct" -- env LXC= LXC_TOKEN= DOCKER= NODE_APPS= INSTALL_METHOD= PVE_CTID="$ct" PVE_NODE="$(hostname)" \
         HUB_URL="$chub" TOKEN="$ctoken" KEY="$ckey" ALLOW_INSECURE="$cinsecure" \
         AUTO_UPDATE="${AUTO_UPDATE:-}" SMART=false REMOTE_UPDATES="$remote" REPO="$REPO" BUNDLE=/tmp/hlm-bundle \
         sh /tmp/hlm-bundle/install.sh 2>&1 && rc=0 || rc=$?; echo "$rc" > "$TMP/rc"; } | sed 's/^/      /'
