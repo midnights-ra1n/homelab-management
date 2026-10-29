@@ -14,11 +14,14 @@ import (
 )
 
 // dialAgent performs the agent handshake and returns the hello message.
-func dialAgent(t *testing.T, wsURL, token, hostname string) (map[string]any, int) {
+func dialAgent(t *testing.T, wsURL, token, hostname string, cookieOnly ...bool) (map[string]any, int) {
 	t.Helper()
 	nonce := make([]byte, 32)
 	rand.Read(nonce)
 	hdr := http.Header{"Authorization": {"Bearer " + token}, "X-Agent-Nonce": {base64.StdEncoding.EncodeToString(nonce)}, "X-Agent-Hostname": {hostname}}
+	if len(cookieOnly) > 0 && cookieOnly[0] {
+		hdr = http.Header{"Cookie": {"hlm_agent_token=" + token + "; hlm_agent_nonce=" + base64.StdEncoding.EncodeToString(nonce) + "; hlm_agent_host=" + hostname}}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, resp, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{HTTPHeader: hdr})
@@ -54,8 +57,12 @@ func TestEnrollmentToken(t *testing.T) {
 	}
 	// A second machine with the same name gets its own host, never the first one.
 	dialAgent(t, wsURL, shared, "pve-01")
+	// Behind a proxy that forwards only Cookie, the handshake still works and enrolls.
+	if hello3, code := dialAgent(t, wsURL, shared, "lxc-1", true); code != 101 || hello3["token"] == nil {
+		t.Fatalf("cookie handshake: %d %v", code, hello3)
+	}
 	hosts, _ := s.loadHosts("")
-	if len(hosts) != 2 || hosts[0].Name != "pve-01" || hosts[1].Name != "pve-01-2" {
+	if len(hosts) != 3 || hosts[0].Name != "lxc-1" || hosts[1].Name != "pve-01" || hosts[2].Name != "pve-01-2" {
 		t.Fatalf("hosts: %+v", hosts)
 	}
 	// Expired enrollment token.

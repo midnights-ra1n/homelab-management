@@ -616,13 +616,29 @@ func (s *Server) handleHostLive(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"live": true, "at": at.UnixMilli(), "metrics": m})
 }
 
+// agentParam reads a handshake value from its header, else from its cookie: some reverse
+// proxies (Zoraxy by default) forward only Cookie among the headers of a WebSocket upgrade.
+func agentParam(r *http.Request, header, cookie string) string {
+	if v := r.Header.Get(header); header != "" && v != "" {
+		return v
+	}
+	if c, err := r.Cookie(cookie); err == nil {
+		return c.Value
+	}
+	return ""
+}
+
 // handleAgentWS authenticates an agent in both directions, Beszel-style:
 // the agent proves itself with its token, the hub proves itself by signing the
 // agent's nonce with the key the agent was installed with.
 func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	ip := s.clientIP(r)
 	tok, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	nonce, err := base64.StdEncoding.DecodeString(r.Header.Get("X-Agent-Nonce"))
+	if !found {
+		tok = agentParam(r, "", "hlm_agent_token")
+		found = tok != ""
+	}
+	nonce, err := base64.StdEncoding.DecodeString(agentParam(r, "X-Agent-Nonce", "hlm_agent_nonce"))
 	if !found || len(tok) < 32 || err != nil || len(nonce) != 32 {
 		writeErr(w, 400, "Poignée de main agent invalide")
 		return
@@ -641,7 +657,7 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 		}
 		var ok bool
 		if strings.HasPrefix(tok, enrollPrefix) {
-			id, hostName, issued, ok, err = s.enrollHost(tok, r.Header.Get("X-Agent-Hostname"))
+			id, hostName, issued, ok, err = s.enrollHost(tok, agentParam(r, "X-Agent-Hostname", "hlm_agent_host"))
 			if err != nil {
 				serverErr(w, err)
 				return

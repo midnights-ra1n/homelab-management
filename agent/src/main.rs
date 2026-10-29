@@ -123,6 +123,17 @@ enum Failure {
     Rejected,
 }
 
+/// The handshake values again as cookies: some reverse proxies (Zoraxy by default) forward
+/// only Cookie among the headers of a WebSocket upgrade. The hub prefers the headers.
+fn handshake_cookie(token: &str, nonce: &[u8; 32], host: Option<&str>) -> String {
+    let mut c = format!("hlm_agent_token={token}; hlm_agent_nonce={}", B64.encode(nonce));
+    // Cookie values cannot hold spaces, quotes, commas, semicolons or backslashes.
+    if let Some(h) = host.filter(|h| h.bytes().all(|b| b.is_ascii_alphanumeric() || b"-._".contains(&b))) {
+        c.push_str(&format!("; hlm_agent_host={h}"));
+    }
+    c
+}
+
 async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) -> Failure {
     let mut nonce = [0u8; 32];
     if let Err(e) = getrandom::fill(&mut nonce) {
@@ -133,11 +144,15 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
         Err(e) => return Failure::Fatal(format!("invalid HUB_URL: {e}")),
     };
     let h = req.headers_mut();
+    let host = sysinfo::System::host_name();
     h.insert("Authorization", format!("Bearer {token}").parse().unwrap());
-    if let Some(name) = sysinfo::System::host_name().and_then(|n| n.parse().ok()) {
+    if let Some(name) = host.as_deref().and_then(|n| n.parse().ok()) {
         h.insert("X-Agent-Hostname", name); // name used when enrolling with a shared token
     }
     h.insert("X-Agent-Nonce", B64.encode(nonce).parse().unwrap());
+    if let Ok(c) = handshake_cookie(token, &nonce, host.as_deref()).parse() {
+        h.insert("Cookie", c);
+    }
     h.insert("User-Agent", format!("hlm-agent/{VERSION}").parse().unwrap());
 
     let ws = tokio::time::timeout(Duration::from_secs(15), tokio_tungstenite::connect_async(req)).await;
@@ -146,6 +161,10 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
         Ok(Err(tungstenite::Error::Http(resp))) if resp.status() == 401 => {
             // A wrong token never fixes itself; slow retry is handled by the caller.
             return Failure::Rejected;
+        }
+        Ok(Err(tungstenite::Error::Http(resp))) => {
+            let body = resp.body().as_deref().map(String::from_utf8_lossy).unwrap_or_default();
+            return Failure::Retry(format!("HTTP error: {} {}", resp.status(), body.trim()));
         }
         Ok(Err(e)) => return Failure::Retry(e.to_string()),
         Ok(Ok((ws, _))) => ws,
@@ -482,5 +501,13 @@ mod tests {
         let impostor = SigningKey::from_bytes(&[9u8; 32]).verifying_key();
         assert!(!hub_signature_ok(&impostor, &nonce, "tok", &sig));
         assert!(!hub_signature_ok(&key, &nonce, "tok", "not base64!"));
+    }
+
+    #[test]
+    fn handshake_cookie_skips_unsafe_hostnames() {
+        let n = [0u8; 32];
+        assert!(handshake_cookie("tok", &n, Some("pve-01.lan")).ends_with("; hlm_agent_host=pve-01.lan"));
+        assert!(!handshake_cookie("tok", &n, Some("a b;c")).contains("hlm_agent_host"));
+        assert!(handshake_cookie("tok", &n, None).starts_with("hlm_agent_token=tok; hlm_agent_nonce="));
     }
 }
