@@ -32,6 +32,7 @@ FILES="install.sh hlm-agent.service hlm-agent-smart.service hlm-agent-smart.time
        hlm-agent-node-action.service node-app-helper.sh"
 
 die() { echo "hlm-agent install: $*" >&2; exit 1; }
+say() { echo "hlm-agent install: $*"; }
 [ "$(id -u)" -eq 0 ] || die "must run as root"
 command -v systemctl >/dev/null || die "systemd is required"
 
@@ -51,6 +52,7 @@ esac
 if [ -n "${BUNDLE:-}" ]; then
   # Files already downloaded and verified by a Proxmox host (LXC=all): no network needed.
   TMP=$BUNDLE
+  say "using the files pushed by the Proxmox host ($TMP)"
   [ -f "$TMP/hlm-agent" ] && [ -f "$TMP/sum" ] || die "incomplete bundle $BUNDLE"
 else
   if [ -n "${VERSION:-}" ]; then BASE="https://github.com/$REPO/releases/download/$VERSION"
@@ -61,12 +63,14 @@ else
     elif command -v wget >/dev/null; then wget -q --https-only -O "$2" "$1"
     else die "curl or wget is required"; fi
   }
+  say "downloading hlm-agent ($ARCH) from $BASE"
   fetch "$BASE/hlm-agent-linux-$ARCH" "$TMP/hlm-agent"
   fetch "$BASE/hlm-agent-linux-$ARCH.sha256" "$TMP/sum"
   RAW="https://raw.githubusercontent.com/$REPO/${VERSION:-stable}/agent"
   for f in $FILES; do fetch "$RAW/$f" "$TMP/$f"; done
 fi
 ( cd "$TMP" && echo "$(cut -d' ' -f1 sum)  hlm-agent" | sha256sum -c - >/dev/null ) || die "checksum mismatch"
+say "checksum OK"
 
 id hlm-agent >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin hlm-agent
 install -d -o hlm-agent -g hlm-agent -m 0755 "$PREFIX"
@@ -86,6 +90,9 @@ if [ -n "${TOKEN:-}" ] || [ ! -f "$CONF" ]; then
     true
   } > "$CONF.tmp"
   chown root:hlm-agent "$CONF.tmp"; chmod 0640 "$CONF.tmp"; mv "$CONF.tmp" "$CONF"
+  say "configuration written to $CONF (hub $HUB_URL)"
+else
+  say "keeping the configuration of $CONF"
 fi
 
 install -m 0644 "$TMP/hlm-agent.service" "$SYSTEMD/hlm-agent.service"
@@ -134,6 +141,7 @@ if [ "$node" = auto ]; then if [ -x /usr/local/bin/node-app ]; then node=true; e
 nodeact=false; [ "$node" = true ] && [ "${NODE_APPS_ACTIONS:-1}" != 0 ] && nodeact=true
 helper "$node" hlm-agent-node-read.path node-app-helper.sh hlm-agent-node-read.path hlm-agent-node-read.service
 helper "$nodeact" hlm-agent-node-action.path hlm-agent-node-action.path hlm-agent-node-action.service
+say "options: SMART=$smart, remote updates=$remote, Docker=$docker, Node.js apps=$node (actions=$nodeact)"
 
 # Installed by the .deb: the package owns the binary, so the agent must not rewrite it.
 if [ "${INSTALL_METHOD:-}" = deb ]; then
@@ -144,11 +152,13 @@ else
 fi
 systemctl daemon-reload
 systemctl enable hlm-agent >/dev/null 2>&1
+say "starting hlm-agent.service"
 systemctl restart hlm-agent || true
 sleep 2
 # Unprivileged LXC containers without nesting cannot set up the service sandbox
 # (mount namespaces): fall back to running without those protections there only.
 if ! systemctl is-active -q hlm-agent && systemd-detect-virt -cq 2>/dev/null; then
+  say "the service did not start in this container, retrying without its sandbox"
   install -d -m 0755 "$SYSTEMD/hlm-agent.service.d"
   cat > "$SYSTEMD/hlm-agent.service.d/container.conf" <<'EOF'
 # Written by install.sh: this container cannot create the sandbox of hlm-agent.service.
@@ -180,19 +190,26 @@ if [ "${LXC:-}" = all ]; then
   conf() { sed -n "s/^$1=//p" "$CONF" | head -n1; }
   chub=${HUB_URL:-$(conf HUB_URL)}; ckey=${KEY:-$(conf KEY)}; cinsecure=${ALLOW_INSECURE:-$(conf ALLOW_INSECURE)}
   ok=0; failed=0
+  say "installing in the running LXC containers (hub $chub)"
   for ct in $(pct list | awk 'NR > 1 && $2 == "running" { print $1 }'); do
     name=$(pct config "$ct" | sed -n 's/^hostname: //p')
     if ! pct exec "$ct" -- sh -c 'test -f /etc/debian_version && command -v systemctl' >/dev/null 2>&1; then
       echo "  CT $ct ($name): not Debian with systemd, skipped"; continue
     fi
+    echo "  CT $ct ($name): pushing the files"
     pct exec "$ct" -- sh -c 'rm -rf /tmp/hlm-bundle && mkdir -m 0700 /tmp/hlm-bundle'
     for f in hlm-agent sum $FILES; do pct push "$ct" "$TMP/$f" "/tmp/hlm-bundle/$f"; done
-    if pct exec "$ct" -- env HUB_URL="$chub" TOKEN="$ctoken" KEY="$ckey" ALLOW_INSECURE="$cinsecure" \
-         AUTO_UPDATE="${AUTO_UPDATE:-}" SMART=false REMOTE_UPDATES="$remote" REPO="$REPO" BUNDLE=/tmp/hlm-bundle \
-         sh /tmp/hlm-bundle/install.sh >/dev/null; then
+    # pct exec keeps the host environment: blank what must not reach the container,
+    # LXC above all (the container has no pct and would fail on LXC=all).
+    { pct exec "$ct" -- env LXC= LXC_TOKEN= DOCKER= NODE_APPS= INSTALL_METHOD= \
+        HUB_URL="$chub" TOKEN="$ctoken" KEY="$ckey" ALLOW_INSECURE="$cinsecure" \
+        AUTO_UPDATE="${AUTO_UPDATE:-}" SMART=false REMOTE_UPDATES="$remote" REPO="$REPO" BUNDLE=/tmp/hlm-bundle \
+        sh /tmp/hlm-bundle/install.sh 2>&1 && rc=0 || rc=$?; echo "$rc" > "$TMP/rc"; } | sed 's/^/      /'
+    if [ "$(cat "$TMP/rc")" = 0 ]; then
       echo "  CT $ct ($name): installed"; ok=$((ok + 1))
     else
-      echo "  CT $ct ($name): FAILED (pct enter $ct, then journalctl -u hlm-agent)"; failed=$((failed + 1))
+      echo "  CT $ct ($name): FAILED, last lines of journalctl -u hlm-agent:"; failed=$((failed + 1))
+      pct exec "$ct" -- journalctl -u hlm-agent -n 15 --no-pager 2>&1 | sed 's/^/      /' || true
     fi
     pct exec "$ct" -- rm -rf /tmp/hlm-bundle || true
   done
