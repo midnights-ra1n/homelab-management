@@ -4,6 +4,8 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
+	"errors"
 	"encoding/csv"
 	"html/template"
 	"log/slog"
@@ -19,6 +21,7 @@ type energyPlug struct {
 	AvgDayWh   *float64   `json:"avg_day_wh"`
 	AvgWeekWh  *float64   `json:"avg_week_wh"`
 	AvgMonthWh *float64   `json:"avg_month_wh"`
+	PowerW     *float64   `json:"power_w"` // live power: last reading, nil if older than livePower
 	Daily      []*float64 `json:"daily"` // Wh per day, aligned on EnergyReport.Days, nil without readings
 }
 
@@ -30,8 +33,12 @@ type EnergyReport struct {
 	AvgDayWh   *float64     `json:"avg_day_wh"`
 	AvgWeekWh  *float64     `json:"avg_week_wh"`
 	AvgMonthWh *float64     `json:"avg_month_wh"`
+	PowerW     *float64     `json:"power_w"` // live power of the plugs that answered, nil if none
 	Plugs      []energyPlug `json:"plugs"`
 }
+
+// livePower: a plug reading older than this (or 3 check intervals) is no longer "live".
+const livePower = 5 * time.Minute
 
 // averages derive week and month from the mean measured day, so partial weeks or months do not drag them down.
 func averages(total float64, days int) (d, w, m *float64) {
@@ -56,8 +63,20 @@ func (s *Server) energyReport(from, to int64) (*EnergyReport, error) {
 	}
 	pos := map[int64]int{}
 	for _, m := range mons {
+		since := time.Now().Add(-max(livePower, 3*time.Duration(m.IntervalS)*time.Second)).UnixMilli()
 		pos[m.ID] = len(rep.Plugs)
-		rep.Plugs = append(rep.Plugs, energyPlug{ID: m.ID, Name: m.Name, Daily: make([]*float64, len(rep.Days))})
+		p := energyPlug{ID: m.ID, Name: m.Name, Daily: make([]*float64, len(rep.Days))}
+		if err := s.db.QueryRow(`SELECT value FROM monitor_results WHERE monitor_id=? AND ts>=? ORDER BY ts DESC LIMIT 1`, m.ID, since).Scan(&p.PowerW); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		if p.PowerW != nil {
+			total := *p.PowerW
+			if rep.PowerW != nil {
+				total += *rep.PowerW
+			}
+			rep.PowerW = &total
+		}
+		rep.Plugs = append(rep.Plugs, p)
 	}
 	rows, err := s.db.Query(`SELECT d.monitor_id, d.day, d.energy_wh FROM monitor_daily d JOIN monitors m ON m.id=d.monitor_id
 		WHERE m.type='meross' AND d.day>=? AND d.day<?`, from, to)

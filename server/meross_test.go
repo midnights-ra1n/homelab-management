@@ -76,6 +76,9 @@ func TestEnergyReport(t *testing.T) {
 	if len(rep.Days) != 7 || len(rep.Plugs) != 1 || rep.TotalWh != 150 || *rep.AvgDayWh != 150 || *rep.AvgWeekWh != 1050 || rep.Plugs[0].Daily[6] == nil {
 		t.Fatalf("got %+v", rep)
 	}
+	if rep.PowerW == nil || *rep.PowerW != 50 || *rep.Plugs[0].PowerW != 50 {
+		t.Fatalf("live power: want the last reading (50 W), got %+v", rep)
+	}
 }
 
 func TestMonitorSecretsRedacted(t *testing.T) {
