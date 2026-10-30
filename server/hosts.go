@@ -332,7 +332,7 @@ func (s *Server) pingDownHosts(ctx context.Context, hosts []Host) {
 }
 
 func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
-	rows, err := s.db.Query(`SELECT id,name,last_seen,maintenance,public,info,latest,updates,action,docker,node_apps,created_at,parent_id,parent_manual,vmid FROM hosts `+where+` ORDER BY name COLLATE NOCASE`, args...)
+	rows, err := s.db.Query(`SELECT id,name,COALESCE(l.last_seen,0),maintenance,public,info,COALESCE(l.latest,'{}'),updates,action,COALESCE(l.docker,'{}'),node_apps,created_at,parent_id,parent_manual,vmid FROM hosts LEFT JOIN host_live l ON l.host_id=id `+where+` ORDER BY name COLLATE NOCASE`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -887,7 +887,7 @@ func (s *Server) storeMetrics(id int64, m *agentMetrics) error {
 		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, now, m.CPU, m.MemUsed, m.MemTotal, m.SwapUsed, m.SwapTotal, m.DiskUsed, m.DiskTotal, m.NetRx, m.NetTx, m.Load1, m.Temp, m.CPUTemp); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`UPDATE hosts SET latest=?, last_seen=? WHERE id=?`, string(latest), now, id); err != nil {
+	if _, err := tx.Exec(`INSERT INTO host_live(host_id,latest,last_seen) VALUES(?,?,?) ON CONFLICT(host_id) DO UPDATE SET latest=excluded.latest, last_seen=excluded.last_seen`, id, string(latest), now); err != nil {
 		return err
 	}
 	var memPct float64

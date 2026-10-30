@@ -50,7 +50,7 @@ func TestUpdateAlertsAreSentOnce(t *testing.T) {
 		t.Fatal("Docker image alerts must be off by default")
 	}
 	s.setSetting("notify_docker_updates", "true")
-	s.db.Exec(`UPDATE hosts SET docker='{}' WHERE id=?`, id)
+	s.db.Exec(`UPDATE host_live SET docker='{}' WHERE host_id=?`, id)
 	s.storeDocker(id, "pve", snap())
 	s.storeDocker(id, "pve", snap())
 	if pendingKinds(s)[KindImage] != 1 {

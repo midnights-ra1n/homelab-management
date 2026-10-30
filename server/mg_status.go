@@ -75,8 +75,10 @@ func (s *Server) refreshAssetStatuses(ctx context.Context) {
 			st = "online"
 		}
 		// The state is filtered again: the item may have been set to maintenance meanwhile.
-		tx.Exec(`UPDATE assets SET status = ?, status_source = 'ping', status_checked_at = datetime('now')
-		   WHERE id = ? AND status IN ('online','offline') AND hlm_host_id IS NULL`, st, r.id)
+		// An unchanged state only refreshes its check time every 10 minutes (fewer disk writes).
+		tx.Exec(`UPDATE assets SET status = ?1, status_source = 'ping', status_checked_at = datetime('now')
+		   WHERE id = ?2 AND status IN ('online','offline') AND hlm_host_id IS NULL
+		   AND (status <> ?1 OR status_source <> 'ping' OR status_checked_at IS NULL OR status_checked_at < datetime('now', '-10 minutes'))`, st, r.id)
 	}
 	// Address removed: the state is manual again.
 	tx.Exec(`UPDATE assets SET status_source = '', status_checked_at = NULL WHERE status_source = 'ping'

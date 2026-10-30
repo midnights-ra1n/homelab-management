@@ -66,7 +66,7 @@ func (s *Server) storeDocker(id int64, hostName string, d *dockerSnapshot) error
 
 	var prev dockerSnapshot
 	var raw string
-	if s.db.QueryRow(`SELECT docker FROM hosts WHERE id=?`, id).Scan(&raw) == nil {
+	if s.db.QueryRow(`SELECT docker FROM host_live WHERE host_id=?`, id).Scan(&raw) == nil {
 		json.Unmarshal([]byte(raw), &prev)
 	}
 	known := map[string]bool{}
@@ -89,7 +89,7 @@ func (s *Server) storeDocker(id int64, hostName string, d *dockerSnapshot) error
 	}
 	d.CollectedAt = time.Now().Unix()
 	b, _ := json.Marshal(d)
-	_, err := s.db.Exec(`UPDATE hosts SET docker=? WHERE id=?`, string(b), id)
+	_, err := s.db.Exec(`INSERT INTO host_live(host_id,docker) VALUES(?,?) ON CONFLICT(host_id) DO UPDATE SET docker=excluded.docker`, id, string(b))
 	return err
 }
 

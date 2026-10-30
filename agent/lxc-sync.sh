@@ -24,18 +24,27 @@ flock 9
 # Only while pmxcfs is mounted, else the list would be empty and every container look deleted.
 if [ -f /etc/pve/.version ]; then
   for f in /etc/pve/nodes/*/lxc/*.conf; do [ -e "$f" ] && basename "$f" .conf; done > "$OUT/cts.new"
-  chgrp hlm-agent "$OUT/cts.new"; chmod 0640 "$OUT/cts.new"; mv "$OUT/cts.new" "$OUT/cts"
+  # Rewritten only when it changed: this runs every two minutes.
+  if cmp -s "$OUT/cts.new" "$OUT/cts"; then rm -f "$OUT/cts.new"
+  else chgrp hlm-agent "$OUT/cts.new"; chmod 0640 "$OUT/cts.new"; mv "$OUT/cts.new" "$OUT/cts"; fi
 fi
 
+# Every pct call starts Perl and loads the Proxmox modules: the read-only checks below read
+# the config (pmxcfs, in memory) and the container's file system through /proc instead.
 ok=0; failed=0
-for ct in $(pct list | awk 'NR > 1 && $2 == "running" { print $1 }'); do
-  name=$(pct config "$ct" | sed -n 's/^hostname: //p')
-  if pct config "$ct" | grep -Eq '^tags:.*(^|[ ;,])no-hlm([ ;,]|$)'; then
+for conf in /etc/pve/lxc/*.conf; do
+  [ -e "$conf" ] || continue
+  ct=$(basename "$conf" .conf)
+  pid=$(lxc-info -n "$ct" -p -H 2>/dev/null) || continue
+  [ -n "$pid" ] || continue # stopped
+  main=$(sed '/^\[/q' "$conf") # without the snapshot sections
+  name=$(echo "$main" | sed -n 's/^hostname: //p')
+  if echo "$main" | grep -Eq '^tags:.*(^|[ ;,])no-hlm([ ;,]|$)'; then
     [ "$mode" = all ] && echo "  CT $ct ($name): tagged no-hlm, skipped"
     continue
   fi
   if [ "$mode" != all ]; then
-    pct exec "$ct" -- test -x /opt/hlm-agent/hlm-agent 2>/dev/null && continue
+    [ -x "/proc/$pid/root/opt/hlm-agent/hlm-agent" ] && continue
     [ -n "$(find "$OUT/tried/$ct" -mmin -60 2>/dev/null)" ] && continue
     echo "  CT $ct ($name): new container without the agent"
   fi

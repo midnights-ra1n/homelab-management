@@ -601,7 +601,8 @@ func (s *Server) updateFromHost(assetID int64, name, status string, inv hostInve
 		return 0, err
 	}
 	defer tx.Rollback()
-	tx.Exec(`UPDATE assets SET status_source = 'hlm', status_checked_at = datetime('now'), hlm_name = ? WHERE id = ?`, name, assetID)
+	tx.Exec(`UPDATE assets SET status_source = 'hlm', status_checked_at = datetime('now'), hlm_name = ?1 WHERE id = ?2
+	   AND (status_source <> 'hlm' OR hlm_name IS NOT ?1 OR status_checked_at IS NULL OR status_checked_at < datetime('now', '-10 minutes'))`, name, assetID)
 	ipAdded := s.addAgentIP(tx, assetID, inv, fmtVal(before["hostname"]))
 	if len(cols) > 0 {
 		if err := s.updateRow(tx, "assets", assetID, cols); err != nil {

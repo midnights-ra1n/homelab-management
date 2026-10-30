@@ -138,6 +138,17 @@ var migrations = []string{
 	ALTER TABLE hosts ADD COLUMN parent_manual INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE hosts ADD COLUMN vmid INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE hosts ADD COLUMN pve TEXT NOT NULL DEFAULT '{}';`,
+	// Columns rewritten every few seconds, out of the wide hosts row: SQLite rewrites a whole
+	// row (info, updates, pve…) on each UPDATE, which was most of the disk writes.
+	`CREATE TABLE host_live(
+		host_id INTEGER PRIMARY KEY REFERENCES hosts(id) ON DELETE CASCADE,
+		latest TEXT NOT NULL DEFAULT '{}',
+		last_seen INTEGER NOT NULL DEFAULT 0,
+		docker TEXT NOT NULL DEFAULT '{}');
+	INSERT INTO host_live(host_id,latest,last_seen,docker) SELECT id,latest,last_seen,docker FROM hosts;
+	ALTER TABLE hosts DROP COLUMN latest;
+	ALTER TABLE hosts DROP COLUMN last_seen;
+	ALTER TABLE hosts DROP COLUMN docker;`,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's
