@@ -119,19 +119,21 @@ var statusColors = map[string]string{
 const defaultSubject = `{{if .Down}}[Alerte] {{.Down}} service(s) en panne{{else if .Warnings}}[Avertissement] {{.Warnings}} avertissement(s){{else}}[Rétabli] {{len .Events}} changement(s) d'état{{end}}`
 
 const defaultEmailHTML = `<!doctype html>
-<html lang="fr"><body style="margin:0;background:#f2f6f8;font-family:Geist,system-ui,-apple-system,'Segoe UI',sans-serif;color:#131b1f">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #d8dfe3;border-radius:6px">
-<tr><td style="padding:16px;border-bottom:1px solid #e7ecef">
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting">
+<style>@media (max-width:600px){.wrap{padding:0 !important}.card{border-radius:0 !important;border-left:0 !important;border-right:0 !important}.pad{padding-left:16px !important;padding-right:16px !important}.ev{font-size:16px !important}.meta{font-size:14px !important}.btn{display:block !important;text-align:center !important;padding:14px !important;font-size:16px !important}}</style></head>
+<body style="margin:0;background:#f2f6f8;font-family:Geist,system-ui,-apple-system,'Segoe UI',sans-serif;color:#131b1f;-webkit-text-size-adjust:100%">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="wrap" align="center" style="padding:24px">
+<table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #d8dfe3;border-radius:6px">
+<tr><td class="pad" style="padding:16px;border-bottom:1px solid #e7ecef">
 <div style="font-size:18px;font-weight:600">{{.Title}}</div>
-<div style="font-size:13px;color:#546066">{{len .Events}} changement(s) d'état · {{.Date}}</div>
+<div class="meta" style="font-size:13px;color:#546066">{{len .Events}} changement(s) d'état · {{.Date}}</div>
 </td></tr>
-{{range .Events}}<tr><td style="padding:12px 16px;border-bottom:1px solid #e7ecef;font-size:14px">
+{{range .Events}}<tr><td class="pad ev" style="padding:12px 16px;border-bottom:1px solid #e7ecef;font-size:15px;line-height:1.45">
 <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:500;color:#ffffff;background:{{.Color}}">{{.ToLabel}}</span>
 <strong style="font-weight:600;margin-left:6px">{{.Name}}</strong> <span style="color:#546066">({{.Kind}})</span>
-<div style="font-size:13px;color:#546066;margin-top:4px">{{if .FromLabel}}{{.FromLabel}} → {{.ToLabel}} à {{.Time}}{{else}}{{.Time}}{{end}}{{if .Message}} · {{.Message}}{{end}}</div>
+<div class="meta" style="font-size:13px;color:#546066;margin-top:4px;line-height:1.45">{{if .FromLabel}}{{.FromLabel}} → {{.ToLabel}} à {{.Time}}{{else}}{{.Time}}{{end}}{{if .Message}} · {{.Message}}{{end}}</div>
 </td></tr>{{end}}
-<tr><td style="padding:12px 16px;font-size:12px;color:#67727a">{{if .URL}}<a href="{{.URL}}" style="color:#16695a">Ouvrir le tableau de bord</a>{{end}}</td></tr>
+<tr><td class="pad" style="padding:12px 16px;font-size:13px;color:#67727a">{{if .URL}}<a href="{{.URL}}" style="color:#16695a">Ouvrir le tableau de bord</a>{{end}}</td></tr>
 </table></td></tr></table></body></html>`
 
 type emailEvent struct {
