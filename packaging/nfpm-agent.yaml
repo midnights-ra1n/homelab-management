@@ -64,6 +64,13 @@ contents:
   - src: agent/node-app-helper.sh
     dst: /usr/share/hlm-agent/node-app-helper.sh
     file_info: { mode: 0755 }
+  - src: agent/hlm-agent-lxc.service
+    dst: /usr/share/hlm-agent/hlm-agent-lxc.service
+  - src: agent/hlm-agent-lxc.timer
+    dst: /usr/share/hlm-agent/hlm-agent-lxc.timer
+  - src: agent/lxc-sync.sh
+    dst: /usr/share/hlm-agent/lxc-sync.sh
+    file_info: { mode: 0755 }
 scripts:
   postinstall: packaging/agent/postinst
   preremove: packaging/agent/prerm

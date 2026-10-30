@@ -1,43 +1,66 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, Server, Thermometer, Trash2, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, RefreshCw, Server, Thermometer, Trash2, Users } from "lucide-react";
 import { api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostLatest, type HostSeries, type Install } from "../api";
 import {
   Alert, Badge, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
   Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, statusKind, usePoll, useTitle, useToast,
 } from "../ui";
 import { DiskCard, type HostDisks } from "./Disks";
-import { AddHostWizard, InstallInstructions, UNINSTALL_COMMAND } from "./AddHostWizard";
+import { AddHostWizard, InstallInstructions, ParentSelect, UNINSTALL_COMMAND } from "./AddHostWizard";
 import { MassDeployDialog } from "./MassDeploy";
 import { AgentVersion, useHostAction } from "./AgentVersion";
 import { ContainersTable } from "./Containers";
 import { NodeAppsPanel } from "./NodeApps";
 
-/** Proxmox: LXC hosts under the host whose hostname is their node, sorted by CT ID. */
+/** Proxmox ID of a VM or LXC container (from its node, else from install.sh LXC=all). */
+export const guestId = (h: Host) => h.vmid || h.info.pve_ctid;
+
+/** Hierarchy from parent_id (see server/guests.go): children sorted by VM / CT ID, then name. */
 export function proxmoxTree(hosts: Host[]) {
-  const short = (n: string) => n.split(".")[0].toLowerCase();
-  const byName = new Map(hosts.filter((h) => h.info.hostname).map((h) => [short(h.info.hostname!), h]));
+  const byId = new Map(hosts.map((h) => [h.id, h]));
   const parentOf = new Map<number, Host>();
   const kids = new Map<number, Host[]>();
   for (const h of hosts) {
-    const p = h.info.pve_ctid && h.info.pve_node ? byName.get(short(h.info.pve_node)) : undefined;
+    const p = h.parent_id != null ? byId.get(h.parent_id) : undefined;
     if (!p || p.id === h.id) continue;
     parentOf.set(h.id, p);
     kids.set(p.id, [...(kids.get(p.id) ?? []), h]);
   }
-  for (const k of kids.values()) k.sort((a, b) => a.info.pve_ctid! - b.info.pve_ctid!);
+  for (const k of kids.values()) k.sort((a, b) => (guestId(a) ?? Infinity) - (guestId(b) ?? Infinity) || a.name.localeCompare(b.name));
   return { parentOf, kids };
 }
+
+/** "3 CT · 1 VM" for the guests of a node. */
+export const guestCount = (ks: Host[]) => {
+  const ct = ks.filter((k) => k.info.virtualization === "lxc").length;
+  return [ct && `${ct} CT`, ks.length - ct && `${ks.length - ct} VM`].filter(Boolean).join(" · ");
+};
 
 export function HostsPage() {
   const { data, error, refresh } = usePoll(() => api.get<Host[]>("/api/hosts"), 15000, [], ["hosts", "metrics"]);
   const [adding, setAdding] = useState(false);
   const [mass, setMass] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const toast = useToast();
+  const outdated = data?.filter((h) => h.connected && h.agent_outdated).length ?? 0;
+  const updateAll = async () => {
+    setUpdating(true);
+    try {
+      const r = await api.post<{ sent: number; busy: number }>("/api/hosts/update-agents");
+      toast(r.sent ? `Mise à jour demandée à ${r.sent} agent(s)${r.busy ? `, ${r.busy} occupé(s) par une autre action` : ""}` : "Tous les agents connectés sont déjà à jour");
+      refresh();
+    } catch (e) { toast((e as Error).message, "error"); }
+    setUpdating(false);
+  };
   const [open, setOpen] = useState<Set<number>>(new Set());
   const online = data?.filter((h) => h.connected).length ?? 0;
   // Proxmox hosts unfold into their LXC containers.
   const { kids, rows } = useMemo(() => {
     const { parentOf, kids } = proxmoxTree(data ?? []);
-    const rows = (data ?? []).filter((h) => !parentOf.has(h.id)).flatMap((h) => [{ h, child: false }, ...(open.has(h.id) ? (kids.get(h.id) ?? []).map((k) => ({ h: k, child: true })) : [])]);
+    const unfold = (h: Host, depth: number, seen: Set<number>): { h: Host; depth: number }[] => seen.has(h.id) ? [] : (seen.add(h.id),
+      [{ h, depth }, ...(open.has(h.id) ? (kids.get(h.id) ?? []).flatMap((k) => unfold(k, depth + 1, seen)) : [])]);
+    const seen = new Set<number>();
+    const rows = (data ?? []).filter((h) => !parentOf.has(h.id)).flatMap((h) => unfold(h, 0, seen));
     return { kids, rows };
   }, [data, open]);
   const toggle = (id: number) => setOpen((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
@@ -47,10 +70,10 @@ export function HostsPage() {
     const down = ks.filter((k) => statusKind(k.status) === "down").length;
     return (
       <span className="flex shrink-0 items-center gap-1.5">
-        <button type="button" aria-expanded={open.has(h.id)} aria-label={`${open.has(h.id) ? "Replier" : "Déplier"} les conteneurs de ${h.name}`}
+        <button type="button" aria-expanded={open.has(h.id)} aria-label={`${open.has(h.id) ? "Replier" : "Déplier"} les invités de ${h.name}`}
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(h.id); }}
           className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-normal text-meta hover:bg-box hover:text-h1">
-          {open.has(h.id) ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}{ks.length} CT
+          {open.has(h.id) ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}{guestCount(ks)}
         </button>
         {down > 0 && <Badge tone="red" dot>{down} en panne</Badge>}
       </span>
@@ -60,6 +83,10 @@ export function HostsPage() {
     <>
       <PageHeader title="Hôtes" description="Machines virtuelles, serveurs Proxmox, serveurs physiques et postes équipés de l'agent."
         actions={<>
+          <Button variant="secondary" icon={<RefreshCw size={16} />} loading={updating} onClick={updateAll}
+            title="Demande aux agents connectés de se mettre à jour maintenant, sans attendre leur vérification quotidienne">
+            Mettre à jour les agents{outdated ? ` (${outdated})` : ""}
+          </Button>
           <Button variant="secondary" icon={<Users size={16} />} onClick={() => setMass(true)}>Déploiement en masse</Button>
           <Button icon={<Plus size={16} />} onClick={() => setAdding(true)}>Ajouter un hôte</Button>
         </>} />
@@ -74,13 +101,13 @@ export function HostsPage() {
       {data && data.length > 0 && (
         <Card flush title="Hôtes" sub={`${data.length} hôte(s) · ${online} agent(s) connecté(s)`}>
           <ul className="mm-list sm:hidden">
-            {rows.map(({ h, child }) => (
+            {rows.map(({ h, depth }) => (
               <li key={h.id} className="flex items-center">
-                <Link to={`/hosts/${h.id}`} className={cn("mm-list__item min-w-0 flex-1 items-center no-underline", child && "pl-8")}>
+                <Link to={`/hosts/${h.id}`} className="mm-list__item min-w-0 flex-1 items-center no-underline" style={depth ? { paddingLeft: `${depth * 2}rem` } : undefined}>
                   <span className="flex min-w-0 items-center gap-3">
                     <StatusIcon status={h.status} size={18} />
                     <span className="min-w-0">
-                      <span className="mm-list__title flex items-center gap-2">{h.info.pve_ctid && <span className="font-mono text-xs text-meta">{h.info.pve_ctid}</span>}<span className="truncate">{h.name}</span></span>
+                      <span className="mm-list__title flex items-center gap-2">{guestId(h) && <span className="font-mono text-xs text-meta">{guestId(h)}</span>}<span className="truncate">{h.name}</span></span>
                       <span className="mm-list__meta block truncate font-mono">CPU {fmtPct(h.latest.cpu)} · RAM {fmtPct(pct(h.latest.mem_used, h.latest.mem_total))}</span>
                     </span>
                   </span>
@@ -94,11 +121,11 @@ export function HostsPage() {
             <table className="mm-table min-w-[60rem]">
               <thead><tr><th scope="col" className="mm-col-num">ID</th><th scope="col">Nom</th><th scope="col">État</th><th scope="col">Système</th><th scope="col" className="mm-col-num">CPU</th><th scope="col" className="mm-col-num">Mémoire</th><th scope="col" className="mm-col-num">Disque</th><th scope="col" className="mm-col-num">Réseau ↓ / ↑</th><th scope="col">Agent</th><th scope="col">Dernier contact</th></tr></thead>
               <tbody>
-                {rows.map(({ h, child }) => (
+                {rows.map(({ h, depth }) => (
                   <tr key={h.id} className="cursor-pointer" onClick={() => navigate(`/hosts/${h.id}`)}>
-                    <td className="mm-col-num font-mono text-xs">{h.info.pve_ctid ?? ""}</td>
+                    <td className="mm-col-num font-mono text-xs">{guestId(h) ?? ""}</td>
                     <td className="mm-col-strong">
-                      <span className={cn("flex min-w-0 items-center gap-2", child && "pl-6")}>
+                      <span className="flex min-w-0 items-center gap-2" style={depth ? { paddingLeft: `${depth * 1.5}rem` } : undefined}>
                         <Link to={`/hosts/${h.id}`} className="flex min-w-0 items-center gap-2.5 text-inherit no-underline hover:text-accent-text">
                           <StatusIcon status={h.status} />
                           <span className="min-w-0">
@@ -124,7 +151,7 @@ export function HostsPage() {
           </div>
         </Card>
       )}
-      <AddHostWizard open={adding} onClose={() => { setAdding(false); refresh(); }} />
+      <AddHostWizard open={adding} hosts={data ?? []} onClose={() => { setAdding(false); refresh(); }} />
       <MassDeployDialog open={mass} onClose={() => { setMass(false); refresh(); }} />
     </>
   );
@@ -143,7 +170,8 @@ export function HostDetailPage({ id }: { id: number }) {
   const myDisks = disks.data?.find((d) => d.host_id === id);
   const [install, setInstall] = useState<Install>();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [rename, setRename] = useState<string>();
+  const [edit, setEdit] = useState<{ name: string; parent: number; was: number }>();
+  const all = usePoll(() => api.get<Host[]>("/api/hosts"), 60000, [], ["hosts"]);
   const toast = useToast();
   const h = host.data;
   useTitle(h?.name ?? "Hôtes");
@@ -161,10 +189,11 @@ export function HostDetailPage({ id }: { id: number }) {
     load: [{ label: "Charge (1 min)", values: m.load1 }],
   }, [m]);
 
-  const update = async (patch: Partial<Host>) => {
+  const update = async (patch: Partial<Host> & { parent?: number }) => {
     try {
       host.setData(await api.patch<Host>(`/api/hosts/${id}`, patch));
-    } catch (e) { toast((e as Error).message, "error"); }
+      return true;
+    } catch (e) { toast((e as Error).message, "error"); return false; }
   };
 
   if (host.error) return <Alert kind="error" title="Hôte introuvable">{host.error}</Alert>;
@@ -173,16 +202,17 @@ export function HostDetailPage({ id }: { id: number }) {
   const l = isLive ? live.data!.metrics! : h.latest;
   const pctFmt = (v: number) => `${Math.round(v)} %`;
   const temp = l.cpu_temp ?? l.temp;
+  const parent = all.data?.find((p) => p.id === h.parent_id);
 
   return (
     <>
       <PageHeader
         crumbs={<><Link to="/hosts" className="text-meta no-underline hover:text-accent-text">Hôtes</Link><ChevronRight size={14} aria-hidden /><span className="text-h2">{h.name}</span></>}
         title={<span className="flex items-center gap-3"><StatusIcon status={h.status} size={26} />{h.name}</span>}
-        description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.info.os && <Tag>{h.info.os}</Tag>}{h.info.pve_ctid && <Tag>CT {h.info.pve_ctid}{h.info.pve_node ? ` · ${h.info.pve_node}` : ""}</Tag>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
+        description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.info.os && <Tag>{h.info.os}</Tag>}{guestId(h) && <Tag>{h.info.virtualization === "lxc" ? "CT" : "VM"} {guestId(h)}</Tag>}{parent && <Link to={`/hosts/${parent.id}`} className="no-underline"><Tag>Sous {parent.name}</Tag></Link>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
         actions={<>
           <Switch label="Maintenance" checked={h.maintenance} onChange={(v) => update({ maintenance: v })} />
-          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setRename(h.name)}>Renommer</Button>
+          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => { const p = h.parent_manual ? (h.parent_id ?? 0) : -1; setEdit({ name: h.name, parent: p, was: p }); }}>Modifier</Button>
           <Button variant="secondary" icon={<KeyRound size={16} />} onClick={() => api.post<{ install: Install }>(`/api/hosts/${id}/token`).then((r) => setInstall(r.install))}>Régénérer le jeton</Button>
           <Button variant="danger-ghost" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)}>Supprimer</Button>
         </>} />
@@ -309,13 +339,18 @@ export function HostDetailPage({ id }: { id: number }) {
         footer={<Button onClick={() => setInstall(undefined)}>Terminer</Button>}>
         {install && <InstallInstructions install={install} name={h.name} />}
       </Dialog>
-      <Dialog open={rename != null} onClose={() => setRename(undefined)} size="sm" title={`Renommer ${h.name}`}
-        description="Le nouveau nom est repris par l'inventaire de la gestion à la prochaine synchronisation."
-        footer={<><Button variant="secondary" onClick={() => setRename(undefined)}>Annuler</Button>
-          <Button type="submit" form="rename-form">Renommer</Button></>}>
-        <form id="rename-form" onSubmit={async (e) => { e.preventDefault(); await update({ name: rename }); setRename(undefined); }}>
-          <Field label="Nom" htmlFor="h-name"><input id="h-name" className={inputClass} value={rename ?? ""} onChange={(e) => setRename(e.target.value)} autoFocus /></Field>
-        </form>
+      <Dialog open={edit != null} onClose={() => setEdit(undefined)} size="sm" title={`Modifier ${h.name}`}
+        description="Le nom et l'hôte parent sont repris par l'inventaire de la gestion à la prochaine synchronisation."
+        footer={<><Button variant="secondary" onClick={() => setEdit(undefined)}>Annuler</Button>
+          <Button type="submit" form="edit-form">Enregistrer</Button></>}>
+        {edit && (
+          <form id="edit-form" className="grid gap-5" onSubmit={async (e) => { e.preventDefault(); if (await update({ name: edit.name, ...(edit.parent !== edit.was && { parent: edit.parent }) })) { setEdit(undefined); all.refresh(); } }}>
+            <Field label="Nom" htmlFor="h-name"><input id="h-name" className={inputClass} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} autoFocus /></Field>
+            <Field label="Hôte parent" htmlFor="h-parent" hint="Automatique : le Proxmox qui voit cette machine sur ses bridges. Un choix manuel n'est jamais modifié.">
+              <ParentSelect id="h-parent" hosts={all.data ?? []} self={h.id} value={edit.parent} onChange={(parent) => setEdit({ ...edit, parent })} />
+            </Field>
+          </form>
+        )}
       </Dialog>
       <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} size="sm" title={`Supprimer ${h.name}`}
         footer={<><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annuler</Button>

@@ -57,7 +57,7 @@ Mise à jour : le bouton *Mettre à jour l'agent* passe par l'assistant root `ap
 
 ## Proxmox et conteneurs LXC
 
-Dans l'assistant, le type *Serveur Proxmox* propose **Installer aussi dans les conteneurs LXC Debian démarrés**, activé par défaut. La commande contient alors `LXC=all` et un jeton commun valable 7 jours (`LXC_TOKEN`). Le script :
+Dans l'assistant, le type *Serveur Proxmox* propose **Installer aussi dans les conteneurs LXC Debian démarrés**, activé par défaut. La commande contient alors `LXC=all` et un jeton commun sans expiration (`LXC_TOKEN`), gardé sur le Proxmox dans `/etc/hlm-agent/lxc.env` (lisible par root seulement) pour équiper les futurs conteneurs. Le script :
 
 1. installe l'agent sur le Proxmox lui-même ;
 2. pour chaque conteneur démarré (`pct list`), vérifie qu'il s'agit d'une Debian avec systemd. Les autres conteneurs sont ignorés ;
@@ -65,7 +65,18 @@ Dans l'assistant, le type *Serveur Proxmox* propose **Installer aussi dans les c
 4. lance l'installation dans le conteneur, sans SMART. Chaque conteneur s'inscrit sous son nom avec le jeton commun.
 5. écrit dans la configuration du conteneur son ID (`PVE_CTID`) et le nom du Proxmox (`PVE_NODE`). Dans **Hôtes**, le Proxmox se déplie alors sur ses conteneurs, triés par ID ; sur la **Carte**, ils sont placés sous lui. Pour les conteneurs déjà équipés, relancez la même ligne sur le Proxmox : ils ne sont pas réinscrits, seule leur configuration est complétée.
 
-Il affiche ensuite un bilan (`CT 101 (nextcloud): installed`…). Relancez la même ligne pour équiper les conteneurs créés depuis : ceux qui ont déjà l'agent ne sont pas réinscrits. Les conteneurs arrêtés et les machines virtuelles (QEMU) ne sont pas concernés ; installez l'agent dans une VM comme sur n'importe quelle machine.
+Il affiche ensuite un bilan (`CT 101 (nextcloud): installed`…), puis active `hlm-agent-lxc.timer`. Toutes les 2 minutes, ce timer (script root `lxc-sync.sh`) :
+
+- installe l'agent dans chaque **nouveau** conteneur Debian démarré qui ne l'a pas encore (un échec est retenté au bout d'une heure). Un conteneur avec l'étiquette Proxmox `no-hlm` est laissé de côté ;
+- liste tous les conteneurs du cluster. Quand un conteneur est **supprimé** de Proxmox, le hub supprime son hôte (et l'inscrit au journal). Un conteneur arrêté ou migré vers un autre nœud n'est pas concerné.
+
+Une installation faite avant ce timer ne l'a pas : relancez une fois la ligne avec `LXC=all` et un jeton `LXC_TOKEN=enr_…` valide (*Hôtes → Déploiement en masse*). `LXC=none` arrête le timer ; une relance sans `LXC` garde le choix précédent. Les machines virtuelles (QEMU) ne sont pas concernées ; installez l'agent dans une VM comme sur n'importe quelle machine.
+
+### Hiérarchie Proxmox → VM et conteneurs
+
+L'agent du Proxmox relève, sans droits root, les invités branchés sur ses bridges (ports `tap<VMID>i…` et `veth<CTID>i…`) et les adresses MAC apprises sur chacun. Le hub place sous le Proxmox chaque hôte dont une adresse MAC correspond, VM comme conteneur, avec son ID. Il suffit que l'agent du Proxmox soit à jour : rien à relancer, rien à installer dans les invités. Les conteneurs installés avec `LXC=all` sont aussi rattachés par `PVE_NODE`.
+
+Pour un autre parent (une VM sur un hyperviseur sans agent, un serveur physique…), choisissez l'**hôte parent** dans l'assistant d'ajout ou sur la fiche de l'hôte (*Hôte parent*). Un parent choisi à la main n'est jamais modifié automatiquement ; *Automatique* rend la main à la détection. La carte du homelab (gestion) reprend ces rattachements pour les éléments qui n'ont pas encore d'hôte.
 
 Dans un conteneur non privilégié sans *nesting*, systemd ne peut pas toujours mettre en place l'isolation du service (espaces de noms). Le script le détecte et ajoute alors `/etc/systemd/system/hlm-agent.service.d/container.conf`, qui retire ces protections **dans ce conteneur uniquement**.
 
@@ -109,7 +120,7 @@ Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gèr
 | `DOCKER` | `auto` | Suivi Docker : activé si `docker` est installé |
 | `NODE_APPS` | `auto` | Applications Node.js : activé si `/usr/local/bin/node-app` existe (playbook base-node) |
 | `NODE_APPS_ACTIONS` | `1` | `0` : applications Node.js en lecture seule (pas de déploiement ni de redémarrage) |
-| `LXC` | — | `all` sur un Proxmox : installer aussi dans chaque conteneur LXC Debian démarré |
+| `LXC` | — | `all` sur un Proxmox : installer aussi dans chaque conteneur LXC Debian démarré, puis dans les nouveaux (timer) ; `none` : arrêter le timer |
 | `LXC_TOKEN` | `TOKEN` | Jeton commun `enr_…` utilisé par les conteneurs LXC |
 | `VERSION` | dernière | Installer une release précise (`v0.1.4`) |
 | `REPO` | `midnights-ra1n/homelab-management` | Dépôt hébergeant les releases (fork) |

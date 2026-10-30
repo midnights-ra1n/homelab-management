@@ -133,6 +133,11 @@ var migrations = []string{
 	remindersTable,
 	remindersRef,
 	`ALTER TABLE hosts ADD COLUMN node_apps TEXT NOT NULL DEFAULT '{}';`,
+	// Hierarchy: Proxmox node → VMs and LXC containers (see guests.go).
+	`ALTER TABLE hosts ADD COLUMN parent_id INTEGER REFERENCES hosts(id) ON DELETE SET NULL;
+	ALTER TABLE hosts ADD COLUMN parent_manual INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE hosts ADD COLUMN vmid INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE hosts ADD COLUMN pve TEXT NOT NULL DEFAULT '{}';`,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's

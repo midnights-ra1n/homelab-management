@@ -22,6 +22,8 @@ import { OAuthConsent } from "./shared/OAuthConsent";
 
 const ManagementApp = lazy(() => import("./mg/App"));
 const MapPage = lazy(() => import("./pages/Map"));
+const SupervisionPage = lazy(() => import("./pages/Supervision")); // shares the Map chunk
+const WallPage = lazy(() => import("./pages/Supervision").then((m) => ({ default: m.WallPage })));
 
 interface AuthState {
   setup_required: boolean; authenticated: boolean; username: string; version: string; dev_mode: boolean;
@@ -40,7 +42,7 @@ function App() {
   };
   if (auth) setAppName(auth.role);
   // The management interface sets its own titles once signed in.
-  useTitle((auth?.role === "management" && auth.authenticated) || path === "/status" || seg[1] ? undefined : auth && !auth.authenticated ? (auth.setup_required ? "Premier démarrage" : "Connexion") : PAGE_TITLES[seg[0] ?? ""] ?? "");
+  useTitle((auth?.role === "management" && auth.authenticated) || path === "/status" || path === "/wall" || seg[1] ? undefined : auth && !auth.authenticated ? (auth.setup_required ? "Premier démarrage" : "Connexion") : PAGE_TITLES[seg[0] ?? ""] ?? "");
 
   const loadAuth = () => api.get<AuthState>("/api/auth/state").then(setAuth, () => setAuth(undefined));
   useEffect(() => { loadAuth(); }, []);
@@ -59,6 +61,7 @@ function App() {
   }, []);
 
   if (path === "/status" && auth?.role !== "management") return <PublicStatusPage />;
+  if (path === "/wall" && auth?.role !== "management") return <Suspense fallback={null}><WallPage /></Suspense>;
   if (!auth) return null;
   const devBanner = auth.dev_mode && (
     <Alert kind="warning" className="rounded-none border-x-0 border-t-0" title="Mode test : données simulées et compte admin / devmode-password. Ne jamais exposer cette instance." />
@@ -77,6 +80,7 @@ function App() {
   let page;
   if (seg[0] === "hosts" && seg[1]) page = <HostDetailPage id={Number(seg[1])} />;
   else if (seg[0] === "hosts") page = <HostsPage />;
+  else if (seg[0] === "supervision") page = <Suspense fallback={null}><SupervisionPage /></Suspense>;
   else if (seg[0] === "map") page = <Suspense fallback={null}><MapPage /></Suspense>;
   else if (seg[0] === "monitors" && seg[1]) page = <MonitorDetailPage id={Number(seg[1])} />;
   else if (seg[0] === "monitors") page = <MonitorsPage />;

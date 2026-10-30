@@ -1,5 +1,5 @@
 /* Monitoring map: the hub, the SNMP devices, the hosts (VPS, physical servers, VMs, Proxmox
-   nodes with their LXC containers on a row below) with their containers and the probes that target them, and the WireGuard tunnels between hosts, live. Columns are dragged as a whole; their place is kept in the
+   nodes with their VMs and LXC containers on a row below) with their containers and the probes that target them, and the WireGuard tunnels between hosts, live. Columns are dragged as a whole; their place is kept in the
    preferences shared with the apps (key "map_positions"). */
 import "@xyflow/react/dist/style.css";
 import {
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { api, fmtBytes, fmtMbps, fmtMs, fmtPct, hostStatusLabel, pct, savePrefs, statusLabel, type Host, type Monitor, type MonitorType, type Overview, type Preferences } from "../api";
 import { containerKind } from "./Containers";
-import { proxmoxTree } from "./Hosts";
+import { guestCount, guestId, proxmoxTree } from "./Hosts";
 import { Alert, Badge, ButtonLink, EmptyState, IconButton, Link, Logo, Meter, PageHeader, Skeleton, StatusIcon, cn, inputClass, kindTone, statusKind, usePoll, type StatusKind, type Tone } from "../ui";
 
 type Variant = "hub" | "host" | "device" | "group" | "container" | "monitor";
@@ -130,7 +130,7 @@ function buildGraph(o: Overview, show: { containers: boolean; monitors: boolean 
   const roleOf = new Map(o.hosts.map((h) => [h.id, hostRole(h.info)]));
   const pve = proxmoxTree(o.hosts);
   const sorted = [...o.hosts].sort((a, b) => ROLE_ORDER.indexOf(roleOf.get(a.id)!) - ROLE_ORDER.indexOf(roleOf.get(b.id)!)
-    || (a.info.pve_ctid ?? 0) - (b.info.pve_ctid ?? 0) || a.name.localeCompare(b.name));
+    || (guestId(a) ?? 0) - (guestId(b) ?? 0) || a.name.localeCompare(b.name));
   for (const h of sorted) {
     const l = h.latest;
     const role = ROLE[roleOf.get(h.id)!];
@@ -138,12 +138,14 @@ function buildGraph(o: Overview, show: { containers: boolean; monitors: boolean 
     const hw = [h.info.manufacturer, h.info.model].filter(Boolean).join(" ");
     for (const k of [h.name, h.info.hostname, h.info.hostname?.split(".")[0]]) if (k) hostByName.set(k.toLowerCase(), h.id);
     const cs = h.docker?.containers ?? [];
-    const parent = pve.parentOf.get(h.id);
+    // shortcut: one row of guests under each top-level host; a guest of a guest (nested Proxmox) joins that row. Lay out deeper rows if nesting becomes common.
+    let parent = pve.parentOf.get(h.id);
+    for (let n = 0; parent && pve.parentOf.has(parent.id) && n < 16; n++) parent = pve.parentOf.get(parent.id);
     hosts.set(h.id, {
       parent: parent && `h${parent.id}`,
       head: node(`h${h.id}`, {
         variant: "host", kind: statusKind(h.status), title: h.name,
-        tag: h.info.pve_ctid ? `${role.label} · ${h.info.pve_ctid}` : pve.kids.has(h.id) ? `Proxmox VE · ${pve.kids.get(h.id)!.length} CT` : role.label, icon: <role.Icon size={17} />, href: `/hosts/${h.id}`,
+        tag: guestId(h) ? `${role.label} · ${guestId(h)}` : pve.kids.has(h.id) ? `Proxmox VE · ${guestCount(pve.kids.get(h.id)!)}` : role.label, icon: <role.Icon size={17} />, href: `/hosts/${h.id}`,
         sub: (roleOf.get(h.id) === "physical" && hw) || ips.find((a) => !a.iface.startsWith("wg"))?.address || h.info.os || h.info.hostname,
         meters: h.connected || l.cpu != null ? [
           { label: "CPU", value: l.cpu ?? null }, { label: "RAM", value: pct(l.mem_used, l.mem_total) }, { label: "Disque", value: pct(l.disk_used, l.disk_total) },

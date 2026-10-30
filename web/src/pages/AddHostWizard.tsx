@@ -128,9 +128,29 @@ function Stepper({ step }: { step: number }) {
   );
 }
 
-export function AddHostWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** Parent of a host: -1 automatic (the Proxmox node that runs it), 0 none, else a host id.
+    The host itself and the hosts under it are left out. */
+export function ParentSelect({ id, hosts, self, value, onChange, disabled }: {
+  id: string; hosts: Host[]; self?: number; value: number; onChange: (v: number) => void; disabled?: boolean;
+}) {
+  const below = new Set(self != null ? [self] : []);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const h of hosts) if (h.parent_id != null && below.has(h.parent_id) && !below.has(h.id)) { below.add(h.id); grew = true; }
+  }
+  return (
+    <select id={id} className={inputClass} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))}>
+      <option value={-1}>Automatique (Proxmox détecté par l'agent)</option>
+      <option value={0}>Aucun</option>
+      {hosts.filter((h) => !below.has(h.id)).map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+    </select>
+  );
+}
+
+export function AddHostWizard({ open, onClose, hosts = [] }: { open: boolean; onClose: () => void; hosts?: Host[] }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
+  const [parent, setParent] = useState(-1);
   const [kind, setKind] = useState<Kind>("vm");
   const [opts, setOpts] = useState<InstallOptions>({ smart: false, autoUpdate: true });
   const [lxc, setLxc] = useState(true);
@@ -140,7 +160,7 @@ export function AddHostWizard({ open, onClose }: { open: boolean; onClose: () =>
   const [busy, setBusy] = useState(false);
 
   const close = () => {
-    setStep(0); setName(""); setKind("vm"); setOpts({ smart: false, autoUpdate: true }); setLxc(true);
+    setStep(0); setName(""); setParent(-1); setKind("vm"); setOpts({ smart: false, autoUpdate: true }); setLxc(true);
     setCreated(undefined); setHost(undefined); setError(undefined);
     onClose();
   };
@@ -161,10 +181,11 @@ export function AddHostWizard({ open, onClose }: { open: boolean; onClose: () =>
     setBusy(true);
     setError(undefined);
     try {
-      const r = await api.post<{ id: number; install: Install }>("/api/hosts", { name });
+      const r = await api.post<{ id: number; install: Install }>("/api/hosts", { name, parent });
       if (kind === "proxmox" && lxc) {
-        // LXC containers enroll themselves with a shared token, one host each.
-        const e = await api.post<{ install: Install }>("/api/enroll-tokens", { name: `LXC de ${name}`, expires_at: Math.floor(Date.now() / 1000) + 7 * 86400 });
+        // LXC containers enroll themselves with a shared token, one host each. No expiry:
+        // the Proxmox host keeps it (root only) to equip the containers created later.
+        const e = await api.post<{ install: Install }>("/api/enroll-tokens", { name: `LXC de ${name}` });
         setOpts((o) => ({ ...o, lxcToken: e.install.token }));
       } else {
         setOpts((o) => ({ ...o, lxcToken: undefined }));
@@ -217,7 +238,12 @@ export function AddHostWizard({ open, onClose }: { open: boolean; onClose: () =>
           <Switch label="Surveiller les disques (SMART, installe smartmontools)" checked={opts.smart} onChange={(v) => setOpts({ ...opts, smart: v })} />
           <Switch label="Mise à jour automatique quotidienne de l'agent" checked={opts.autoUpdate} onChange={(v) => setOpts({ ...opts, autoUpdate: v })} />
           {kind === "proxmox" && (
-            <Switch label="Installer aussi dans les conteneurs LXC Debian démarrés" checked={lxc} onChange={setLxc} />
+            <Switch label="Installer aussi dans les conteneurs LXC Debian démarrés, puis dans les nouveaux" checked={lxc} onChange={setLxc} />
+          )}
+          {kind === "vm" && (
+            <Field label="Hôte parent" htmlFor="wiz-parent" hint="Le serveur physique ou le Proxmox qui fait tourner cette machine. Automatique : le Proxmox qui la voit sur ses bridges.">
+              <ParentSelect id="wiz-parent" hosts={hosts} value={parent} onChange={setParent} disabled={!!created} />
+            </Field>
           )}
         </form>
       )}

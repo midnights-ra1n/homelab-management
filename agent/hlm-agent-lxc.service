@@ -1,0 +1,10 @@
+[Unit]
+Description=Midnights Monitoring agent: agent in the new LXC containers of this Proxmox host
+Documentation=https://github.com/midnights-ra1n/homelab-management
+
+[Service]
+Type=oneshot
+# Root-owned helper with a fixed job (pct list / push / exec); see lxc-sync.sh.
+ExecStart=/usr/local/lib/hlm-agent/lxc-sync.sh
+TimeoutStartSec=30min
+Nice=10

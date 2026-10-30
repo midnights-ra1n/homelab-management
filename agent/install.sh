@@ -10,8 +10,10 @@
 #   NODE_APPS=false|true  Node.js apps of the base-node playbook (default: enabled when
 #                         /usr/local/bin/node-app exists); NODE_APPS_ACTIONS=0 keeps them read-only
 #   LXC=all               on a Proxmox host, also install in every running Debian LXC container,
-#                         with the shared enrollment token LXC_TOKEN (enr_…, defaults to TOKEN);
-#                         each container gets PVE_CTID and PVE_NODE to be shown under this host
+#                         with the shared enrollment token LXC_TOKEN (enr_…, defaults to TOKEN),
+#                         then every 2 minutes in each new one (hlm-agent-lxc.timer, tag a CT
+#                         no-hlm to leave it out); the hub drops the hosts of deleted containers.
+#                         LXC=none stops that; without LXC, a re-run keeps the current choice
 #   VERSION=v0.1.12       pin a release (default: latest)
 #   REPO=owner/name       GitHub repository hosting the releases
 #   INSTALL_METHOD=deb    set by the hlm-agent .deb: no self-update, updates go through the package
@@ -30,7 +32,8 @@ FILES="install.sh hlm-agent.service hlm-agent-smart.service hlm-agent-smart.time
        hlm-agent-docker.service hlm-agent-docker.timer hlm-agent-docker-update.path
        hlm-agent-docker-update.service docker-helper.sh
        hlm-agent-node-read.path hlm-agent-node-read.service hlm-agent-node-action.path
-       hlm-agent-node-action.service node-app-helper.sh"
+       hlm-agent-node-action.service node-app-helper.sh
+       hlm-agent-lxc.service hlm-agent-lxc.timer lxc-sync.sh"
 
 die() { echo "hlm-agent install: $*" >&2; exit 1; }
 say() { echo "hlm-agent install: $*"; }
@@ -198,42 +201,32 @@ fi
 systemctl is-active -q hlm-agent || die "hlm-agent did not start, see: journalctl -u hlm-agent -n 30"
 echo "hlm-agent $("$PREFIX/hlm-agent" --version) installed and running on $(hostname)"
 
-# Proxmox: install the same files in every running Debian LXC container.
+# Proxmox: install the same files in every running Debian LXC container, now and in the new ones.
 if [ "${LXC:-}" = all ]; then
   command -v pct >/dev/null 2>&1 || die "LXC=all only works on a Proxmox host"
   ctoken=${LXC_TOKEN:-${TOKEN:-}}
   case "$ctoken" in enr_*) ;; *) die "LXC=all needs a shared enrollment token: LXC_TOKEN=enr_… (Hôtes → Déploiement en masse)" ;; esac
   conf() { sed -n "s/^$1=//p" "$CONF" | head -n1; }
-  chub=${HUB_URL:-$(conf HUB_URL)}; ckey=${KEY:-$(conf KEY)}; cinsecure=${ALLOW_INSECURE:-$(conf ALLOW_INSECURE)}
-  ok=0; failed=0
-  say "installing in the running LXC containers (hub $chub)"
-  for ct in $(pct list | awk 'NR > 1 && $2 == "running" { print $1 }'); do
-    name=$(pct config "$ct" | sed -n 's/^hostname: //p')
-    if ! pct exec "$ct" -- sh -c 'test -f /etc/debian_version && command -v systemctl' >/dev/null 2>&1; then
-      echo "  CT $ct ($name): not Debian with systemd, skipped"; continue
-    fi
-    echo "  CT $ct ($name): pushing the files"
-    pct exec "$ct" -- sh -c 'rm -rf /tmp/hlm-bundle && mkdir -m 0700 /tmp/hlm-bundle'
-    all="hlm-agent sum $FILES"; n=$(echo $all | wc -w); i=0
-    for f in $all; do
-      i=$((i + 1))
-      [ -t 1 ] && printf '\r      [%-20s] %d/%d' "$(printf '%*s' $((i * 20 / n)) '' | tr ' ' '#')" "$i" "$n"
-      pct push "$ct" "$TMP/$f" "/tmp/hlm-bundle/$f"
-    done
-    [ -t 1 ] && echo
-    # pct exec keeps the host environment: blank what must not reach the container,
-    # LXC above all (the container has no pct and would fail on LXC=all).
-    { pct exec "$ct" -- env LXC= LXC_TOKEN= DOCKER= NODE_APPS= INSTALL_METHOD= PVE_CTID="$ct" PVE_NODE="$(hostname)" \
-        HUB_URL="$chub" TOKEN="$ctoken" KEY="$ckey" ALLOW_INSECURE="$cinsecure" \
-        AUTO_UPDATE="${AUTO_UPDATE:-}" SMART=false REMOTE_UPDATES="$remote" REPO="$REPO" BUNDLE=/tmp/hlm-bundle \
-        sh /tmp/hlm-bundle/install.sh 2>&1 && rc=0 || rc=$?; echo "$rc" > "$TMP/rc"; } | sed 's/^/      /'
-    if [ "$(cat "$TMP/rc")" = 0 ]; then
-      echo "  CT $ct ($name): installed"; ok=$((ok + 1))
-    else
-      echo "  CT $ct ($name): FAILED, last lines of journalctl -u hlm-agent:"; failed=$((failed + 1))
-      pct exec "$ct" -- journalctl -u hlm-agent -n 15 --no-pager 2>&1 | sed 's/^/      /' || true
-    fi
-    pct exec "$ct" -- rm -rf /tmp/hlm-bundle || true
-  done
-  echo "LXC containers: $ok installed, $failed failed"
+  umask 077
+  {
+    echo "HUB_URL=${HUB_URL:-$(conf HUB_URL)}"
+    echo "LXC_TOKEN=$ctoken"
+    echo "KEY=${KEY:-$(conf KEY)}"
+    echo "ALLOW_INSECURE=${ALLOW_INSECURE:-$(conf ALLOW_INSECURE)}"
+    echo "AUTO_UPDATE=${AUTO_UPDATE:-}"
+    echo "REMOTE_UPDATES=$remote"
+    echo "REPO=$REPO"
+  } > "$CONF_DIR/lxc.env"
+  umask 022
+  rm -rf "$LIBEXEC/bundle"; install -d -m 0700 "$LIBEXEC/bundle"
+  for f in hlm-agent sum $FILES; do install -m 0600 "$TMP/$f" "$LIBEXEC/bundle/$f"; done
+  # The timer is enabled after the first pass, which would otherwise wait for its lock.
+  helper true "" lxc-sync.sh hlm-agent-lxc.service hlm-agent-lxc.timer
+  say "installing in the running LXC containers (hub $(sed -n 's/^HUB_URL=//p' "$CONF_DIR/lxc.env"))"
+  "$LIBEXEC/lxc-sync.sh" all
+  systemctl enable --now hlm-agent-lxc.timer >/dev/null 2>&1 || true
+  say "new LXC containers will get the agent within 2 minutes (hlm-agent-lxc.timer)"
+elif [ "${LXC:-}" = none ]; then
+  helper false hlm-agent-lxc.timer lxc-sync.sh hlm-agent-lxc.service hlm-agent-lxc.timer
+  rm -rf "$CONF_DIR/lxc.env" "$LIBEXEC/bundle" "$STATE/lxc"
 fi

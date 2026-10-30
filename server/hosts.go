@@ -135,6 +135,7 @@ type agentMsg struct {
 	Docker  *dockerSnapshot `json:"docker,omitempty"`
 	// node_apps and node_read (answer to a nodeRead)
 	NodeApps *nodeSnapshot   `json:"node_apps,omitempty"`
+	Pve      *pveReport      `json:"pve,omitempty"` // Proxmox node: its guests (guests.go)
 	Read     *nodeReadResult `json:"read,omitempty"`
 	// action_result fields
 	Action  string `json:"action,omitempty"`
@@ -171,6 +172,10 @@ type Host struct {
 	AgentLatest string          `json:"agent_latest"`   // latest published agent release, "" if unknown
 	Outdated    bool            `json:"agent_outdated"` // agent older than AgentLatest
 	CreatedAt   int64           `json:"created_at"`
+	// Proxmox node (or physical host) above this one, see guests.go.
+	ParentID     *int64 `json:"parent_id"`
+	ParentManual bool   `json:"parent_manual"` // chosen in the dashboard, never changed automatically
+	VMID         int    `json:"vmid,omitempty"`
 }
 
 type hostAction struct {
@@ -327,7 +332,7 @@ func (s *Server) pingDownHosts(ctx context.Context, hosts []Host) {
 }
 
 func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
-	rows, err := s.db.Query(`SELECT id,name,last_seen,maintenance,public,info,latest,updates,action,docker,node_apps,created_at FROM hosts `+where+` ORDER BY name COLLATE NOCASE`, args...)
+	rows, err := s.db.Query(`SELECT id,name,last_seen,maintenance,public,info,latest,updates,action,docker,node_apps,created_at,parent_id,parent_manual,vmid FROM hosts `+where+` ORDER BY name COLLATE NOCASE`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +341,7 @@ func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
 	for rows.Next() {
 		var h Host
 		var info, latest, updates, action, docker, nodeApps string
-		if err := rows.Scan(&h.ID, &h.Name, &h.LastSeen, &h.Maintenance, &h.Public, &info, &latest, &updates, &action, &docker, &nodeApps, &h.CreatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.Name, &h.LastSeen, &h.Maintenance, &h.Public, &info, &latest, &updates, &action, &docker, &nodeApps, &h.CreatedAt, &h.ParentID, &h.ParentManual, &h.VMID); err != nil {
 			return nil, err
 		}
 		h.Info, h.Latest = json.RawMessage(info), json.RawMessage(latest)
@@ -437,8 +442,10 @@ func (s *Server) installInfo(r *http.Request, token string) map[string]string {
 
 func (s *Server) handleCreateHost(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name string `json:"name"`
+		Name   string `json:"name"`
+		Parent int64  `json:"parent"` // -1 automatic (default), 0 none, else a host id
 	}
+	req.Parent = -1
 	if !readJSON(w, r, &req) {
 		return
 	}
@@ -447,8 +454,13 @@ func (s *Server) handleCreateHost(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, msg)
 		return
 	}
+	parent, manual, msg := s.parentFromRequest(0, req.Parent)
+	if msg != "" {
+		writeErr(w, 400, msg)
+		return
+	}
 	tok := randomToken(32)
-	res, err := s.db.Exec(`INSERT INTO hosts(name,token_hash,created_at) VALUES(?,?,?)`, name, hashToken(tok), time.Now().Unix())
+	res, err := s.db.Exec(`INSERT INTO hosts(name,token_hash,created_at,parent_id,parent_manual) VALUES(?,?,?,?,?)`, name, hashToken(tok), time.Now().Unix(), parent, manual)
 	if err != nil {
 		serverErr(w, err)
 		return
@@ -485,9 +497,24 @@ func (s *Server) handleUpdateHost(w http.ResponseWriter, r *http.Request) {
 		Name        *string `json:"name"`
 		Maintenance *bool   `json:"maintenance"`
 		Public      *bool   `json:"public"`
+		Parent      *int64  `json:"parent"` // -1 automatic, 0 none, else a host id
 	}
 	if !readJSON(w, r, &req) {
 		return
+	}
+	if req.Parent != nil {
+		parent, manual, msg := s.parentFromRequest(id, *req.Parent)
+		if msg != "" {
+			writeErr(w, 400, msg)
+			return
+		}
+		if _, err := s.db.Exec(`UPDATE hosts SET parent_id=?, parent_manual=? WHERE id=?`, parent, manual, id); err != nil {
+			serverErr(w, err)
+			return
+		}
+		if err := s.linkGuests(); err != nil {
+			slog.Error("link guests", "err", err)
+		}
 	}
 	if req.Name != nil {
 		n, msg := validName(*req.Name)
@@ -726,6 +753,23 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 			if _, err := s.db.Exec(`UPDATE hosts SET info=? WHERE id=?`, string(b), id); err != nil {
 				slog.Error("store agent info", "err", err)
 			}
+			if err := s.linkGuests(); err != nil {
+				slog.Error("link guests", "err", err)
+			}
+			events.publish("hosts")
+		case m.Type == "pve" && m.Pve != nil:
+			m.Pve.Guests, m.Pve.CTs = capped(m.Pve.Guests, 1000), capped(m.Pve.CTs, 10000)
+			for i := range m.Pve.Guests {
+				m.Pve.Guests[i].MACs = capped(m.Pve.Guests[i].MACs, 16)
+			}
+			b, _ := json.Marshal(m.Pve)
+			if _, err := s.db.Exec(`UPDATE hosts SET pve=? WHERE id=?`, string(b), id); err != nil {
+				slog.Error("store proxmox guests", "err", err)
+			}
+			if err := s.linkGuests(); err != nil {
+				slog.Error("link guests", "err", err)
+			}
+			s.pruneCTs(id, hostName, m.Pve.CTs)
 			events.publish("hosts")
 		case m.Type == "action_result" && hostActions[m.Action] && (m.State == "running" || m.State == "done" || m.State == "failed"):
 			s.setHostAction(id, m.Action, m.State, m.Message)

@@ -4,6 +4,8 @@ package main
 // decides what is public: an item appears on the page only if a block references it.
 
 import (
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -261,4 +263,53 @@ func (s *Server) handlePreviewStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, page)
+}
+
+// Wall screen (/wall#key): the whole supervision on a TV, without a session, behind a secret key
+// stored hashed (setting wall_key, empty = off). The key travels in the URL fragment, which
+// browsers never send, so it stays out of proxy logs; the page sends it in X-Wall-Key.
+func (s *Server) handleWall(w http.ResponseWriter, r *http.Request) {
+	want, _ := hex.DecodeString(s.getSetting("wall_key", ""))
+	key := r.Header.Get("X-Wall-Key")
+	if len(want) == 0 || key == "" || subtle.ConstantTimeCompare(hashToken(key), want) != 1 {
+		if !s.limiter.allow("wall:" + s.clientIP(r)) {
+			writeErr(w, http.StatusTooManyRequests, "Trop de tentatives")
+			return
+		}
+		writeErr(w, 404, "Écran de supervision introuvable ou lien révoqué")
+		return
+	}
+	hosts, err := s.loadHosts("")
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	mons, err := s.loadMonitors("")
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"title": s.getSetting("status_title", "Homelab"), "hosts": withoutPackages(hosts), "monitors": mons})
+}
+
+func (s *Server) handleGetWallKey(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]bool{"enabled": s.getSetting("wall_key", "") != ""})
+}
+
+// handleNewWallKey creates the wall link, revoking the previous one; the key is shown once.
+func (s *Server) handleNewWallKey(w http.ResponseWriter, r *http.Request) {
+	key := randomToken(24)
+	if err := s.setSetting("wall_key", hex.EncodeToString(hashToken(key))); err != nil {
+		serverErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]string{"url": s.baseURL(r) + "/wall#" + key})
+}
+
+func (s *Server) handleDeleteWallKey(w http.ResponseWriter, r *http.Request) {
+	if err := s.setSetting("wall_key", ""); err != nil {
+		serverErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

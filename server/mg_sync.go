@@ -324,8 +324,39 @@ func (s *Server) syncInventory(ctx context.Context) (int, error) {
 			}
 			changed += n
 		}
+		n, err := s.syncParents(i, hosts)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		changed += n
 	}
 	return changed, errors.Join(errs...)
+}
+
+// syncParents places items under the item of their monitoring parent (Proxmox node → VMs and
+// containers), only when the item has no host yet: a host chosen in the inventory is kept.
+func (s *Server) syncParents(i *integration, hosts []map[string]any) (int, error) {
+	changed := 0
+	for _, h := range hosts {
+		hostID, _ := h["id"].(float64)
+		parentID, _ := h["parent_id"].(float64)
+		if hostID <= 0 || parentID <= 0 {
+			continue
+		}
+		var child, parent int64
+		var childName, parentName string
+		if s.db.QueryRow(`SELECT id, display_name FROM assets WHERE hlm_integration_id = ? AND hlm_host_id = ? AND parent_id IS NULL`, i.ID, int64(hostID)).Scan(&child, &childName) != nil ||
+			s.db.QueryRow(`SELECT id, display_name FROM assets WHERE hlm_integration_id = ? AND hlm_host_id = ?`, i.ID, int64(parentID)).Scan(&parent, &parentName) != nil ||
+			child == parent {
+			continue
+		}
+		if _, err := s.db.Exec(`UPDATE assets SET parent_id = ? WHERE id = ?`, parent, child); err != nil {
+			return changed, err
+		}
+		s.logEvent("synchronisation", "asset", child, "update", "« "+childName+" » placé sous « "+parentName+" » depuis le monitoring « "+i.Name+" »")
+		changed++
+	}
+	return changed, nil
 }
 
 func (s *Server) syncHost(i *integration, h map[string]any) (int, error) {

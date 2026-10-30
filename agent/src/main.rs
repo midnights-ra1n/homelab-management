@@ -9,6 +9,7 @@ mod collect;
 mod docker;
 mod inventory;
 mod node;
+mod pve;
 mod smart;
 mod update;
 mod updates;
@@ -224,6 +225,9 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // Live view: while a dashboard watches this host, stream metrics every 2 s (not stored).
     let mut live_until = 0u64;
     let mut live_tick = tokio::time::interval(Duration::from_secs(2));
+    // Proxmox node: its guests, sent when they change (checked every minute).
+    let mut pve_tick = tokio::time::interval(Duration::from_secs(60));
+    let mut pve_sent: Option<pve::Report> = None;
     live_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         tokio::select! {
@@ -244,6 +248,15 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                     if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
                         return Failure::Retry(e.to_string());
                     }
+                }
+            }
+            _ = pve_tick.tick() => {
+                if let Some(rep) = pve::read().filter(|r| pve_sent.as_ref() != Some(r)) {
+                    let m = serde_json::json!({"type": "pve", "pve": rep});
+                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                        return Failure::Retry(e.to_string());
+                    }
+                    pve_sent = Some(rep);
                 }
             }
             _ = upd.tick() => {

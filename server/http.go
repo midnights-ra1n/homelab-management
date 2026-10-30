@@ -62,6 +62,7 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	auth := s.requireAuth
 	mux.HandleFunc("GET /api/agent/ws", s.handleAgentWS)
 	mux.HandleFunc("GET /api/public/status", s.handlePublicStatus)
+	mux.HandleFunc("GET /api/public/wall", s.handleWall)
 
 	mux.HandleFunc("GET /api/overview", auth(s.handleOverview))
 	mux.HandleFunc("GET /api/hosts", auth(s.handleListHosts))
@@ -73,6 +74,7 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/hosts/{id}/metrics", auth(s.handleHostMetrics))
 	mux.HandleFunc("GET /api/hosts/{id}/live", auth(s.handleHostLive))
 	mux.HandleFunc("POST /api/hosts/{id}/action", auth(s.handleHostAction))
+	mux.HandleFunc("POST /api/hosts/update-agents", auth(s.handleUpdateAllAgents))
 	mux.HandleFunc("GET /api/hosts/{id}/node-apps/{app}/logs", auth(s.handleNodeLogs))
 	mux.HandleFunc("GET /api/hosts/{id}/node-apps/{app}/operations/{op}", auth(s.handleNodeOplog))
 
@@ -117,6 +119,9 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/status/layout", auth(s.handleGetStatusLayout))
 	mux.HandleFunc("PUT /api/status/layout", auth(s.handlePutStatusLayout))
 	mux.HandleFunc("POST /api/status/preview", auth(s.handlePreviewStatus))
+	mux.HandleFunc("GET /api/status/wall-key", auth(s.handleGetWallKey))
+	mux.HandleFunc("POST /api/status/wall-key", auth(s.handleNewWallKey))
+	mux.HandleFunc("DELETE /api/status/wall-key", auth(s.handleDeleteWallKey))
 	mux.HandleFunc("GET /api/enroll-tokens", auth(s.handleListEnrollTokens))
 	mux.HandleFunc("POST /api/enroll-tokens", auth(s.handleCreateEnrollToken))
 	mux.HandleFunc("DELETE /api/enroll-tokens/{id}", auth(s.handleDeleteEnrollToken))

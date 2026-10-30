@@ -81,6 +81,43 @@ func (s *Server) apiUpdateAgent(w http.ResponseWriter, r *http.Request) {
 	s.sendHostAction(w, r, id, "update_agent", "")
 }
 
+// handleUpdateAllAgents asks every connected agent to update itself now instead of at its daily
+// check. When the latest release is known only the outdated ones are asked, so a homelab
+// behind one address does not spend GitHub's 60 anonymous requests an hour for nothing.
+func (s *Server) handleUpdateAllAgents(w http.ResponseWriter, r *http.Request) {
+	hosts, err := s.loadHosts("")
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	sent, busy := 0, 0
+	for _, h := range hosts {
+		if !h.Connected || (h.AgentLatest != "" && !h.Outdated) {
+			continue
+		}
+		if a := h.Action; a != nil && (a.State == "pending" || a.State == "running") && time.Since(time.Unix(a.At, 0)) < 2*time.Hour {
+			busy++
+			continue
+		}
+		s.agentsMu.Lock()
+		conn := s.agents[h.ID]
+		s.agentsMu.Unlock()
+		if conn == nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(conn.ctx, 5*time.Second)
+		err := wsjson.Write(ctx, conn.conn, map[string]string{"type": "action", "action": "update_agent"})
+		cancel()
+		if err == nil {
+			s.setHostAction(h.ID, "update_agent", "pending", "")
+			sent++
+		}
+	}
+	logName(r, strconv.Itoa(sent)+" agent(s)")
+	events.publish("hosts")
+	writeJSON(w, 200, map[string]int{"sent": sent, "busy": busy})
+}
+
 // sendHostAction sends one action to a connected agent and answers with the host.
 func (s *Server) sendHostAction(w http.ResponseWriter, r *http.Request, id int64, action, target string) {
 	hosts, err := s.loadHosts("WHERE id=?", id)

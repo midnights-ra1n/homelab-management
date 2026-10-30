@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ExternalLink } from "lucide-react";
+import { Activity, ExternalLink, Tv } from "lucide-react";
 import { api, fmtDate, type Day, type Host, type Monitor, type Status } from "../api";
 import { BlockEditor, type BlockType } from "../blocks";
 import {
-  Alert, Badge, Button, ButtonAnchor, Card, CardBody, CardHeader, Chart, FIELD_ROW, Field, Logo, PageHeader, SectionTitle, Skeleton, Stat, StatusBadge,
+  Alert, Badge, Button, ButtonAnchor, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, FIELD_ROW, Field, Logo, PageHeader, SectionTitle, Skeleton, Stat, StatusBadge,
   StatusIcon, Switch, UptimeBars, fmtLatency, formatPct, inputClass, kindTone, statusKind, textareaClass, usePoll, useToast,
 } from "../ui";
 
@@ -156,6 +156,47 @@ function ItemPicker({ value, onChange, hosts, monitors }: { value: ItemRef[]; on
   );
 }
 
+/** Wall screen link (/wall#key): the whole supervision on a TV without signing in. */
+function WallDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [enabled, setEnabled] = useState<boolean>();
+  const [url, setUrl] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  useEffect(() => {
+    if (open) api.get<{ enabled: boolean }>("/api/status/wall-key").then((r) => setEnabled(r.enabled), (e) => toast(e.message, "error"));
+    else setUrl(undefined);
+  }, [open]);
+  const create = async () => {
+    setBusy(true);
+    try { setUrl((await api.post<{ url: string }>("/api/status/wall-key")).url); setEnabled(true); } catch (e) { toast((e as Error).message, "error"); }
+    setBusy(false);
+  };
+  const revoke = async () => {
+    setBusy(true);
+    try { await api.del("/api/status/wall-key"); setEnabled(false); setUrl(undefined); toast("Lien révoqué"); } catch (e) { toast((e as Error).message, "error"); }
+    setBusy(false);
+  };
+  return (
+    <Dialog open={open} onClose={onClose} size="lg" title="Écran mural de supervision"
+      description="La vue Supervision en grand, pour une TV ou un écran dédié : toutes les machines, leurs mesures et les sondes, sans se connecter. Indépendant de la page publique."
+      footer={<>
+        {enabled && <Button variant="danger-ghost" loading={busy} onClick={revoke}>Révoquer le lien</Button>}
+        <Button variant="secondary" onClick={onClose}>Fermer</Button>
+        <Button loading={busy} onClick={create}>{enabled ? "Régénérer le lien" : "Créer le lien"}</Button>
+      </>}>
+      <div className="grid gap-4">
+        <Alert kind="warning" title="Ce lien donne à quiconque le possède la vue complète">
+          CPU, mémoire, disques, adresses IP, mises à jour et sondes de toutes les machines, en lecture seule. Régénérer ou révoquer le lien coupe les écrans qui l'utilisent.
+        </Alert>
+        {url ? <>
+          <p className="text-sm text-body">Copie ce lien maintenant, il ne sera plus affiché :</p>
+          <CodeBlock text={url} />
+        </> : <p className="text-sm text-meta">{enabled === undefined ? "Chargement…" : enabled ? "Un lien est actif. Régénère-le pour en obtenir un nouveau (l'ancien cessera de fonctionner)." : "Aucun lien actif."}</p>}
+      </div>
+    </Dialog>
+  );
+}
+
 export function StatusEditorPage() {
   const [blocks, setBlocks] = useState<StatusBlock[]>();
   const [enabled, setEnabled] = useState(false);
@@ -165,6 +206,7 @@ export function StatusEditorPage() {
   const hosts = usePoll(() => api.get<Host[]>("/api/hosts"), 60000);
   const monitors = usePoll(() => api.get<Monitor[]>("/api/monitors"), 60000);
   const toast = useToast();
+  const [wall, setWall] = useState(false);
 
   useEffect(() => {
     api.get<{ blocks: StatusBlock[]; enabled: boolean }>("/api/status/layout").then((r) => { setBlocks(r.blocks); setEnabled(r.enabled); }, (e) => setError(e.message));
@@ -191,6 +233,7 @@ export function StatusEditorPage() {
       <PageHeader title="Page de statut" description="Compose la page publique : seuls les éléments ajoutés ici sont visibles sans connexion."
         actions={<>
           <Switch label="Publiée" checked={enabled} onChange={setEnabled} />
+          <Button variant="secondary" icon={<Tv size={16} />} onClick={() => setWall(true)}>Écran mural</Button>
           <ButtonAnchor variant="secondary" href="/status" target="_blank" rel="noopener" icon={<ExternalLink size={16} />}>Ouvrir</ButtonAnchor>
           <Button loading={busy} onClick={save}>Enregistrer la page</Button>
         </>} />
@@ -247,6 +290,7 @@ export function StatusEditorPage() {
           </div>
         </section>
       </div>
+      <WallDialog open={wall} onClose={() => setWall(false)} />
     </>
   );
 }

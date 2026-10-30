@@ -146,6 +146,10 @@ func run(cfg Config) error {
 		if err := s.initDevMode(ctx); err != nil {
 			return err
 		}
+		// Hosts stored before the hierarchy existed get their Proxmox parent right away.
+		if err := s.linkGuests(); err != nil {
+			slog.Error("link guests", "err", err)
+		}
 		go s.runMonitors(ctx)
 		go s.watchHosts(ctx)
 		go s.runReports(ctx)

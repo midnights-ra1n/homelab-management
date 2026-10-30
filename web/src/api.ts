@@ -36,6 +36,8 @@ export interface Host {
   connected: boolean; agent_down: boolean; reachable?: boolean; info: HostInfo; latest: HostLatest; updates: HostUpdates | null; created_at: number;
   action: HostAction | null; agent_latest: string; agent_outdated: boolean; docker: DockerSnapshot | null;
   node_apps: NodeSnapshot | null;
+  /** Proxmox node or physical host above this one: detected (MAC on its bridges) or chosen by hand. */
+  parent_id: number | null; parent_manual: boolean; vmid?: number;
 }
 
 /** Host status wording: tells a stopped agent apart from a machine that is down. */
