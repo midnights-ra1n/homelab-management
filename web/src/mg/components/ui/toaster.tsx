@@ -1,5 +1,5 @@
 
-import { X } from "lucide-react";
+import { X } from "../../../shared/icons";
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { useT } from "@/i18n/client";
 

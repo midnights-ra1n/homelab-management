@@ -3,15 +3,15 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle, ArrowDownUp, ArrowUpRight, ChevronsUpDown, Container, Plug, CornerDownLeft, Ellipsis, FileBarChart, Globe, HardDrive, LayoutDashboard, ListTree, Network,
-  PackageCheck, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Radar, ScrollText, Search, Server, Settings, Siren, X, type LucideIcon,
-} from "lucide-react";
+  PackageCheck, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Radar, ScrollText, Search, Server, Settings, Siren, X, type IconType,
+} from "./shared/icons";
 import { api, type Overview } from "./api";
 import { incidents } from "./pages/Incidents";
 import { NotificationsMenu, type NotifFeed } from "./shared/notifications";
 import { usePolled } from "./shared/poll";
 import { Link, Logo, StatusDot, StatusIcon, STATUS_TONE, ThemeSwitch, TONE_VAR, SEARCH_KEY, cn, isActive, navigate, toggleRail, usePath, useRail } from "./ui";
 
-type NavItem = { href: string; label: string; short: string; icon: LucideIcon };
+type NavItem = { href: string; label: string; short: string; icon: IconType };
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Vue d'ensemble", short: "Accueil", icon: LayoutDashboard },

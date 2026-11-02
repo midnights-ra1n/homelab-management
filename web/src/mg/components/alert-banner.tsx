@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef } from "react";
-import { AlertTriangle, ArrowUpRight } from "lucide-react";
+import { AlertTriangle, ArrowUpRight } from "../../shared/icons";
 import { NotificationsMenu, type NotifFeed } from "../../shared/notifications";
 import { usePolled } from "../../shared/poll";
 import { TONE_VAR } from "@/lib/constants";

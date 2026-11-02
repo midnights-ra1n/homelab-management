@@ -1,6 +1,6 @@
 /* Management interface: the Next.js app routes (src/mg/app) served by a small history router. */
 import { Component, lazy, Suspense, useEffect, useReducer, type ComponentType, type ReactNode } from "react";
-import { SearchX } from "lucide-react";
+import { SearchX } from "../shared/icons";
 import AppLayout from "./app/layout";
 import { usePathname, useSearchParams, NotFoundError } from "./next/navigation";
 import { onInvalidate, resolved, invalidate } from "./lib/resource";

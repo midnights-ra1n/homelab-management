@@ -1,5 +1,5 @@
 
-import { X } from "lucide-react";
+import { X } from "../../../shared/icons";
 import { useId, useState } from "react";
 import { Field } from "@/components/ui/form";
 import { useT } from "@/i18n/client";

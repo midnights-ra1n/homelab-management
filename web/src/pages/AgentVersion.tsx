@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "../shared/icons";
 import { api, actionBusy, type Host, type HostActionName } from "../api";
 import { Badge, Button, useToast } from "../ui";
 

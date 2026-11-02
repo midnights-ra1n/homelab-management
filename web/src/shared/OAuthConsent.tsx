@@ -1,7 +1,7 @@
 /* Consent page of the MCP OAuth flow (/oauth/authorize), shown by both interfaces once signed in:
    the user lets an assistant (Claude…) read this server through the MCP tools. */
 import { useEffect, useState } from "react";
-import { Bot, ShieldCheck } from "lucide-react";
+import { Bot, ShieldCheck } from "./icons";
 import { api } from "../api";
 import { Alert, Button, Card, CardBody, CardHeader, Logo, Skeleton } from "../ui";
 

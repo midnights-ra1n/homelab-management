@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { ArrowLeftRight, Pencil, Plus, ShieldCheck } from "lucide-react";
+import { ArrowLeftRight, Pencil, Plus, ShieldCheck } from "../../../shared/icons";
 import { deleteVpnAction, saveVpnAction } from "@/actions/network";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmButton } from "@/components/ui/confirm-button";

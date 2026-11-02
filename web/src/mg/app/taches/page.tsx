@@ -11,7 +11,7 @@ import { TaskBoard } from "@/features/tasks/task-board";
 import { TaskDialog } from "@/features/tasks/task-dialog";
 import { TaskSync } from "@/features/tasks/task-sync";
 import { listIntegrations } from "@/lib/data/integrations";
-import { Archive } from "lucide-react";
+import { Archive } from "../../../shared/icons";
 import { getT } from "@/i18n/server";
 
 export default function TasksPage({ searchParams }: PageProps<"/[lang]/taches">) {

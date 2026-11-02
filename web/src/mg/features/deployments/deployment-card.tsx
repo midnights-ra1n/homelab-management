@@ -1,6 +1,6 @@
 import { use } from "react";
 import Link from "next/link";
-import { CalendarDays, Server } from "lucide-react";
+import { CalendarDays, Server } from "../../../shared/icons";
 import { Badge, Tag } from "@/components/ui/badge";
 import { Meter } from "@/components/ui/meter";
 import { DEPLOYMENT_KIND_META, DEPLOYMENT_STATUS_META, PRIORITY_META } from "@/lib/constants";

@@ -1,8 +1,8 @@
-import { Box, Container, Cpu, HardDrive, Monitor, Router, Server, type LucideProps } from "lucide-react";
+import { Box, Container, Cpu, HardDrive, Monitor, Router, Server, type IconProps } from "../../shared/icons";
 import { ASSET_KIND_META, TONE_TEXT_VAR, TONE_VAR, type AssetKind } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-const ICONS: Record<AssetKind, React.ComponentType<LucideProps>> = {
+const ICONS: Record<AssetKind, React.ComponentType<IconProps>> = {
   physical: Server,
   vm: Monitor,
   lxc: Box,

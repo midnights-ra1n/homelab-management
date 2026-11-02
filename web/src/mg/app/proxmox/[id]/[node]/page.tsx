@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, use } from "react";
-import { ArrowLeft, ExternalLink, Play, Power, RefreshCw, RotateCw, Square } from "lucide-react";
+import { ArrowLeft, ExternalLink, Play, Power, RefreshCw, RotateCw, Square } from "../../../../../shared/icons";
 import { getIntegration, type Integration } from "@/lib/data/integrations";
 import {
   TIMEFRAMES,

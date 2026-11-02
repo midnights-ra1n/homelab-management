@@ -1,6 +1,6 @@
 import { use } from "react";
 import Link from "next/link";
-import { CalendarDays, Pencil } from "lucide-react";
+import { CalendarDays, Pencil } from "../../../shared/icons";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { DEPLOYMENT_KIND_META, PRIORITY_META, TONE_VAR } from "@/lib/constants";

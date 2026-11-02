@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "../shared/icons";
 import { api, fmtAgo, fmtDate, type Install } from "../api";
 import { Alert, Badge, Button, Card, CodeBlock, Dialog, Field, IconButton, Segmented, Switch, inputClass } from "../ui";
 import { HubUrlField, UNINSTALL_COMMAND, installCommand } from "./AddHostWizard";

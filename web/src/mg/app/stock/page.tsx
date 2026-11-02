@@ -1,5 +1,5 @@
 import { Suspense, use } from "react";
-import { AlertTriangle, CheckCircle2, Package, Warehouse } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Package, Warehouse } from "../../../shared/icons";
 import { listHardware } from "@/lib/data/hardware";
 import { assetOptions } from "@/lib/data/assets";
 import {

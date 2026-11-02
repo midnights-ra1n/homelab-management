@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleAlert, CircleCheck, TriangleAlert, Wrench } from "lucide-react";
+import { CircleAlert, CircleCheck, TriangleAlert, Wrench } from "../shared/icons";
 import { api, fmtAgo, statusLabel, type Overview, type Status } from "../api";
 import { Alert, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, Segmented, Card, Stat, StatusBadge, StatusIcon, navigate, usePoll } from "../ui";
 

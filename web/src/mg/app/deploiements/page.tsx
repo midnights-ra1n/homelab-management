@@ -1,5 +1,5 @@
 import { Suspense, use } from "react";
-import { LayoutGrid, List, Plus, Rocket } from "lucide-react";
+import { LayoutGrid, List, Plus, Rocket } from "../../../shared/icons";
 import { deploymentCounts, listDeployments } from "@/lib/data/deployments";
 import { DeploymentList } from "@/features/deployments/deployment-list";
 import { ViewSwitch } from "@/components/view-switch";

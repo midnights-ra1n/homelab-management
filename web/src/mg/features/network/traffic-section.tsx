@@ -1,5 +1,5 @@
 import { use } from "react";
-import { ArrowDownUp, ExternalLink } from "lucide-react";
+import { ArrowDownUp, ExternalLink } from "../../../shared/icons";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";

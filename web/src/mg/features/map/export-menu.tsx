@@ -1,5 +1,5 @@
 
-import { Download } from "lucide-react";
+import { Download } from "../../../shared/icons";
 import { useRef, useState } from "react";
 import { getNodesBounds, useReactFlow } from "@xyflow/react";
 import { Button } from "@/components/ui/button";

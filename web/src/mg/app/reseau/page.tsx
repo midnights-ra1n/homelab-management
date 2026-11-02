@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense, use } from "react";
-import { Network } from "lucide-react";
+import { Network } from "../../../shared/icons";
 import { listTunnels } from "@/lib/data/vpn";
 import { listRules } from "@/lib/data/firewall";
 import { listDomains } from "@/lib/data/domains";

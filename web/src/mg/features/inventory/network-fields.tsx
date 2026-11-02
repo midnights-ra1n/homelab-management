@@ -1,5 +1,5 @@
 
-import { Sparkles } from "lucide-react";
+import { Sparkles } from "../../../shared/icons";
 import { useState, useTransition } from "react";
 import { nextFreeIpAction } from "@/actions/network";
 import { Button } from "@/components/ui/button";

@@ -1,5 +1,5 @@
 import { use, useState, useTransition } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "../../../shared/icons";
 import { syncNowAction } from "@/actions/integrations";
 import { getSetting } from "@/lib/data/settings";
 import { write } from "@/lib/client";

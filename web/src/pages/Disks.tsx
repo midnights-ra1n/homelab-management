@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleAlert, CircleCheck, HardDrive, RefreshCw, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, HardDrive, RefreshCw, TriangleAlert } from "../shared/icons";
 import { api, fmtAgo, fmtBytes, fmtNum } from "../api";
 import { Alert, Badge, Button, Card, EmptyState, Link, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Skeleton, Stat, StatusIcon, TONE_VAR, type Tone, usePoll, useToast } from "../ui";
 

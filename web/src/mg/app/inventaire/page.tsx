@@ -1,5 +1,5 @@
 import { Suspense, use } from "react";
-import { Boxes, Plus, X } from "lucide-react";
+import { Boxes, Plus, X } from "../../../shared/icons";
 import { allTags, assetCounts, assetOptions, hostOptions, listAssets } from "@/lib/data/assets";
 import { listVlans } from "@/lib/data/network";
 import { ASSET_KINDS, ASSET_KIND_META, ASSET_STATUSES, ASSET_STATUS_META } from "@/lib/constants";

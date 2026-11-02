@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, RefreshCw, Server, Thermometer, Trash2, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, RefreshCw, Server, Thermometer, Trash2, Users } from "../shared/icons";
 import { api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostLatest, type HostSeries, type Install } from "../api";
 import {
   Alert, Badge, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,

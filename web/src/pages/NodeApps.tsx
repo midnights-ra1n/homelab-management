@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, ExternalLink, GitPullRequestArrow, LoaderCircle, Package, RotateCw, Square, Trash2 } from "lucide-react";
+import { Download, ExternalLink, GitPullRequestArrow, LoaderCircle, Package, RotateCw, Square, Trash2 } from "../shared/icons";
 import { actionBusy, api, fmtAgo, fmtDate, type Host, type NodeAction, type NodeApp, type NodeOp } from "../api";
 import {
   Alert, Badge, Button, ButtonAnchor, Card, Checkbox, CodeBlock, Dialog, Segmented, Skeleton, StatusIcon, cn,

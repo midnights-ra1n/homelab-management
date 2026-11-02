@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus } from "../../../shared/icons";
 import { saveHardwareAction } from "@/actions/hardware";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Field, inputClass, SelectField, Switch, TextAreaField, TextField } from "@/components/ui/form";

@@ -1,5 +1,5 @@
 
-import { ListTree } from "lucide-react";
+import { ListTree } from "../../../shared/icons";
 import { useState, useTransition } from "react";
 import { nodeTasksAction } from "@/actions/proxmox";
 import { Alert } from "@/components/ui/alert";

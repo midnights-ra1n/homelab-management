@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleAlert, Container, Download, LoaderCircle, Server } from "lucide-react";
+import { CircleAlert, Container, Download, LoaderCircle, Server } from "../shared/icons";
 import { actionBusy, api, fmtAgo, fmtBytes, fmtPct, type DockerContainer, type Host } from "../api";
 import {
   Alert, Badge, Button, Card, Dialog, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, StatusIcon, cn,

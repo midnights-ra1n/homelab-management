@@ -1,5 +1,5 @@
 
-import { X } from "lucide-react";
+import { X } from "../../../shared/icons";
 import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n/client";

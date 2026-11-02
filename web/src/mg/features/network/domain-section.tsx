@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Globe, Pencil, Plus } from "lucide-react";
+import { Globe, Pencil, Plus } from "../../../shared/icons";
 import { deleteDomainAction, saveDomainAction } from "@/actions/network";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmButton } from "@/components/ui/confirm-button";

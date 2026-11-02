@@ -1,5 +1,5 @@
 import { use, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "../../../shared/icons";
 import { updateAgentsAction } from "@/actions/inventory";
 import { agentsState, type AgentState } from "@/lib/data/assets";
 import { Badge } from "@/components/ui/badge";

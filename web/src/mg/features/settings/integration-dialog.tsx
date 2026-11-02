@@ -1,5 +1,5 @@
 
-import { Pencil, Plug, Plus } from "lucide-react";
+import { Pencil, Plug, Plus } from "../../../shared/icons";
 import { useState, useTransition } from "react";
 import { saveIntegrationAction, testIntegrationAction } from "@/actions/integrations";
 import { Alert } from "@/components/ui/alert";

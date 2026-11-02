@@ -1,8 +1,8 @@
 import { use, useTransition } from "react";
 import Link from "next/link";
 import {
-  Box, CircuitBoard, Copy, Cpu, EthernetPort, Fan, Gpu, HardDrive, MemoryStick, Monitor, Network, Package, RadioTower, Router, Server, Undo2, Wifi, Zap, type LucideIcon,
-} from "lucide-react";
+  Box, CircuitBoard, Copy, Cpu, EthernetPort, Fan, Gpu, HardDrive, MemoryStick, Monitor, Network, Package, RadioTower, Router, Server, Undo2, Wifi, Zap, type IconType,
+} from "../../../shared/icons";
 import { deleteHardwareAction, duplicateHardwareAction, installHardwareAction } from "@/actions/hardware";
 import { ActionButton } from "@/components/ui/action-button";
 import { Badge, Tag } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import { daysUntil, formatDate, formatGb } from "@/lib/utils";
 import { useT } from "@/i18n/client";
 import { HardwareDialog, type HardwareOptions } from "./hardware-dialog";
 
-export const CATEGORY_ICON: Record<HardwareCategory, LucideIcon> = {
+export const CATEGORY_ICON: Record<HardwareCategory, IconType> = {
   server: Server, pc: Monitor, router: Router, wifi_router: Wifi, switch: Network, ap: RadioTower, cpu: Cpu, ram: MemoryStick, disk: HardDrive, motherboard: CircuitBoard, gpu: Gpu,
   psu: Zap, nic: EthernetPort, case: Box, cooling: Fan, other: Package,
 };

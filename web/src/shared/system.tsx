@@ -1,7 +1,7 @@
 /* Sections shared by both interfaces (monitoring and management): database, server updates,
    passkeys and the journal. Same server endpoints on both roles, same components. */
 import { useEffect, useState } from "react";
-import { Bot, Database, Download, Fingerprint, KeyRound, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Bot, Database, Download, Fingerprint, KeyRound, Plus, RefreshCw, Search, Trash2 } from "./icons";
 import { api, ApiError, fmtAgo, fmtBytes } from "../api";
 import { Alert, Badge, Button, CodeBlock, EmptyState, Field, FORM_ACTIONS, inputClass, Meter, PageHeader, SettingsSection, Skeleton, Switch, textareaClass, useToast } from "../ui";
 

@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { ArrowUpRight, ChevronRight, Container, Download, LoaderCircle, PackageCheck, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Container, Download, LoaderCircle, PackageCheck, RefreshCw, RotateCcw, ShieldAlert } from "../shared/icons";
 import { actionBusy, api, fmtAgo, fmtDate, type Host } from "../api";
 import {
   Alert, Badge, Button, Card, Dialog, EmptyState, IconButton, Link, PageHeader, SECTIONS, STAT_GRID, Skeleton, Stat, StatusIcon, Switch, cn, usePoll,

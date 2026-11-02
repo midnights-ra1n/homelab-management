@@ -1,5 +1,5 @@
 
-import { Search, X } from "lucide-react";
+import { Search, X } from "../../shared/icons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { cn } from "@/lib/utils";

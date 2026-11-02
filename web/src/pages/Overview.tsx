@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpRight, Columns2, Eye, EyeOff, LayoutGrid, PackageCheck, Radar, RotateCcw, Server, ShieldAlert, Square, Timer } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Columns2, Eye, EyeOff, LayoutGrid, PackageCheck, Radar, RotateCcw, Server, ShieldAlert, Square, Timer } from "../shared/icons";
 import { api, certDays, hostStatusLabel, fmtMs, pct, statusLabel, type Overview, type Status } from "../api";
 import { updateTotals } from "./Updates";
 import { incidents } from "./Incidents";

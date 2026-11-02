@@ -1,5 +1,5 @@
 
-import { Zap } from "lucide-react";
+import { Zap } from "../../../shared/icons";
 import { useState } from "react";
 import { saveAssetAction } from "@/actions/inventory";
 import { FormDialog } from "@/components/ui/form-dialog";

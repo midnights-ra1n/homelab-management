@@ -1,5 +1,5 @@
 
-import { ArrowUpDown, Cloud, Flame, Globe, Laptop, Network, Play, Router, Shield } from "lucide-react";
+import { ArrowUpDown, Cloud, Flame, Globe, Laptop, Network, Play, Router, Shield } from "../../../shared/icons";
 import { useState, useTransition } from "react";
 import { simulateAction } from "@/actions/network";
 import { Alert } from "@/components/ui/alert";

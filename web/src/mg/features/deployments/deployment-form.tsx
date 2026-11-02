@@ -1,5 +1,5 @@
 
-import { ArrowDown, ArrowUp, ListChecks, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ListChecks, Plus, Trash2 } from "../../../shared/icons";
 import { useState } from "react";
 import { saveDeploymentAction } from "@/actions/deployments";
 import { Button, ButtonLink } from "@/components/ui/button";

@@ -1,6 +1,6 @@
 import { use } from "react";
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "../../../shared/icons";
 import type { Issue } from "@/lib/net/engine";
 import { TONE_VAR } from "@/lib/constants";
 import { getT } from "@/i18n/server";

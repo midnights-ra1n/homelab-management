@@ -3,7 +3,7 @@
    updates, Docker, the probes that target it); Proxmox nodes unfold into their VMs and
    containers, and the probes that target no machine are grouped by category. */
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Maximize, Radar, Search, Tv } from "lucide-react";
+import { ChevronDown, ChevronRight, Maximize, Radar, Search, Tv } from "../shared/icons";
 import { api, fmtMs, fmtPct, hostStatusLabel, pct, type Host, type Monitor, type Overview } from "../api";
 import { Alert, ButtonLink, EmptyState, IconButton, Link, Logo, PageHeader, Skeleton, StatusIcon, cn, inputClass, kindTone, statusKind, usePoll, useTitle, type StatusKind } from "../ui";
 import { containerKind } from "./Containers";

@@ -1,7 +1,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, ChevronRight, Copy, ExternalLink, Pencil, SquareTerminal } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Copy, ExternalLink, Pencil, SquareTerminal } from "../../../shared/icons";
 import { Fragment, useMemo, useState, useTransition, type ReactNode } from "react";
 import { bulkAssetAction } from "@/actions/inventory";
 import { Badge, StatusDot, Tag } from "@/components/ui/badge";

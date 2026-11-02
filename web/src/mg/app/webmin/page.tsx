@@ -1,5 +1,5 @@
 import { Suspense, use } from "react";
-import { ExternalLink, KeyRound, Settings } from "lucide-react";
+import { ExternalLink, KeyRound, Settings } from "../../../shared/icons";
 import { fetchWebmin } from "@/lib/integrations";
 import { Alert } from "@/components/ui/alert";
 import { Badge, Tag } from "@/components/ui/badge";

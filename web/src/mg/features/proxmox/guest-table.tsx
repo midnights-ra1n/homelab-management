@@ -1,5 +1,5 @@
 
-import { ArrowRightLeft, ExternalLink, Pause, Play, Power, RotateCw, Search, Square, SquareTerminal } from "lucide-react";
+import { ArrowRightLeft, ExternalLink, Pause, Play, Power, RotateCw, Search, Square, SquareTerminal } from "../../../shared/icons";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { guestActionAction, migrationTargetsAction, remoteMigrateAction } from "@/actions/proxmox";

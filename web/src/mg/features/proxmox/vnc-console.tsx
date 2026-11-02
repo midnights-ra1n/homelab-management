@@ -1,5 +1,5 @@
 
-import { Keyboard, Maximize, RotateCw } from "lucide-react";
+import { Keyboard, Maximize, RotateCw } from "../../../shared/icons";
 import { useEffect, useRef, useState } from "react";
 import { vncSessionAction } from "@/actions/proxmox";
 import { Alert } from "@/components/ui/alert";

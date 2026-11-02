@@ -1,5 +1,5 @@
 
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown } from "../../../shared/icons";
 import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/actions/auth";
 import { ThemeSwitch } from "./theme-switch";

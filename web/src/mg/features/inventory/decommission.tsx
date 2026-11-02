@@ -1,5 +1,5 @@
 import { useState, useTransition } from "react";
-import { CircleCheck, CircleDashed, Play, PowerOff, Trash2, Undo2 } from "lucide-react";
+import { CircleCheck, CircleDashed, Play, PowerOff, Trash2, Undo2 } from "../../../shared/icons";
 import {
   cancelDecommissionAction,
   decommissionStepAction,

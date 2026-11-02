@@ -1,5 +1,5 @@
 
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus } from "../../../shared/icons";
 import { saveIpAction, saveSubnetAction, saveVlanAction } from "@/actions/network";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { ActionForm, SelectField, SubmitButton, TextAreaField, TextField } from "@/components/ui/form";

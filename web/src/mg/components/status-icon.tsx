@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, CirclePause, Clock, TriangleAlert, Wrench } from "lucide-react";
+import { CircleAlert, CircleCheck, CirclePause, Clock, TriangleAlert, Wrench } from "../../shared/icons";
 import { TONE_VAR } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 

@@ -12,10 +12,10 @@ import {
   Warehouse,
   ScrollText,
   SquareTerminal,
-  type LucideIcon,
-} from "lucide-react";
+  type IconType,
+} from "../../../shared/icons";
 
-export type NavItem = { href: string; label: string; short: string; icon: LucideIcon; description?: string };
+export type NavItem = { href: string; label: string; short: string; icon: IconType; description?: string };
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Tableau de bord", short: "Accueil", icon: LayoutDashboard },

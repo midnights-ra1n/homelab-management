@@ -1,5 +1,5 @@
 
-import { Check, Plus, X } from "lucide-react";
+import { Check, Plus, X } from "../../../shared/icons";
 import { useOptimistic, useState, useTransition } from "react";
 import { addStepAction, deleteStepAction, toggleStepAction } from "@/actions/deployments";
 import { Button } from "@/components/ui/button";

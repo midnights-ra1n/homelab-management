@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense, use } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "../../../../shared/icons";
 import { getIntegration } from "@/lib/data/integrations";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";

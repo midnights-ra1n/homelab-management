@@ -1,8 +1,8 @@
 /* UI kit ported from homelab-management (src/components/ui, src/components/layout, src/lib/theme.ts) so both
    apps look the same. Next.js pieces (next/link, server actions, i18n) are replaced by their React equivalents. */
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import uPlot from "uplot";
-import { CircleAlert, CircleCheck, CirclePause, Clock, Copy, TriangleAlert, Wrench, X } from "lucide-react";
+import { CircleAlert, CircleCheck, CirclePause, Clock, Copy, TriangleAlert, Wrench, X } from "./shared/icons";
 import { savePrefs, statusLabel, type Day, type Status } from "./api";
 import { isLive, subscribeLive, type Topic } from "./live";
 
@@ -114,7 +114,7 @@ const SIDEBAR_KEY = "hlm-sidebar";
 function syncThemeColor() {
   const forced = document.documentElement.dataset.theme;
   const light = forced ? forced === "light" : matchMedia("(prefers-color-scheme: light)").matches;
-  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = light ? "#d8dde5" : "#0f131a"));
+  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = light ? "#EAEAF9" : "#060B1F"));
 }
 
 function getChoice(): ThemeChoice {
@@ -800,17 +800,28 @@ export function Chart({ t, series, format, height = 220, max }: {
 
 /* ---------- Brand ---------- */
 
-/** Logo: two slashes (muted mint + accent) followed by the name. */
+/** Logo: two lavender arches followed by the name (final dot in Rose, as the DA wants). */
 export function Logo({ compact = false }: { compact?: boolean }) {
+  const id = useId();
   return (
     <span className="flex items-center gap-2.5">
-      <svg viewBox="248 128 528 768" className="h-7 w-auto" aria-hidden="true">
-        <path d="M504 128L312 896H248L440 128H504Z" style={{ fill: "var(--mm-mint-700)" }} />
-        <path d="M776 128L584 896H360L552 128H776Z" style={{ fill: "var(--mm-accent)" }} />
+      <svg viewBox="0 0 224 261" className="h-7 w-auto" aria-hidden="true">
+        <defs>
+          {/* Lavande sur fond sombre ; passe au cran 700 en thème clair via les tokens d'accent. */}
+          <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="224" y1="0" x2="0" y2="261">
+            <stop offset="0" style={{ stopColor: "var(--mm-accent-hover)" }} />
+            <stop offset="0.5" style={{ stopColor: "var(--mm-accent)" }} />
+            <stop offset="1" style={{ stopColor: "var(--mm-accent-active)" }} />
+          </linearGradient>
+        </defs>
+        <g fill={`url(#${id})`}>
+          <path d="M0 0A110 110 0 0 1 110 110V261A110 110 0 0 1 0 151Z" />
+          <path transform="translate(114 0)" d="M0 0A110 110 0 0 1 110 110V261A110 110 0 0 1 0 151Z" />
+        </g>
       </svg>
       {!compact && (
-        <span className="text-lg font-bold leading-none tracking-tight text-h1">
-          homelab<span className="text-accent-text">.</span>
+        <span className="text-lg font-extrabold uppercase leading-none tracking-[-0.03em] text-h1">
+          homelab<span className="text-pink">.</span>
         </span>
       )}
     </span>

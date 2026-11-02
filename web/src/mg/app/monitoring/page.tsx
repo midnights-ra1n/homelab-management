@@ -1,5 +1,5 @@
 import { Suspense, use } from "react";
-import { ExternalLink, Settings } from "lucide-react";
+import { ExternalLink, Settings } from "../../../shared/icons";
 import { listIntegrations } from "@/lib/data/integrations";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, SectionTitle } from "@/components/ui/page-header";

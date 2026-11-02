@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense, use } from "react";
-import { ArrowLeft, Camera, DatabaseBackup, ExternalLink, History, Pencil, SquareTerminal } from "lucide-react";
+import { ArrowLeft, Camera, DatabaseBackup, ExternalLink, History, Pencil, SquareTerminal } from "../../../../../../../shared/icons";
 import { getIntegration, type Integration } from "@/lib/data/integrations";
 import {
   TIMEFRAMES,

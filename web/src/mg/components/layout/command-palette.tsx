@@ -1,6 +1,6 @@
 
 import { useRouter } from "next/navigation";
-import { CornerDownLeft, Search, Settings } from "lucide-react";
+import { CornerDownLeft, Search, Settings } from "../../../shared/icons";
 import { useEffect, useRef, useState } from "react";
 import { searchAssetsAction } from "@/actions/inventory";
 import { StatusDot } from "@/components/ui/badge";

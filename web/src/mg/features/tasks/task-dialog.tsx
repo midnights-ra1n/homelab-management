@@ -1,5 +1,5 @@
 
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus } from "../../../shared/icons";
 import { saveTaskAction } from "@/actions/tasks";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { SelectField, TextAreaField, TextField } from "@/components/ui/form";

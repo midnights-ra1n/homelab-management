@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, use } from "react";
 import { AssetHardware } from "@/features/hardware/hardware-views";
-import { Copy, ExternalLink, Pencil, Plus, SquareTerminal, Star } from "lucide-react";
+import { Copy, ExternalLink, Pencil, Plus, SquareTerminal, Star } from "../../../../shared/icons";
 import { ancestorsOf, assetDetail, assetMonitoring, assetOptions, childrenOf, getAsset, type Asset } from "@/lib/data/assets";
 import { DecommissionButton, DecommissionPanel } from "@/features/inventory/decommission";
 import { AgentVersion } from "@/features/inventory/agent-update";

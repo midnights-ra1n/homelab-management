@@ -1,95 +1,89 @@
-/* Midnights Classic — copie du design system (« Midnights Classic/ » : tokens + composants .mm-*).
+/* Midnights til dawn (DA v5) — design system partagé (tokens + composants .mm-*).
    Dans @layer components : les utilitaires Tailwind restent prioritaires. */
 @layer components {
 :root {
-  /* Accent mint — échelle fixe, identique dans les deux thèmes */
-  --mm-mint-50: #def9f1;
-  --mm-mint-100: #c3f0e3;
-  --mm-mint-200: #8be1cb;
-  --mm-mint-300: #57cfb5;
-  --mm-mint-400: #3fbfa6;
-  --mm-mint-500: #27a28a;
-  --mm-mint-600: #1d836f;
-  --mm-mint-700: #136656;
-  --mm-mint-800: #0a4b3e;
-  --mm-mint-900: #033128;
+  /* Lavande — crans fixes (DA « Midnights til dawn » v5), identiques dans les deux thèmes */
+  --mm-lavande-100: #E4E1FE;
+  --mm-lavande-700: #5F47AE;
+  --mm-lavande-800: #402584;
 }
 
+/* Thème Nuit — fond Minuit, cartes Crépuscule, texte Lune, lumière pastel. */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
 
   /* Surfaces — un rôle = une teinte */
-  --mm-crust: #0f131a;      /* sunken : sidebar, barre d'onglets */
-  --mm-bg: #191e27;         /* page */
-  --mm-surface: #212730;    /* card : carte, panneau, tableau */
-  --mm-overlay: #2a313c;    /* elevated : menu, popover, modale */
-  --mm-field: #13171f;      /* saisie, select, textarea */
-  --mm-hover: #ffffff0d;    /* survol de ligne / item (5 %) */
-  --mm-pressed: #ffffff17;  /* pressé (9 %) */
-  --mm-scrim: #0a0d12b3;    /* voile derrière modale / tiroir */
+  --mm-crust: #060B1F;      /* Vide : sidebar, barre d'onglets */
+  --mm-bg: #0B1130;         /* Minuit : page */
+  --mm-surface: #121A42;    /* Crépuscule : carte, panneau, tableau */
+  --mm-overlay: #1A2558;    /* Indigo : menu, popover, modale */
+  --mm-field: #060B1F;      /* Vide : saisie, select, textarea */
+  --mm-hover: #EEEBFF0d;    /* survol de ligne / item (5 %) */
+  --mm-pressed: #EEEBFF17;  /* pressé (9 %) */
+  --mm-scrim: #060B1Fb3;    /* voile derrière modale / tiroir */
 
   /* Contours */
-  --mm-border: #39404d;         /* séparateur décoratif */
-  --mm-border-strong: #6d7583;  /* contour de contrôle ≥ 3:1 */
+  --mm-border: #263478;         /* Brume : séparateur décoratif */
+  --mm-border-strong: #6F69AE;  /* contour de contrôle ≥ 3:1 */
 
   /* Texte */
-  --mm-bright: #f0f4f9;  /* 15.1 titres, valeurs KPI */
-  --mm-fg: #dde1ea;      /* 12.8 texte courant */
-  --mm-subtle: #b4bbc6;  /* 8.6 libellés, en-têtes de tableau */
-  --mm-muted: #8b93a0;   /* 5.4 aide, placeholder, métadonnées */
+  --mm-bright: #EEEBFF;  /* Lune 15.8 titres, valeurs KPI */
+  --mm-fg: #DAD5FF;      /* texte courant */
+  --mm-subtle: #BDB6EC;  /* Voile 9.7 libellés, en-têtes de tableau */
+  --mm-muted: #9A92D6;   /* Brouillard 6.6 aide, placeholder, métadonnées */
 
-  /* Accent */
-  --mm-accent: #3fbfa6;
-  --mm-accent-text: #3fbfa6;
-  --mm-accent-hover: #1ccaa8;
-  --mm-accent-active: #0fb796;
-  --mm-accent-soft: #1ccaa826;
-  --mm-selection: #1ccaa83d;
-  --mm-on-accent: #12161d;
-  --mm-focus: #1ccaa8;
+  /* Accent — Lavande */
+  --mm-accent: #C3BAFE;
+  --mm-accent-text: #C3BAFE;
+  --mm-accent-hover: #DAD5FE;
+  --mm-accent-active: #A79AE9;
+  --mm-accent-soft: #C3BAFE24;
+  --mm-selection: #C3BAFE40;
+  --mm-on-accent: #0B1130;
+  --mm-focus: #C3BAFE;
 
-  /* Couleurs vives (style #d83f3f : OKLCH L≈0.59, C≈0.19) — remplissages, pastilles, graphiques.
-     Identiques dans les deux thèmes. Le jaune/orange sont relevés en luminosité pour rester lisibles. */
-  --mm-red: #d83f3f;
-  --mm-orange: #e18d44;
-  --mm-yellow: #e1d044;
-  --mm-green: #44e180;
-  --mm-cyan: #0199a5;
-  --mm-blue: #5589c8;
-  --mm-purple: #925bdc;
-  --mm-pink: #d24794;
-  /* Variantes texte (≥ 4.5:1 sur page, carte, elevated) */
-  --mm-red-text: #ffa098;
-  --mm-orange-text: #e5b28a;
-  --mm-yellow-text: #d8d087;
-  --mm-green-text: #86d59c;
-  --mm-cyan-text: #02aab7;
-  --mm-blue-text: #a1c1e9;
-  --mm-purple-text: #b380fd;
-  --mm-pink-text: #f26cb2;
+  /* Pastels (L≈0.8, C≈0.1) — lumière sur fond sombre : points, traits, remplissages à texte Minuit.
+     orange (Abricot) et cyan (Lagon) sont dérivés à la même luminosité pour garder 8 tons distincts. */
+  --mm-red: #FB909E;     /* Grenadine */
+  --mm-orange: #FFA68A;  /* Abricot (dérivé) */
+  --mm-yellow: #FFBE8D;  /* Pêche : attente */
+  --mm-green: #91E3AE;   /* Menthe */
+  --mm-cyan: #7EE2DB;    /* Lagon (dérivé) */
+  --mm-blue: #87D7F7;    /* Ciel : information */
+  --mm-purple: #E09FEA;  /* Mauve */
+  --mm-pink: #FFB0CF;    /* Rose */
+  /* Variantes texte (≥ 4.5:1 sur page, carte, elevated) : les pastels suffisent en Nuit */
+  --mm-red-text: var(--mm-red);
+  --mm-orange-text: var(--mm-orange);
+  --mm-yellow-text: var(--mm-yellow);
+  --mm-green-text: var(--mm-green);
+  --mm-cyan-text: var(--mm-cyan);
+  --mm-blue-text: var(--mm-blue);
+  --mm-purple-text: var(--mm-purple);
+  --mm-pink-text: var(--mm-pink);
 
   /* Rôles sémantiques : -text pour le texte, -solid pour les remplissages */
   --mm-success: var(--mm-green-text);
   --mm-success-solid: var(--mm-green);
-  --mm-success-soft: #44e18029;
-  --mm-success-border: #44e1806b;
+  --mm-success-soft: #91E3AE24;
+  --mm-success-border: #91E3AE66;
   --mm-warning: var(--mm-yellow-text);
   --mm-warning-solid: var(--mm-yellow);
-  --mm-warning-soft: #e1d04429;
-  --mm-warning-border: #e1d0446b;
+  --mm-warning-soft: #FFBE8D24;
+  --mm-warning-border: #FFBE8D66;
   --mm-danger: var(--mm-red-text);
   --mm-danger-solid: var(--mm-red);
-  --mm-danger-soft: #d83f3f29;
-  --mm-danger-border: #d83f3f6b;
+  --mm-danger-soft: #FB909E24;
+  --mm-danger-border: #FB909E66;
   --mm-info: var(--mm-blue-text);
   --mm-info-solid: var(--mm-blue);
-  --mm-info-soft: #5589c829;
-  --mm-info-border: #5589c86b;
-  --mm-danger-fill: #cc3737;
-  --mm-danger-hover: #b52e2f;
-  --mm-on-danger: #ffffff;
-  --mm-on-solid: #12161d;
+  --mm-info-soft: #87D7F724;
+  --mm-info-border: #87D7F766;
+  --mm-danger-fill: #FB909E;
+  --mm-danger-hover: #FDB0BA;
+  --mm-on-danger: #0B1130;
+  --mm-on-solid: #0B1130;
   --mm-chart-2: var(--mm-blue);
   --mm-chart-3: var(--mm-purple);
   --mm-chart-4: var(--mm-orange);
@@ -100,86 +94,83 @@
 
   /* Data-viz — ordre catégoriel fixe */
   --mm-chart-1: var(--mm-accent);
-  --mm-chart-grid: #39404d;
+  --mm-chart-grid: #263478;
   --mm-chart-axis: var(--mm-muted);
 
-  /* Ombres (sombre : ombre portée + liseré clair) */
-  --mm-shadow-sm: 0 1px 2px #0000004d;
-  --mm-shadow-md: 0 4px 12px #00000059, 0 0 0 1px #ffffff0a;
-  --mm-shadow-lg: 0 16px 40px #00000073, 0 0 0 1px #ffffff0f;
+  /* Ombres (sombre : ombre Vide + liseré Lune) */
+  --mm-shadow-sm: 0 1px 2px #060B1F66;
+  --mm-shadow-md: 0 4px 12px #060B1F80, 0 0 0 1px #EEEBFF0a;
+  --mm-shadow-lg: 0 16px 40px #060B1F99, 0 0 0 1px #EEEBFF0f;
 }
 
 [data-theme="light"] {
   color-scheme: light;
 
-  --mm-crust: #d8dde5;
-  --mm-bg: #e4e8ef;
-  --mm-surface: #edf0f6;
-  --mm-overlay: #f4f7fb;
-  --mm-field: #fcfdff;
-  --mm-hover: #161b240d;
-  --mm-pressed: #161b2417;
-  --mm-scrim: #161b2466;
+  /* Thème Aube — mêmes teintes, accents au cran 700 */
+  --mm-crust: #EAEAF9;    /* Opale */
+  --mm-bg: #F5F5FE;       /* Perle */
+  --mm-surface: #FDFDFF;  /* Nacre */
+  --mm-overlay: #FDFDFF;  /* Nacre + ombre */
+  --mm-field: #FDFDFF;
+  --mm-hover: #0B11300d;
+  --mm-pressed: #0B113017;
+  --mm-scrim: #0B113066;
 
-  --mm-border: #c9ced7;
-  --mm-border-strong: #737b88;
+  --mm-border: #D8D8EE;         /* Brume claire */
+  --mm-border-strong: #7B7DA8;
 
-  --mm-bright: #161b24;
-  --mm-fg: #252c37;
-  --mm-subtle: #414854;
-  --mm-muted: #5c6470;
+  --mm-bright: #0B1130;  /* Minuit */
+  --mm-fg: #1F2550;
+  --mm-subtle: #404468;  /* Ardoise */
+  --mm-muted: #585B8A;   /* Brouillard profond */
 
-  --mm-accent: #3fbfa6;
-  --mm-accent-text: #007561;
-  --mm-accent-hover: #0fb796;
-  --mm-accent-active: #00a385;
-  --mm-accent-soft: #0fb79629;
-  --mm-selection: #0fb79640;
-  --mm-on-accent: #12161d;
-  --mm-focus: #0fb796;
+  --mm-accent: #5F47AE;
+  --mm-accent-text: #5F47AE;
+  --mm-accent-hover: #4E3896;
+  --mm-accent-active: #432F84;
+  --mm-accent-soft: #5F47AE1f;
+  --mm-selection: #5F47AE33;
+  --mm-on-accent: #FDFDFF;
+  --mm-focus: #5F47AE;
 
+  /* Crans 700 — traits, points et textes restent visibles sur Perle */
+  --mm-red: #AF0040;
+  --mm-orange: #953A1C;
+  --mm-yellow: #8C4A01;
+  --mm-green: #04703F;
+  --mm-cyan: #006A66;
+  --mm-blue: #056883;
+  --mm-purple: #8E229E;
+  --mm-pink: #9F2464;
+  --mm-red-text: var(--mm-red);
+  --mm-orange-text: var(--mm-orange);
+  --mm-yellow-text: var(--mm-yellow);
+  --mm-green-text: var(--mm-green);
+  --mm-cyan-text: var(--mm-cyan);
+  --mm-blue-text: var(--mm-blue);
+  --mm-purple-text: var(--mm-purple);
+  --mm-pink-text: var(--mm-pink);
 
-  /* Couleurs vives (style #d83f3f : OKLCH L≈0.59, C≈0.19) — remplissages, pastilles, graphiques.
-     Identiques dans les deux thèmes. Le jaune/orange sont relevés en luminosité pour rester lisibles. */
-  --mm-red: #d83f3f;
-  --mm-orange: #e18d44;
-  --mm-yellow: #e1d044;
-  --mm-green: #44e180;
-  --mm-cyan: #0199a5;
-  --mm-blue: #5589c8;
-  --mm-purple: #925bdc;
-  --mm-pink: #d24794;
-  /* Variantes texte (≥ 4.5:1 sur page, carte, elevated) */
-  --mm-red-text: #b83232;
-  --mm-orange-text: #965103;
-  --mm-yellow-text: #6e6402;
-  --mm-green-text: #037339;
-  --mm-cyan-text: #006f78;
-  --mm-blue-text: #38659b;
-  --mm-purple-text: #7e45c4;
-  --mm-pink-text: #b32679;
-
-  /* Rôles sémantiques : -text pour le texte, -solid pour les remplissages */
   --mm-success: var(--mm-green-text);
   --mm-success-solid: var(--mm-green);
-  --mm-success-soft: #44e18024;
-  --mm-success-border: #44e18066;
+  --mm-success-soft: #04703F1a;
+  --mm-success-border: #04703F59;
   --mm-warning: var(--mm-yellow-text);
   --mm-warning-solid: var(--mm-yellow);
-  --mm-warning-soft: #e1d04424;
-  --mm-warning-border: #e1d04466;
+  --mm-warning-soft: #8C4A011a;
+  --mm-warning-border: #8C4A0159;
   --mm-danger: var(--mm-red-text);
   --mm-danger-solid: var(--mm-red);
-  --mm-danger-soft: #d83f3f24;
-  --mm-danger-border: #d83f3f66;
+  --mm-danger-soft: #AF00401a;
+  --mm-danger-border: #AF004059;
   --mm-info: var(--mm-blue-text);
   --mm-info-solid: var(--mm-blue);
-  --mm-info-soft: #5589c824;
-  --mm-info-border: #5589c866;
-  --mm-danger-fill: #cc3737;
-  --mm-danger-hover: #b52e2f;
-  --mm-on-danger: #ffffff;
-  --mm-on-solid: #12161d;
+  --mm-info-soft: #0568831a;
+  --mm-info-border: #05688359;
+  --mm-danger-fill: #AF0040;
+  --mm-danger-hover: #8F0035;
+  --mm-on-danger: #FDFDFF;
+  --mm-on-solid: #FDFDFF;
   --mm-chart-2: var(--mm-blue);
   --mm-chart-3: var(--mm-purple);
   --mm-chart-4: var(--mm-orange);
@@ -188,85 +179,82 @@
   --mm-chart-7: var(--mm-cyan);
   --mm-chart-8: var(--mm-red);
 
-  --mm-chart-1: #1d836f;
-  --mm-chart-grid: #c9ced7;
+  --mm-chart-1: var(--mm-accent);
+  --mm-chart-grid: #D8D8EE;
 
-  --mm-shadow-sm: 0 1px 2px #161b241a;
-  --mm-shadow-md: 0 4px 12px #161b241f, 0 0 0 1px #161b240d;
-  --mm-shadow-lg: 0 16px 40px #161b242e, 0 0 0 1px #161b240f;
+  --mm-shadow-sm: 0 1px 2px #0B11301a;
+  --mm-shadow-md: 0 4px 12px #0B11301f, 0 0 0 1px #0B11300d;
+  --mm-shadow-lg: 0 16px 40px #0B11302e, 0 0 0 1px #0B11300f;
 }
 @media (prefers-color-scheme: light) {
 :root:not([data-theme]) {
   color-scheme: light;
 
-  --mm-crust: #d8dde5;
-  --mm-bg: #e4e8ef;
-  --mm-surface: #edf0f6;
-  --mm-overlay: #f4f7fb;
-  --mm-field: #fcfdff;
-  --mm-hover: #161b240d;
-  --mm-pressed: #161b2417;
-  --mm-scrim: #161b2466;
+  /* Thème Aube — mêmes teintes, accents au cran 700 */
+  --mm-crust: #EAEAF9;    /* Opale */
+  --mm-bg: #F5F5FE;       /* Perle */
+  --mm-surface: #FDFDFF;  /* Nacre */
+  --mm-overlay: #FDFDFF;  /* Nacre + ombre */
+  --mm-field: #FDFDFF;
+  --mm-hover: #0B11300d;
+  --mm-pressed: #0B113017;
+  --mm-scrim: #0B113066;
 
-  --mm-border: #c9ced7;
-  --mm-border-strong: #737b88;
+  --mm-border: #D8D8EE;         /* Brume claire */
+  --mm-border-strong: #7B7DA8;
 
-  --mm-bright: #161b24;
-  --mm-fg: #252c37;
-  --mm-subtle: #414854;
-  --mm-muted: #5c6470;
+  --mm-bright: #0B1130;  /* Minuit */
+  --mm-fg: #1F2550;
+  --mm-subtle: #404468;  /* Ardoise */
+  --mm-muted: #585B8A;   /* Brouillard profond */
 
-  --mm-accent: #3fbfa6;
-  --mm-accent-text: #007561;
-  --mm-accent-hover: #0fb796;
-  --mm-accent-active: #00a385;
-  --mm-accent-soft: #0fb79629;
-  --mm-selection: #0fb79640;
-  --mm-on-accent: #12161d;
-  --mm-focus: #0fb796;
+  --mm-accent: #5F47AE;
+  --mm-accent-text: #5F47AE;
+  --mm-accent-hover: #4E3896;
+  --mm-accent-active: #432F84;
+  --mm-accent-soft: #5F47AE1f;
+  --mm-selection: #5F47AE33;
+  --mm-on-accent: #FDFDFF;
+  --mm-focus: #5F47AE;
 
+  /* Crans 700 — traits, points et textes restent visibles sur Perle */
+  --mm-red: #AF0040;
+  --mm-orange: #953A1C;
+  --mm-yellow: #8C4A01;
+  --mm-green: #04703F;
+  --mm-cyan: #006A66;
+  --mm-blue: #056883;
+  --mm-purple: #8E229E;
+  --mm-pink: #9F2464;
+  --mm-red-text: var(--mm-red);
+  --mm-orange-text: var(--mm-orange);
+  --mm-yellow-text: var(--mm-yellow);
+  --mm-green-text: var(--mm-green);
+  --mm-cyan-text: var(--mm-cyan);
+  --mm-blue-text: var(--mm-blue);
+  --mm-purple-text: var(--mm-purple);
+  --mm-pink-text: var(--mm-pink);
 
-  /* Couleurs vives (style #d83f3f : OKLCH L≈0.59, C≈0.19) — remplissages, pastilles, graphiques.
-     Identiques dans les deux thèmes. Le jaune/orange sont relevés en luminosité pour rester lisibles. */
-  --mm-red: #d83f3f;
-  --mm-orange: #e18d44;
-  --mm-yellow: #e1d044;
-  --mm-green: #44e180;
-  --mm-cyan: #0199a5;
-  --mm-blue: #5589c8;
-  --mm-purple: #925bdc;
-  --mm-pink: #d24794;
-  /* Variantes texte (≥ 4.5:1 sur page, carte, elevated) */
-  --mm-red-text: #b83232;
-  --mm-orange-text: #965103;
-  --mm-yellow-text: #6e6402;
-  --mm-green-text: #037339;
-  --mm-cyan-text: #006f78;
-  --mm-blue-text: #38659b;
-  --mm-purple-text: #7e45c4;
-  --mm-pink-text: #b32679;
-
-  /* Rôles sémantiques : -text pour le texte, -solid pour les remplissages */
   --mm-success: var(--mm-green-text);
   --mm-success-solid: var(--mm-green);
-  --mm-success-soft: #44e18024;
-  --mm-success-border: #44e18066;
+  --mm-success-soft: #04703F1a;
+  --mm-success-border: #04703F59;
   --mm-warning: var(--mm-yellow-text);
   --mm-warning-solid: var(--mm-yellow);
-  --mm-warning-soft: #e1d04424;
-  --mm-warning-border: #e1d04466;
+  --mm-warning-soft: #8C4A011a;
+  --mm-warning-border: #8C4A0159;
   --mm-danger: var(--mm-red-text);
   --mm-danger-solid: var(--mm-red);
-  --mm-danger-soft: #d83f3f24;
-  --mm-danger-border: #d83f3f66;
+  --mm-danger-soft: #AF00401a;
+  --mm-danger-border: #AF004059;
   --mm-info: var(--mm-blue-text);
   --mm-info-solid: var(--mm-blue);
-  --mm-info-soft: #5589c824;
-  --mm-info-border: #5589c866;
-  --mm-danger-fill: #cc3737;
-  --mm-danger-hover: #b52e2f;
-  --mm-on-danger: #ffffff;
-  --mm-on-solid: #12161d;
+  --mm-info-soft: #0568831a;
+  --mm-info-border: #05688359;
+  --mm-danger-fill: #AF0040;
+  --mm-danger-hover: #8F0035;
+  --mm-on-danger: #FDFDFF;
+  --mm-on-solid: #FDFDFF;
   --mm-chart-2: var(--mm-blue);
   --mm-chart-3: var(--mm-purple);
   --mm-chart-4: var(--mm-orange);
@@ -275,12 +263,12 @@
   --mm-chart-7: var(--mm-cyan);
   --mm-chart-8: var(--mm-red);
 
-  --mm-chart-1: #1d836f;
-  --mm-chart-grid: #c9ced7;
+  --mm-chart-1: var(--mm-accent);
+  --mm-chart-grid: #D8D8EE;
 
-  --mm-shadow-sm: 0 1px 2px #161b241a;
-  --mm-shadow-md: 0 4px 12px #161b241f, 0 0 0 1px #161b240d;
-  --mm-shadow-lg: 0 16px 40px #161b242e, 0 0 0 1px #161b240f;
+  --mm-shadow-sm: 0 1px 2px #0B11301a;
+  --mm-shadow-md: 0 4px 12px #0B11301f, 0 0 0 1px #0B11300d;
+  --mm-shadow-lg: 0 16px 40px #0B11302e, 0 0 0 1px #0B11300f;
 }
 }
 /* Typographie — Geist / Geist Mono. Échelle dense pour interfaces de gestion.
@@ -305,7 +293,8 @@
   --mm-weight-bold: 700;
 
   --mm-tracking-tight: -0.01em;  /* ≥ 20px */
-  --mm-tracking-label: 0.04em;   /* labels de section en capitales */
+  --mm-tracking-title: -0.03em;  /* titres Geist 800 en capitales */
+  --mm-tracking-label: 0.14em;   /* détails Geist Mono en capitales */
 
   /* Alias sémantiques */
   --mm-font-body: var(--mm-font-sans);
@@ -328,10 +317,11 @@
   --mm-space-12: 48px;
   --mm-space-16: 64px;
 
-  --mm-radius-xs: 4px;    /* badge, case à cocher */
-  --mm-radius-sm: 6px;    /* bouton, champ, item de sidebar */
-  --mm-radius-md: 10px;   /* carte, tableau, menu */
-  --mm-radius-lg: 14px;   /* modale, tiroir mobile */
+  /* Aucun angle vif : plus la surface est grande, plus le rayon est généreux. */
+  --mm-radius-xs: 6px;    /* case à cocher, infobulle */
+  --mm-radius-sm: 14px;   /* alerte, bloc interne */
+  --mm-radius-md: 28px;   /* carte, tableau, menu */
+  --mm-radius-lg: 36px;   /* modale, tiroir mobile */
   --mm-radius-full: 999px;
 
   /* Hauteurs de contrôle — 44px minimum sur écran tactile (pointer: coarse) */
@@ -341,14 +331,15 @@
   --mm-touch-target: 44px;
 
   --mm-border-width: 1px;
-  --mm-focus-width: 2px;
-  --mm-focus-offset: 2px;
+  --mm-focus-width: 3px;
+  --mm-focus-offset: 3px;
 
-  --mm-ease: cubic-bezier(0.2, 0, 0, 1);
-  --mm-ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --mm-duration-fast: 120ms;   /* survol, pressé */
-  --mm-duration-base: 180ms;   /* menus, popovers */
-  --mm-duration-slow: 260ms;   /* tiroir, modale */
+  /* Lent par défaut, plus vif quand l'utilisateur agit (out-soft). */
+  --mm-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --mm-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --mm-duration-fast: 300ms;   /* survol, pressé */
+  --mm-duration-base: 450ms;   /* menus, popovers */
+  --mm-duration-slow: 600ms;   /* tiroir, modale */
 
   --mm-z-sticky: 10;
   --mm-z-sidebar: 20;
@@ -444,10 +435,10 @@
 .mm-icon--lg { width: 20px; height: 20px; }
 
 /* ---------- Typo utilitaire ---------- */
-.mm-h1 { margin: 0; font-size: var(--mm-text-page); line-height: var(--mm-leading-page); font-weight: 600; color: var(--mm-bright); letter-spacing: var(--mm-tracking-tight); }
-.mm-h2 { margin: 0; font-size: var(--mm-text-xl); line-height: var(--mm-leading-xl); font-weight: 600; color: var(--mm-bright); }
-.mm-h3 { margin: 0; font-size: var(--mm-text-lg); line-height: var(--mm-leading-lg); font-weight: 600; color: var(--mm-bright); }
-.mm-label-caps { font-size: var(--mm-text-xs); line-height: var(--mm-leading-xs); font-weight: 500; letter-spacing: var(--mm-tracking-label); text-transform: uppercase; color: var(--mm-muted); }
+.mm-h1 { margin: 0; font-size: var(--mm-text-page); line-height: var(--mm-leading-page); font-weight: 800; color: var(--mm-bright); letter-spacing: var(--mm-tracking-title); text-transform: uppercase; }
+.mm-h2 { margin: 0; font-size: var(--mm-text-xl); line-height: var(--mm-leading-xl); font-weight: 700; letter-spacing: var(--mm-tracking-tight); color: var(--mm-bright); }
+.mm-h3 { margin: 0; font-size: var(--mm-text-lg); line-height: var(--mm-leading-lg); font-weight: 700; color: var(--mm-bright); }
+.mm-label-caps { font-family: var(--mm-font-mono); font-size: 13px; line-height: var(--mm-leading-xs); font-weight: 500; letter-spacing: var(--mm-tracking-label); text-transform: uppercase; color: var(--mm-muted); }
 .mm-help { font-size: var(--mm-text-sm); line-height: var(--mm-leading-sm); color: var(--mm-muted); }
 
 /* ---------- Bouton ---------- */
@@ -571,6 +562,8 @@
 
 /* ---------- Carte ---------- */
 .mm-card { background: var(--mm-surface); border: 1px solid var(--mm-border); border-radius: var(--mm-radius-md); min-width: 0; }
+/* Grands rayons : les lignes de tableau ne doivent pas dépasser de l'arrondi. */
+.mm-card:has(table) { overflow: clip; }
 .mm-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; min-height: 56px; }
 .mm-card__head + .mm-card__body { padding-top: 0; }
 .mm-card__title { margin: 0; font-size: var(--mm-text-md); line-height: var(--mm-leading-md); font-weight: 600; color: var(--mm-bright); }
@@ -666,9 +659,9 @@
   min-width: 200px; padding: 6px; background: var(--mm-overlay); border: 1px solid var(--mm-border); border-radius: var(--mm-radius-md);
   box-shadow: var(--mm-shadow-lg); color: var(--mm-fg); animation: mm-in var(--mm-duration-base) var(--mm-ease-out);
 }
-.mm-menu__label { padding: 8px 10px 4px; }
+.mm-menu__label { padding: 8px 14px 4px; }
 .mm-menu__item {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 0 10px; border: 0; border-radius: var(--mm-radius-xs);
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 0 14px; border: 0; border-radius: var(--mm-radius-full);
   background: transparent; color: var(--mm-fg); font: 400 var(--mm-text-md)/1.2 var(--mm-font-sans); text-align: left; cursor: pointer;
 }
 .mm-menu__item:hover, .mm-menu__item:focus-visible { background: var(--mm-hover); color: var(--mm-bright); outline: none; }
@@ -697,7 +690,7 @@
 }
 
 /* ---------- Avatar ---------- */
-.mm-avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: var(--mm-mint-800); color: var(--mm-mint-100); font: 600 11px/1 var(--mm-font-sans); }
+.mm-avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: var(--mm-lavande-800); color: var(--mm-lavande-100); font: 600 11px/1 var(--mm-font-sans); }
 .mm-avatar--lg { width: 40px; height: 40px; font-size: 14px; }
 .mm-avatar img { width: 100%; height: 100%; object-fit: cover; }
 

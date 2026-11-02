@@ -1,7 +1,7 @@
 /* Notifications menu of both UIs: open alerts, hosts with pending updates and update reminders.
    Each role gives its own feed (alerts and hosts); the reminders live on /api/reminders in both. */
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowUpRight, Bell, BellPlus, Check, PackageCheck, Trash2 } from "lucide-react";
+import { ArrowUpRight, Bell, BellPlus, Check, PackageCheck, Trash2 } from "./icons";
 import { api } from "../api";
 import { Popover } from "../mg/components/ui/popover";
 import { refreshPolled, usePolled } from "./poll";

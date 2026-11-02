@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
-import { LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserPlus } from "../shared/icons";
 import { Alert, Button, Field, Logo, inputClass } from "../ui";
 import { PasskeyLoginButton } from "../shared/system";
 

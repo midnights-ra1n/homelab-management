@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDownUp } from "lucide-react";
+import { ArrowDownUp } from "../shared/icons";
 import { api, fmtNum, type Bandwidth, type BandwidthLink } from "../api";
 import { BandwidthChart, BandwidthFigures, BandwidthVolume, LiveLink, useLiveBandwidth, type LiveSource, type LiveView } from "../shared/bandwidth";
 import { Alert, Card, EmptyState, Link, PageHeader, SECTIONS, Segmented, Skeleton, StatusBadge, StatusIcon, usePoll } from "../ui";

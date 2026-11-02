@@ -4,8 +4,8 @@
 @import "uplot/dist/uPlot.min.css";
 @import "./midnights.css";
 
-/* Same setup as homelab-management (src/app/globals.css): Midnights Classic tokens --mm-* and .mm-* components
-   in midnights.css (copied verbatim), Tailwind colour names mapped onto those tokens. */
+/* Midnights til dawn (DA v5): tokens --mm-* and .mm-* components in midnights.css,
+   Tailwind colour names mapped onto those tokens. */
 
 :root {
   --font-geist-sans: "Geist Variable";
@@ -13,17 +13,17 @@
 }
 :root,
 [data-theme="dark"] {
-  --mm-neutral-soft: #ffffff12;
-  --mm-accent-border: #3fbfa666;
+  --mm-neutral-soft: #EEEBFF12;
+  --mm-accent-border: #C3BAFE66;
 }
 [data-theme="light"] {
-  --mm-neutral-soft: #161b2412;
-  --mm-accent-border: #00756159;
+  --mm-neutral-soft: #0B113012;
+  --mm-accent-border: #5F47AE59;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --mm-neutral-soft: #161b2412;
-    --mm-accent-border: #00756159;
+    --mm-neutral-soft: #0B113012;
+    --mm-accent-border: #5F47AE59;
   }
 }
 
@@ -55,7 +55,7 @@
   --color-accent-text: var(--mm-accent-text);
   --color-accent-hover: var(--mm-accent-hover);
   --color-accent-active: var(--mm-accent-active);
-  --color-accent-muted: var(--mm-mint-700);
+  --color-accent-muted: var(--mm-lavande-700);
   --color-accent-soft: var(--mm-accent-soft);
   --color-on-accent: var(--mm-on-accent);
   --color-red: var(--mm-red-text);
@@ -67,16 +67,16 @@
   --color-purple: var(--mm-purple-text);
   --color-pink: var(--mm-pink-text);
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 10px;
-  --radius-2xl: 10px;
-  --radius-3xl: 14px;
-  --radius-4xl: 14px;
-  --ease-expo: cubic-bezier(0.2, 0, 0, 1);
-  --ease-soft: cubic-bezier(0.2, 0, 0, 1);
-  --ease-quart: cubic-bezier(0.2, 0, 0, 1);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-3xl: 36px;
+  --radius-4xl: 36px;
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-quart: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ---------- Base ---------- */
@@ -253,7 +253,7 @@ dialog::backdrop {
   --xy-controls-button-color-hover: var(--mm-bright);
   --xy-controls-button-border-color: var(--mm-border);
   --xy-minimap-background-color: var(--mm-crust);
-  --xy-minimap-mask-background-color: #0f131a99;
+  --xy-minimap-mask-background-color: #060B1F99;
   --xy-minimap-node-background-color: var(--mm-border);
   --xy-attribution-background-color: transparent;
   --xy-selection-background-color: var(--mm-accent-soft);

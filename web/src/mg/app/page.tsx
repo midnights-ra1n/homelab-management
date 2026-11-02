@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cache, Suspense, use } from "react";
 import { BandwidthFigures } from "../../shared/bandwidth";
-import { Activity, AlertTriangle, ArrowUpRight, Boxes, ClipboardList, Cpu, HardDrive, MemoryStick, Network, Plus, Rocket, Server, ShieldAlert, Zap, PackageCheck } from "lucide-react";
+import { Activity, AlertTriangle, ArrowUpRight, Boxes, ClipboardList, Cpu, HardDrive, MemoryStick, Network, Plus, Rocket, Server, ShieldAlert, Zap, PackageCheck } from "../../shared/icons";
 import { assetCounts, hardwareTotals, storageTotalGb } from "@/lib/data/assets";
 import { deploymentCounts, listDeployments } from "@/lib/data/deployments";
 import { openTasks, taskCounts } from "@/lib/data/tasks";

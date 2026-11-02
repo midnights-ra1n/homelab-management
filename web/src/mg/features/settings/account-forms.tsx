@@ -1,5 +1,5 @@
 
-import { Download, Upload } from "lucide-react";
+import { Download, Upload } from "../../../shared/icons";
 import { changePasswordAction } from "@/actions/auth";
 import { importBackupAction } from "@/actions/backup";
 import { ActionForm, Field, SubmitButton, Switch, TextField } from "@/components/ui/form";

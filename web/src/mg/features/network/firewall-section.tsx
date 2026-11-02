@@ -1,5 +1,5 @@
 
-import { ArrowDown, ArrowUp, Pencil, Plus, ShieldHalf } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, Plus, ShieldHalf } from "../../../shared/icons";
 import { useState, useTransition } from "react";
 import { deleteRuleAction, moveRuleAction, saveRuleAction, setDefaultPolicyAction, toggleRuleAction } from "@/actions/network";
 import { Badge } from "@/components/ui/badge";

@@ -1,6 +1,6 @@
 import { use } from "react";
 import Link from "next/link";
-import { ExternalLink, Globe, PackageCheck, Radar, RotateCcw, Server, ShieldAlert } from "lucide-react";
+import { ExternalLink, Globe, PackageCheck, Radar, RotateCcw, Server, ShieldAlert } from "../../../shared/icons";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";

@@ -1,5 +1,5 @@
 
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "../../../shared/icons";
 import { useState, useTransition, type ReactNode } from "react";
 import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { Dialog } from "./dialog";

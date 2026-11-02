@@ -1,5 +1,5 @@
 import { Suspense, use } from "react";
-import { Share2, Plus } from "lucide-react";
+import { Share2, Plus } from "../../../shared/icons";
 import { listAssets } from "@/lib/data/assets";
 import { listLinks, mapPositions } from "@/lib/data/map";
 import { listSubnets, listVlans } from "@/lib/data/network";

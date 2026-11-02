@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { CalendarDays, Rocket, Server } from "lucide-react";
+import { CalendarDays, Rocket, Server } from "../../../shared/icons";
 import { useOptimistic, useState, useTransition } from "react";
 import { deleteTaskAction, moveTaskAction } from "@/actions/tasks";
 import { Badge, Tag } from "@/components/ui/badge";

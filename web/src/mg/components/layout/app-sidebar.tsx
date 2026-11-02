@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { PanelLeftClose, PanelLeftOpen, Search, Settings } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Search, Settings } from "../../../shared/icons";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { isRail, subscribeTheme, toggleRail } from "@/lib/theme";
 import { openSearch } from "./command-palette";
@@ -8,7 +8,7 @@ import { Logo } from "./logo";
 import { NAV_SECTIONS, isActive, type NavItem } from "./nav-items";
 import { usePathname, useT } from "@/i18n/client";
 import { useSession } from "@/session";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "../../../shared/icons";
 import { SEARCH_KEY } from "../../../ui";
 import { NotificationsButton } from "../alert-banner";
 

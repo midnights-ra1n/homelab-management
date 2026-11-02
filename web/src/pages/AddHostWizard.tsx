@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Cpu, HardDrive, Laptop, LoaderCircle, Server } from "lucide-react";
+import { Check, Cpu, HardDrive, Laptop, LoaderCircle, Server } from "../shared/icons";
 import { api, fmtBytes, fmtPct, type Host, type Install } from "../api";
 import { Alert, Button, CodeBlock, Dialog, Field, Segmented, Switch, cn, inputClass, navigate, useToast } from "../ui";
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleAlert, Printer, Radar, Send, Server, ShieldAlert } from "lucide-react";
+import { CircleAlert, Printer, Radar, Send, Server, ShieldAlert } from "../shared/icons";
 import { api, fmtDate, fmtMs, fmtPct, type Monitor, type Status } from "../api";
 import {
   Alert, Badge, Button, Card, Link, PageHeader, SECTIONS, STAT_GRID, Skeleton, Stat, StatusBadge, StatusIcon, cn, inputClass, usePoll, useToast,

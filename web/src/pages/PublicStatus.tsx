@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ExternalLink, Tv } from "lucide-react";
+import { Activity, ExternalLink, Tv } from "../shared/icons";
 import { api, fmtDate, type Day, type Host, type Monitor, type Status } from "../api";
 import { BlockEditor, type BlockType } from "../blocks";
 import {

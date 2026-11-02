@@ -1,5 +1,5 @@
 
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "../../../shared/icons";
 import { useEffect, useState } from "react";
 import { saveAssetAction } from "@/actions/inventory";
 import { Button, ButtonLink } from "@/components/ui/button";

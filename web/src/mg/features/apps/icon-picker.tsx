@@ -1,6 +1,6 @@
 
 /* eslint-disable @next/next/no-img-element */
-import { Search, Trash2, Upload } from "lucide-react";
+import { Search, Trash2, Upload } from "../../../shared/icons";
 import { useEffect, useState, useTransition } from "react";
 import { deleteUploadedIconAction, searchIconsAction, uploadIconAction } from "@/actions/shortcuts";
 import { Button } from "@/components/ui/button";

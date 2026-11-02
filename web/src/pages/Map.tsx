@@ -9,7 +9,7 @@ import {
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Activity, ArrowUpRight, Box, Boxes, Cable, Cloud, Container, Database, Globe, LayoutTemplate, Maximize, Plug, Radar, Router, Search, Server, ShieldCheck, Signpost, Waypoints, X,
-} from "lucide-react";
+} from "../shared/icons";
 import { api, fmtBytes, fmtMbps, fmtMs, fmtPct, hostStatusLabel, pct, savePrefs, statusLabel, type Host, type Monitor, type MonitorType, type Overview, type Preferences } from "../api";
 import { containerKind } from "./Containers";
 import { guestCount, guestId, proxmoxTree } from "./Hosts";

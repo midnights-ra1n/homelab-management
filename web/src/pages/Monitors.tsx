@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, LayoutGrid, List, Pencil, Plus, Radar, ShieldAlert, Timer, Trash2 } from "lucide-react";
+import { ChevronRight, LayoutGrid, List, Pencil, Plus, Radar, ShieldAlert, Timer, Trash2 } from "../shared/icons";
 import { api, certDays, fmtOctets, type SnmpDevice, type SnmpIface, savePrefs, fmtAgo, fmtDate, fmtMs, fmtNum, statusLabel, type Monitor, type MonitorInput, type MonitorType, type Series } from "../api";
 import {
   Alert, Badge, Button, Card, Chart, Dialog, EmptyState, Field, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, StatusBadge,

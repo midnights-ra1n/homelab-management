@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, use } from "react";
-import { ArrowUpRight, PackagePlus, Pencil } from "lucide-react";
+import { ArrowUpRight, PackagePlus, Pencil } from "../../../../shared/icons";
 import { deploymentOptions, getDeployment } from "@/lib/data/deployments";
 import { listTasks } from "@/lib/data/tasks";
 import { assetOptions } from "@/lib/data/assets";

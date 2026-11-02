@@ -1,5 +1,5 @@
 
-import { Check, Copy, KeyRound, Plus } from "lucide-react";
+import { Check, Copy, KeyRound, Plus } from "../../../shared/icons";
 import { useState } from "react";
 import { deleteSshKeyAction, saveSshKeyAction } from "@/actions/ssh-keys";
 import { Badge } from "@/components/ui/badge";

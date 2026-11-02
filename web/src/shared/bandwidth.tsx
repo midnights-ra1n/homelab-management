@@ -1,7 +1,7 @@
 /* Bandwidth figures and chart, shown identically by the monitoring (page and dashboard) and the
    management dashboards, from the same GET /api(/v1)/bandwidth view. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ShieldCheck } from "lucide-react";
+import { ArrowDown, ArrowUp, ShieldCheck } from "./icons";
 import { fmtMbps, fmtOctets, type BandwidthLink } from "../api";
 import { Chart, StatusIcon, cn, statusKind } from "../ui";
 

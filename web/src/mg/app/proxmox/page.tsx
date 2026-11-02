@@ -1,5 +1,5 @@
 import { Suspense, use } from "react";
-import { ExternalLink, Server, Settings } from "lucide-react";
+import { ExternalLink, Server, Settings } from "../../../shared/icons";
 import { fetchProxmox } from "@/lib/integrations";
 import { listIntegrations } from "@/lib/data/integrations";
 import { Alert } from "@/components/ui/alert";

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, ExternalLink, Send, Upload } from "lucide-react";
+import { Download, ExternalLink, Send, Upload } from "../shared/icons";
 import { api, fmtBytes } from "../api";
 import {
   Alert, Button, ButtonAnchor, ButtonLink, Card, CardBody, Checkbox, FIELD_ROW, FORM_ACTIONS, Field, PageHeader, SECTIONS, SectionTitle, SettingsSection,

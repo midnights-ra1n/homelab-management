@@ -1,5 +1,5 @@
 
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "../../../shared/icons";
 import { useCallback, useOptimistic, useRef, useState, useTransition } from "react";
 import { Popover } from "@/components/ui/popover";
 import { setDeploymentStatusAction } from "@/actions/deployments";

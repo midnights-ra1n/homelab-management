@@ -19,7 +19,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import Link from "next/link";
-import { ArrowUpRight, Globe, LayoutTemplate, Maximize, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Globe, LayoutTemplate, Maximize, Trash2, X } from "../../../shared/icons";
 import { memo, useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { createLinkAction, deleteLinkAction, resetPositionsAction, savePositionsAction } from "@/actions/map";
 import { Badge } from "@/components/ui/badge";

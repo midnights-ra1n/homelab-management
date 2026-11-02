@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, ArrowUpRight, CalendarDays, Download, Plug, Send, Zap } from "lucide-react";
+import { Activity, ArrowUpRight, CalendarDays, Download, Plug, Send, Zap } from "../shared/icons";
 import { api, fmtNum } from "../api";
 import {
   Alert, Button, ButtonAnchor, ButtonLink, Card, CardBody, CardHeader, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, Chart, usePoll, useToast,

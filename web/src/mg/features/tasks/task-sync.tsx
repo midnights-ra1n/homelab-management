@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "../../../shared/icons";
 import { syncTasksAction } from "@/actions/tasks";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toaster";

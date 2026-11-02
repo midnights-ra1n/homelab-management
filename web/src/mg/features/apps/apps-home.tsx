@@ -1,5 +1,5 @@
 
-import { ArrowDown, ArrowUp, FolderPlus, LayoutGrid, Pencil, Plus, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, FolderPlus, LayoutGrid, Pencil, Plus, Search } from "../../../shared/icons";
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import {
   deleteGroupAction,

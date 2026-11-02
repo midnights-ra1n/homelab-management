@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Ellipsis, Search, Settings, X } from "lucide-react";
+import { Ellipsis, Search, Settings, X } from "../../../shared/icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { openSearch } from "./command-palette";
 import { MOBILE_TABS, NAV_ITEMS, isActive, type NavItem } from "./nav-items";

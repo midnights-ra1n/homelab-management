@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BookOpen, KeyRound, Plus, Trash2 } from "lucide-react";
+import { BookOpen, KeyRound, Plus, Trash2 } from "../shared/icons";
 import { api, fmtAgo, fmtDate } from "../api";
 import {
   Alert, Badge, Button, ButtonAnchor, Card, CardBody, Checkbox, CodeBlock, Dialog, FIELD_ROW, FORM_ACTIONS, Field, IconButton, SectionTitle, Switch, Tag,
