@@ -2,8 +2,11 @@
 # Node.js apps of the base-node playbook (its node-app command) for hlm-agent. node-app must run
 # as root (it reads /etc/node-apps and /var/log/node-app, drives PM2 and iptables), so the
 # unprivileged agent goes through this root-owned script, which takes one request file:
-#   read    (hlm-agent-node-read.path): "<seq> collect", "<seq> logs <app> <lines>" or
-#           "<seq> oplog <app> <id> <offset>". Never an app's variables (.env, secrets).
+#   read    (hlm-agent-node-read.path): "<seq> collect", "<seq> logs <app> <lines>",
+#           "<seq> oplog <app> <id> <offset>", and, unless the host is read-only (no action
+#           unit), the requests of node-app-ui that carry secrets, answered to the asking user
+#           only: "env", "setenv", "key", "newkey", "importkey" and "create" <app>, with their
+#           payload (.env text, private key, creation JSON) in the agent's node-payload file.
 #   action  (hlm-agent-node-action.path, absent with NODE_APPS_ACTIONS=0): "<verb> <app>",
 #           verb = deploy, pull, update (started with systemd-run, followed in the history),
 #           restart, stop, remove or purge.
@@ -12,7 +15,7 @@ set -u
 NODE_APP=/usr/local/bin/node-app
 OUT=/var/lib/hlm-agent/node-apps
 STATE=/var/lib/hlm-agent/state
-MAX=262144 # bytes of log sent per read
+MAX=262144 # bytes of log sent per read, and of payload taken
 [ -x "$NODE_APP" ] || exit 0
 install -d -o root -g hlm-agent -m 0750 "$OUT"
 
@@ -25,6 +28,79 @@ take() {
   [ -f "$req" ] && [ ! -L "$req" ] || { rm -f "$req"; return; }
   head -c 300 "$req" | head -n1 | tr -dc 'A-Za-z0-9 _-'
   rm -f "$req"
+}
+
+# The payload the agent dropped with its read (untrusted: size-capped, never a link), into $1.
+take_payload() {
+  local f=$STATE/node-payload
+  [ -f "$f" ] && [ ! -L "$f" ] && head -c "$MAX" "$f" > "$1"
+  rm -f "$f"
+}
+can_write() { [ -e /etc/systemd/system/hlm-agent-node-action.path ]; }
+as_json() { node -e 'const fs = require("fs"); console.log(JSON.stringify({ [process.argv[1]]: fs.readFileSync(0, "utf8").trim() }))' "$1"; }
+
+# Creation request of node-app-ui (POST /api/apps) checked, then turned into node-app create options
+# (NUL-separated on stdout), its .env text into $2 and its private key into $3. Git sources only:
+# a path on the server would let the hub copy any root-readable file into an app.
+CREATE_JS='
+const fs = require("fs");
+const fail = (m) => { console.log(m); process.exit(1); };
+let b;
+try { b = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { fail("Requête de création invalide"); }
+if (!b || typeof b !== "object") fail("Requête de création invalide");
+const opt = (k, re, msg) => {
+  const v = b[k];
+  if (v === undefined || v === null || v === "") return "";
+  if ((typeof v !== "string" && typeof v !== "number") || !re.test(String(v))) fail(msg);
+  return String(v);
+};
+const src = opt("source", /^(https?:\/\/|ssh:\/\/|[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:)[^\s]{1,490}$/, "Source invalide : URL git attendue (https://… ou git@hôte:compte/dépôt.git)");
+if (!src) fail("Source du code manquante");
+const args = ["--repo", src, "--no-deploy", "--auto-deploy", b.auto_deploy === false ? "non" : "oui", "--auto-update", b.auto_update === false ? "non" : "oui"];
+const add = (flag, v) => v && args.push(flag, v);
+add("--branch", opt("branch", /^[A-Za-z0-9._][A-Za-z0-9._\/-]{0,199}$/, "Branche ou tag invalide"));
+const port = opt("port", /^[0-9]{1,5}$/, "Port invalide");
+if (port && (+port < 1 || +port > 65535)) fail("Port invalide");
+add("--port", port);
+add("--preset", opt("preset", /^[a-z][a-z-]{0,29}$/, "Préréglage invalide"));
+add("--start", opt("start", /^[^\n\r\0]{1,500}$/, "Commande de démarrage invalide"));
+add("--migrate", opt("migrate", /^[^\n\r\0]{1,500}$/, "Commande de migration invalide"));
+if (typeof b.env === "string" && b.env.trim()) {
+  fs.writeFileSync(process.argv[2], b.env);
+  args.push("--env-stdin");
+  if (b.env_merge === "saisie" || b.env_merge === "code") args.push("--env-merge", b.env_merge);
+}
+if (typeof b.private_key === "string" && b.private_key.trim()) fs.writeFileSync(process.argv[3], b.private_key);
+process.stdout.write(args.join("\0"));'
+
+# node-app create, like node-app-ui: recorded without deploying (errors right away), then
+# deployed in the background. Answers JSON: {"warnings"} or {"need_key"} (deploy key to add).
+create_app() { # app payload
+  local app=$1 tmp rc args=()
+  tmp=$(mktemp -d)
+  if ! node -e "$CREATE_JS" "$2" "$tmp/env" "$tmp/key" > "$tmp/args"; then
+    cp "$tmp/args" "$OUT/read.out"; rm -rf "$tmp"; return 1
+  fi
+  mapfile -d '' -t args < "$tmp/args"
+  if [ -f "/etc/node-apps/$app.conf" ]; then
+    echo "L'application $app existe déjà" > "$OUT/read.out"; rm -rf "$tmp"; return 1
+  fi
+  if [ -s "$tmp/key" ] && ! "$NODE_APP" key "$app" --import < "$tmp/key" > /dev/null 2> "$OUT/read.out"; then
+    rm -rf "$tmp"; return 1
+  fi
+  [ -f "$tmp/env" ] || : > "$tmp/env"
+  timeout 9m "$NODE_APP" create "$app" "${args[@]}" < "$tmp/env" > "$tmp/out" 2> "$tmp/err"
+  rc=$?
+  if [ "$rc" -eq 3 ]; then
+    "$NODE_APP" key "$app" 2>/dev/null | as_json need_key > "$OUT/read.out"; rc=0
+  elif [ "$rc" -ne 0 ]; then
+    if [ -s "$tmp/err" ]; then cp "$tmp/err" "$OUT/read.out"; else cp "$tmp/out" "$OUT/read.out"; fi
+  else
+    systemd-run --no-block --collect --quiet --unit="node-app-deploy-$app-$(date +%s)" "$NODE_APP" deploy "$app" --force
+    as_json warnings < "$tmp/err" > "$OUT/read.out"
+  fi
+  rm -rf "$tmp"
+  return "$rc"
 }
 
 # One app as JSON: its settings (.conf, sourced like node-app does) and its last 20 operations.
@@ -77,11 +153,18 @@ answer() { # seq code offset [operation json]
 }
 
 read_req() {
-  local line seq verb app arg off f size op
+  local line seq verb app arg off f size op pl
   line=$(take node-read)
+  pl=$(mktemp)
+  trap 'rm -f "$pl"' EXIT
+  take_payload "$pl"
   read -r seq verb app arg off _ <<< "$line"
   [[ ${seq:-} =~ ^[0-9]{1,18}$ ]] || exit 0
   : > "$OUT/read.out"; publish "$OUT/read.out"
+  case "${verb:-}" in
+    env | setenv | key | newkey | importkey | create)
+      if ! can_write; then echo "Hôte en lecture seule (NODE_APPS_ACTIONS=0)" > "$OUT/read.out"; answer "$seq" 1 0; exit 0; fi ;;
+  esac
   case "${verb:-}" in
     collect) collect; answer "$seq" 0 0 ;;
     logs)
@@ -97,6 +180,27 @@ read_req() {
       tail -c +$((off + 1)) "$f" | head -c "$MAX" > "$OUT/read.out"
       op=$(grep -F "\"id\":\"$arg\"" "/var/log/node-app/$app/history.jsonl" 2>/dev/null | tail -n1)
       answer "$seq" 0 $((off + $(stat -c %s "$OUT/read.out"))) "$op" ;;
+    env)
+      valid_app "${app:-}" || { echo "Application inconnue" > "$OUT/read.out"; answer "$seq" 1 0; exit 0; }
+      head -c "$MAX" "/etc/node-apps/$app.env" > "$OUT/read.out" 2>/dev/null
+      answer "$seq" 0 0 ;;
+    setenv)
+      valid_app "${app:-}" || { echo "Application inconnue" > "$OUT/read.out"; answer "$seq" 1 0; exit 0; }
+      timeout 5m "$NODE_APP" env "$app" --stdin < "$pl" > "$OUT/read.out" 2>&1
+      answer "$seq" "$?" 0 ;;
+    key | newkey | importkey)
+      # Before its creation too (private repository): the name only has to be valid.
+      [[ ${app:-} =~ ^[a-z0-9][a-z0-9_-]*$ ]] || { echo "Nom invalide" > "$OUT/read.out"; answer "$seq" 1 0; exit 0; }
+      case "$verb" in
+        key) timeout 1m "$NODE_APP" key "$app" ;;
+        newkey) timeout 1m "$NODE_APP" key "$app" --new ;;
+        importkey) timeout 1m "$NODE_APP" key "$app" --import < "$pl" ;;
+      esac > "$OUT/read.out" 2>&1
+      answer "$seq" "$?" 0 ;;
+    create)
+      [[ ${app:-} =~ ^[a-z0-9][a-z0-9_-]*$ ]] || { echo "Nom invalide (minuscules, chiffres, - et _)" > "$OUT/read.out"; answer "$seq" 1 0; exit 0; }
+      create_app "$app" "$pl"
+      answer "$seq" "$?" 0 ;;
     *) echo "Requête refusée" > "$OUT/read.out"; answer "$seq" 1 0 ;;
   esac
 }

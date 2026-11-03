@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Cpu, Download, HardDrive, KeyRound, Pencil, MemoryStick, Plus, RefreshCw, Server, Thermometer, Trash2, Users } from "../shared/icons";
-import { actionBusy, api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostLatest, type HostSeries, type Install } from "../api";
+import { actionBusy, api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, HOST_TYPES, hostTypeLabel, type Host, type HostLatest, type HostSeries, type HostType, type Install } from "../api";
 import {
   Alert, Badge, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
   Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, statusKind, usePoll, useTitle, useToast,
@@ -173,7 +173,7 @@ export function HostDetailPage({ id }: { id: number }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [upgrade, setUpgrade] = useState<Host>();
   const [lxc, setLxc] = useState(false);
-  const [edit, setEdit] = useState<{ name: string; parent: number; was: number }>();
+  const [edit, setEdit] = useState<{ name: string; parent: number; was: number; type: HostType | "" }>();
   const all = usePoll(() => api.get<Host[]>("/api/hosts"), 60000, [], ["hosts"]);
   const toast = useToast();
   const h = host.data;
@@ -192,7 +192,7 @@ export function HostDetailPage({ id }: { id: number }) {
     load: [{ label: "Charge (1 min)", values: m.load1 }],
   }, [m]);
 
-  const update = async (patch: Partial<Host> & { parent?: number }) => {
+  const update = async (patch: Partial<Omit<Host, "host_type">> & { parent?: number; type?: HostType | "" }) => {
     try {
       host.setData(await api.patch<Host>(`/api/hosts/${id}`, patch));
       return true;
@@ -212,10 +212,10 @@ export function HostDetailPage({ id }: { id: number }) {
       <PageHeader
         crumbs={<><Link to="/hosts" className="text-meta no-underline hover:text-accent-text">Hôtes</Link><ChevronRight size={14} aria-hidden /><span className="text-h2">{h.name}</span></>}
         title={<span className="flex items-center gap-3"><StatusIcon status={h.status} size={26} />{h.name}</span>}
-        description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.info.os && <Tag>{h.info.os}</Tag>}{guestId(h) && <Tag>{h.info.virtualization === "lxc" ? "CT" : "VM"} {guestId(h)}</Tag>}{parent && <Link to={`/hosts/${parent.id}`} className="no-underline"><Tag>Sous {parent.name}</Tag></Link>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
+        description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.host_type && <Tag>{hostTypeLabel(h.host_type)}</Tag>}{h.info.os && <Tag>{h.info.os}</Tag>}{guestId(h) && <Tag>{h.info.virtualization === "lxc" ? "CT" : "VM"} {guestId(h)}</Tag>}{parent && <Link to={`/hosts/${parent.id}`} className="no-underline"><Tag>Sous {parent.name}</Tag></Link>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
         actions={<>
           <Switch label="Maintenance" checked={h.maintenance} onChange={(v) => update({ maintenance: v })} />
-          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => { const p = h.parent_manual ? (h.parent_id ?? 0) : -1; setEdit({ name: h.name, parent: p, was: p }); }}>Modifier</Button>
+          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => { const p = h.parent_manual ? (h.parent_id ?? 0) : -1; setEdit({ name: h.name, parent: p, was: p, type: h.host_type_manual ? h.host_type : "" }); }}>Modifier</Button>
           <Button variant="secondary" icon={<KeyRound size={16} />} onClick={() => api.post<{ install: Install }>(`/api/hosts/${id}/token`).then((r) => setInstall(r.install))}>Régénérer le jeton</Button>
           <Button variant="danger-ghost" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)}>Supprimer</Button>
         </>} />
@@ -362,12 +362,18 @@ export function HostDetailPage({ id }: { id: number }) {
         {install && <InstallInstructions install={install} name={h.name} />}
       </Dialog>
       <Dialog open={edit != null} onClose={() => setEdit(undefined)} size="sm" title={`Modifier ${h.name}`}
-        description="Le nom et l'hôte parent sont repris par l'inventaire de la gestion à la prochaine synchronisation."
+        description="Le nom, le type et l'hôte parent sont repris par l'inventaire de la gestion à la prochaine synchronisation."
         footer={<><Button variant="secondary" onClick={() => setEdit(undefined)}>Annuler</Button>
           <Button type="submit" form="edit-form">Enregistrer</Button></>}>
         {edit && (
-          <form id="edit-form" className="grid gap-5" onSubmit={async (e) => { e.preventDefault(); if (await update({ name: edit.name, ...(edit.parent !== edit.was && { parent: edit.parent }) })) { setEdit(undefined); all.refresh(); } }}>
+          <form id="edit-form" className="grid gap-5" onSubmit={async (e) => { e.preventDefault(); if (await update({ name: edit.name, type: edit.type, ...(edit.parent !== edit.was && { parent: edit.parent }) })) { setEdit(undefined); all.refresh(); } }}>
             <Field label="Nom" htmlFor="h-name"><input id="h-name" className={inputClass} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} autoFocus /></Field>
+            <Field label="Type de déploiement" htmlFor="h-type" hint="Automatique : le type indiqué à l'installation de l'agent (hlm_host_type), sinon celui détecté.">
+              <select id="h-type" className={inputClass} value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value as HostType | "" })}>
+                <option value="">Automatique ({hostTypeLabel(h.host_type_manual ? (h.info.host_type ?? "") : h.host_type) || "détecté"})</option>
+                {HOST_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </Field>
             <Field label="Hôte parent" htmlFor="h-parent" hint="Automatique : le Proxmox qui voit cette machine sur ses bridges. Un choix manuel n'est jamais modifié.">
               <ParentSelect id="h-parent" hosts={all.data ?? []} self={h.id} value={edit.parent} onChange={(parent) => setEdit({ ...edit, parent })} />
             </Field>

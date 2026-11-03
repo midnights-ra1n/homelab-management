@@ -161,6 +161,8 @@ var migrations = []string{
 		at INTEGER NOT NULL,
 		from_text TEXT NOT NULL DEFAULT '',
 		to_text TEXT NOT NULL DEFAULT '');`,
+	// Deployment type chosen in the dashboard ('' = the agent's HOST_TYPE, else detected), see hostType.
+	`ALTER TABLE hosts ADD COLUMN host_type TEXT NOT NULL DEFAULT '';`,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's

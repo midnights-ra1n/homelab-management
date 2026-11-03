@@ -4,7 +4,9 @@ Documentation=https://github.com/midnights-ra1n/homelab-management
 
 [Service]
 Type=oneshot
-# Root-owned helper, fixed reads only (node-app status, history, logs; never the .env); see node-app-helper.sh.
+# Root-owned helper: fixed reads (node-app status, history, logs) and, unless read-only, the
+# variables, deploy keys and creation of an app (answered to the hub only); see node-app-helper.sh.
 ExecStart=/usr/local/lib/hlm-agent/node-app-helper.sh read
-TimeoutStartSec=2min
+# Creating an app clones its repository.
+TimeoutStartSec=12min
 Nice=10

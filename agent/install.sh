@@ -14,6 +14,8 @@
 #                         then every 2 minutes in each new one (hlm-agent-lxc.timer, tag a CT
 #                         no-hlm to leave it out); the hub drops the hosts of deleted containers.
 #                         LXC=none stops that; without LXC, a re-run keeps the current choice
+#   HOST_TYPE=vps         deployment type shown by the hub: proxmox, physical, vm, lxc or vps
+#                         (default: detected; the dashboard can change it)
 #   VERSION=v0.1.12       pin a release (default: latest)
 #   REPO=owner/name       GitHub repository hosting the releases
 #   INSTALL_METHOD=deb    set by the hlm-agent .deb: no self-update, updates go through the package
@@ -106,6 +108,7 @@ if [ -n "${TOKEN:-}" ] || [ ! -f "$CONF" ]; then
     [ -n "${AUTO_UPDATE:-}" ] && echo "AUTO_UPDATE=$AUTO_UPDATE"
     [ "$REPO" != "midnights-ra1n/homelab-management" ] && echo "UPDATE_REPO=$REPO"
     [ -n "${PVE_CTID:-}" ] && echo "PVE_CTID=$PVE_CTID" && echo "PVE_NODE=$PVE_NODE"
+    case "${HOST_TYPE:-}" in proxmox | physical | vm | lxc | vps) echo "HOST_TYPE=$HOST_TYPE" ;; esac
     true
   } > "$CONF.tmp"
   chown root:hlm-agent "$CONF.tmp"; chmod 0640 "$CONF.tmp"; mv "$CONF.tmp" "$CONF"

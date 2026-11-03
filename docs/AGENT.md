@@ -100,11 +100,12 @@ Si Docker est installé au moment de l'installation de l'agent, le suivi Docker 
 
 Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gère les applications Node.js (pnpm, PM2, déploiement git, retour arrière). Si `/usr/local/bin/node-app` existe à l'installation de l'agent, le suivi s'active tout seul (`NODE_APPS=true|false` pour le forcer). La fiche de l'hôte affiche alors une section *Applications Node.js*, comme le tableau de bord `node-app-ui`.
 
-- **État** : toutes les 30 secondes (5 secondes quand la fiche de l'hôte est ouverte), un helper root (`node-app-helper.sh`, lancé par `hlm-agent-node-read.path`) relève `node-app status`, les réglages de chaque app, ses 20 dernières opérations et les clés SSH. Les **variables d'environnement** (`.env`) ne sont jamais lues, et le jeton éventuel de l'URL du dépôt est masqué.
+- **État** : toutes les 30 secondes (5 secondes quand la fiche de l'hôte est ouverte), un helper root (`node-app-helper.sh`, lancé par `hlm-agent-node-read.path`) relève `node-app status`, les réglages de chaque app, ses 20 dernières opérations et les clés SSH. Les **variables d'environnement** (`.env`) n'en font jamais partie, et le jeton éventuel de l'URL du dépôt est masqué.
 - **Actions** : *Déployer* (`deploy --force`), *Nouveaux commits* (`deploy`), *Mettre à jour* (`update`), *Redémarrer*, *Arrêter* et *Supprimer* (avec ou sans le code). Les opérations longues sont lancées par `systemd-run`, hors de l'unité du helper, comme le fait `node-app-ui`. Le journal de l'opération se suit en direct depuis l'historique. `NODE_APPS_ACTIONS=0` garde l'hôte en lecture seule.
 - **Logs** de l'app (PM2) et journaux des déploiements, lus à la demande.
 - **Alerte** (*Paramètres → Notifications*, activée par défaut) : app en erreur, déploiement en échec ou dernière opération annulée par un retour arrière. Chaque problème est signalé une fois.
-- Les variables, la création d'app et l'import de clés SSH restent dans `node-app-ui` (bouton sur la fiche) : ces données sensibles ne passent pas par le monitoring.
+- **Variables, nouvelle app et deploy keys**, comme dans `node-app-ui` : onglet *Variables* de l'app (lu à la demande, enregistré avec redémarrage), bouton *Nouvelle app* (dépôt git uniquement : un chemin sur le serveur est refusé ; la deploy key s'affiche pour un dépôt SSH privé, ou une clé existante s'importe), *Nouvelle clé* et *Importer une clé*. Ces secrets transitent par la connexion chiffrée de l'agent et sont remis à l'utilisateur qui les demande : le hub ne les enregistre pas. Le helper root vérifie à nouveau chaque demande, et les refuse sur un hôte en lecture seule (`NODE_APPS_ACTIONS=0`).
+- Le bouton **Ouvrir Node.js UI** ouvre l'interface `node-app-ui` de l'hôte (tableau de bord système, même historique).
 
 ## Options de install.sh
 
@@ -121,7 +122,8 @@ Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gèr
 | `REMOTE_UPDATES` | `true` | Autoriser les boutons *Vérifier* et *Mettre à jour* (paquets apt et conteneurs Docker) |
 | `DOCKER` | `auto` | Suivi Docker : activé si `docker` est installé |
 | `NODE_APPS` | `auto` | Applications Node.js : activé si `/usr/local/bin/node-app` existe (playbook base-node) |
-| `NODE_APPS_ACTIONS` | `1` | `0` : applications Node.js en lecture seule (pas de déploiement ni de redémarrage) |
+| `NODE_APPS_ACTIONS` | `1` | `0` : applications Node.js en lecture seule (ni déploiement, ni redémarrage, ni variables, ni création, ni deploy keys) |
+| `HOST_TYPE` | détecté | Type de déploiement affiché par le hub : `proxmox`, `physical`, `vm`, `lxc` ou `vps` (modifiable ensuite dans le hub) |
 | `LXC` | — | `all` sur un Proxmox : installer aussi dans chaque conteneur LXC Debian démarré, puis dans les nouveaux (timer) ; `none` : arrêter le timer |
 | `LXC_TOKEN` | `TOKEN` | Jeton commun `enr_…` utilisé par les conteneurs LXC |
 | `VERSION` | dernière | Installer une release précise (`v0.1.4`) |
@@ -153,7 +155,7 @@ Cela retire les services, le timer SMART, le binaire, la configuration, l'état 
 | `/etc/systemd/system/hlm-agent-docker.{service,timer}` | `root` | Relevé Docker chaque minute, **sans réseau** |
 | `/etc/systemd/system/hlm-agent-docker-update.{path,service}` | `root` | Mise à jour d'un conteneur demandée depuis le tableau de bord |
 | `/var/lib/hlm-agent/docker/` | `root:hlm-agent`, `0750` | Relevé Docker et journal de la dernière mise à jour |
-| `/usr/local/lib/hlm-agent/node-app-helper.sh` | `root`, `0755` | Lectures et actions `node-app` (liste fermée, jamais les `.env`) |
+| `/usr/local/lib/hlm-agent/node-app-helper.sh` | `root`, `0755` | Lectures et actions `node-app` (liste fermée ; `.env`, création et deploy keys seulement à la demande du hub, hors lecture seule) |
 | `/etc/systemd/system/hlm-agent-node-{read,action}.{path,service}` | `root` | Lancent le helper quand l'agent dépose une lecture ou une action |
 | `/var/lib/hlm-agent/node-apps/` | `root:hlm-agent`, `0750` | Relevé des applications, réponse de la dernière lecture et journal de la dernière action |
 

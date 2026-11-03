@@ -18,7 +18,12 @@ export interface HostInfo {
   cpu_cores?: number; mem_total?: number; agent_version?: string; boot_time?: number;
   virtualization?: string; manufacturer?: string; model?: string; ips?: { iface: string; address: string; prefix: number }[];
   pve_node?: string; pve_ctid?: number; // Proxmox LXC container: node hostname and CT ID
+  host_type?: HostType; // declared at install (Ansible hlm_host_type)
 }
+/** Deployment type, see hostTypes in server/hosts.go. */
+export type HostType = "proxmox" | "physical" | "vm" | "lxc" | "vps";
+export const HOST_TYPES: [HostType, string][] = [["proxmox", "Serveur Proxmox"], ["physical", "Serveur physique"], ["vm", "Machine virtuelle"], ["lxc", "Conteneur LXC"], ["vps", "VPS"]];
+export const hostTypeLabel = (t: string) => HOST_TYPES.find(([v]) => v === t)?.[1] ?? "";
 export interface HostLatest {
   cpu?: number; mem_used?: number; mem_total?: number; swap_used?: number; swap_total?: number;
   disk_used?: number; disk_total?: number; net_rx?: number; net_tx?: number; load1?: number; temp?: number | null; cpu_temp?: number | null;
@@ -40,6 +45,8 @@ export interface Host {
   parent_id: number | null; parent_manual: boolean; vmid?: number;
   /** Proxmox node; lxc_sync: its agent also equips the LXC containers (install.sh LXC=all). */
   proxmox: boolean; lxc_sync: boolean;
+  /** Deployment type: chosen in the dashboard (host_type_manual), else declared by the agent, else detected. */
+  host_type: HostType; host_type_manual: boolean;
 }
 
 /** Host status wording: tells a stopped agent apart from a machine that is down. */
@@ -120,7 +127,7 @@ export interface SnmpDevice { target: string; sys_name: string; sys_descr: strin
 export type HostSeries = Record<"t" | "cpu" | "mem" | "swap" | "disk" | "net_rx" | "net_tx" | "load1" | "temp" | "cpu_temp", (number | null)[]>;
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public data: Record<string, unknown> = {}) { super(message); }
 }
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -134,7 +141,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && !path.startsWith("/api/auth/")) window.dispatchEvent(new Event("hlm:unauthorized"));
-    throw new ApiError(res.status, data.error || `Erreur ${res.status}`);
+    throw new ApiError(res.status, data.error || `Erreur ${res.status}`, data);
   }
   return data as T;
 }

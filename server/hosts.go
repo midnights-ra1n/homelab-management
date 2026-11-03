@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,6 +34,7 @@ type agentInfo struct {
 	BootTime     int64  `json:"boot_time"`
 	PveNode      string `json:"pve_node,omitempty"` // Proxmox LXC container: node hostname and CT ID
 	PveCTID      int    `json:"pve_ctid,omitempty"`
+	HostType     string `json:"host_type,omitempty"` // HOST_TYPE of agent.env (Ansible hlm_host_type), "" = auto
 	// Inventory, read by the management role to fill its items (see mg_sync.go).
 	OSVersion      string          `json:"os_version,omitempty"`
 	CPUThreads     int             `json:"cpu_threads,omitempty"`
@@ -178,6 +180,31 @@ type Host struct {
 	VMID         int    `json:"vmid,omitempty"`
 	Proxmox      bool   `json:"proxmox"`  // the agent runs on a Proxmox node (/etc/pve)
 	LxcSync      bool   `json:"lxc_sync"` // and installs itself in the LXC containers (hlm-agent-lxc)
+	// Deployment type (hostTypes): chosen in the dashboard, else declared by the agent, else detected.
+	HostType       string `json:"host_type"`
+	HostTypeManual bool   `json:"host_type_manual"`
+}
+
+// Same list as HOST_TYPES in agent/src/collect.rs and hlm_host_type in the Ansible role.
+var hostTypes = []string{"proxmox", "physical", "vm", "lxc", "vps"}
+
+// hostType is the deployment type: chosen, else declared by the agent, else detected.
+func hostType(manual, declared string, proxmox bool, virt string) string {
+	switch {
+	case manual != "":
+		return manual
+	case slices.Contains(hostTypes, declared):
+		return declared
+	case proxmox:
+		return "proxmox"
+	}
+	switch assetKind("", virt) {
+	case "physical":
+		return "physical"
+	case "lxc", "docker":
+		return "lxc"
+	}
+	return "vm"
 }
 
 type hostAction struct {
@@ -334,7 +361,7 @@ func (s *Server) pingDownHosts(ctx context.Context, hosts []Host) {
 }
 
 func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
-	rows, err := s.db.Query(`SELECT id,name,COALESCE(l.last_seen,0),maintenance,public,info,COALESCE(l.latest,'{}'),updates,action,COALESCE(l.docker,'{}'),node_apps,created_at,parent_id,parent_manual,vmid,pve FROM hosts LEFT JOIN host_live l ON l.host_id=id `+where+` ORDER BY name COLLATE NOCASE`, args...)
+	rows, err := s.db.Query(`SELECT id,name,COALESCE(l.last_seen,0),maintenance,public,info,COALESCE(l.latest,'{}'),updates,action,COALESCE(l.docker,'{}'),node_apps,created_at,parent_id,parent_manual,vmid,pve,host_type FROM hosts LEFT JOIN host_live l ON l.host_id=id `+where+` ORDER BY name COLLATE NOCASE`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -342,8 +369,8 @@ func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
 	hosts := []Host{}
 	for rows.Next() {
 		var h Host
-		var info, latest, updates, action, docker, nodeApps, pve string
-		if err := rows.Scan(&h.ID, &h.Name, &h.LastSeen, &h.Maintenance, &h.Public, &info, &latest, &updates, &action, &docker, &nodeApps, &h.CreatedAt, &h.ParentID, &h.ParentManual, &h.VMID, &pve); err != nil {
+		var info, latest, updates, action, docker, nodeApps, pve, manualType string
+		if err := rows.Scan(&h.ID, &h.Name, &h.LastSeen, &h.Maintenance, &h.Public, &info, &latest, &updates, &action, &docker, &nodeApps, &h.CreatedAt, &h.ParentID, &h.ParentManual, &h.VMID, &pve, &manualType); err != nil {
 			return nil, err
 		}
 		var p pveReport
@@ -371,6 +398,7 @@ func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
 		json.Unmarshal(h.Info, &ai)
 		h.AgentLatest = latestAgentVersion()
 		h.Outdated = versionLess(ai.AgentVersion, h.AgentLatest)
+		h.HostType, h.HostTypeManual = hostType(manualType, ai.HostType, h.Proxmox, ai.Virtualization), manualType != ""
 		hosts = append(hosts, h)
 	}
 	if err := rows.Err(); err != nil {
@@ -504,6 +532,7 @@ func (s *Server) handleUpdateHost(w http.ResponseWriter, r *http.Request) {
 		Maintenance *bool   `json:"maintenance"`
 		Public      *bool   `json:"public"`
 		Parent      *int64  `json:"parent"` // -1 automatic, 0 none, else a host id
+		Type        *string `json:"type"`   // "" automatic, else one of hostTypes
 	}
 	if !readJSON(w, r, &req) {
 		return
@@ -520,6 +549,16 @@ func (s *Server) handleUpdateHost(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := s.linkGuests(); err != nil {
 			slog.Error("link guests", "err", err)
+		}
+	}
+	if req.Type != nil {
+		if *req.Type != "" && !slices.Contains(hostTypes, *req.Type) {
+			writeErr(w, 400, "Type invalide : automatique, "+strings.Join(hostTypes, ", "))
+			return
+		}
+		if _, err := s.db.Exec(`UPDATE hosts SET host_type=? WHERE id=?`, *req.Type, id); err != nil {
+			serverErr(w, err)
+			return
 		}
 	}
 	if req.Name != nil {

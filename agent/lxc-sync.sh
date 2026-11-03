@@ -63,7 +63,7 @@ for conf in /etc/pve/lxc/*.conf; do
   [ -t 1 ] && echo
   # pct exec keeps the host environment: blank what must not reach the container,
   # LXC above all (the container has no pct and would fail on LXC=all).
-  { pct exec "$ct" -- env LXC= LXC_TOKEN= DOCKER= NODE_APPS= INSTALL_METHOD= PVE_CTID="$ct" PVE_NODE="$(hostname)" \
+  { pct exec "$ct" -- env LXC= LXC_TOKEN= DOCKER= NODE_APPS= INSTALL_METHOD= HOST_TYPE=lxc PVE_CTID="$ct" PVE_NODE="$(hostname)" \
       HUB_URL="$HUB_URL" TOKEN="$LXC_TOKEN" KEY="$KEY" ALLOW_INSECURE="${ALLOW_INSECURE:-}" \
       AUTO_UPDATE="${AUTO_UPDATE:-}" SMART=false REMOTE_UPDATES="${REMOTE_UPDATES:-true}" REPO="$REPO" BUNDLE=/tmp/hlm-bundle \
       sh /tmp/hlm-bundle/install.sh 2>&1 && rc=0 || rc=$?; echo "$rc" > "$OUT/rc"; } | sed 's/^/      /'

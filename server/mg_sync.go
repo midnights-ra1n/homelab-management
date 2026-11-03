@@ -237,6 +237,7 @@ type hostInventory struct {
 	CPUSockets     int     `json:"cpu_sockets"`
 	MemTotal       float64 `json:"mem_total"`
 	Virtualization string  `json:"virtualization"` // none, kvm, qemu, lxc, docker, …
+	HostType       string  `json:"host_type"`      // set from the host (chosen or declared type), see syncHost
 	Manufacturer   string  `json:"manufacturer"`
 	Model          string  `json:"model"`
 	Serial         string  `json:"serial"`
@@ -369,6 +370,9 @@ func (s *Server) syncHost(i *integration, h map[string]any) (int, error) {
 	if b, err := json.Marshal(h["info"]); err == nil {
 		json.Unmarshal(b, &inv)
 	}
+	if t, _ := h["host_type"].(string); t != "" {
+		inv.HostType = t // the dashboard's choice wins over the agent's
+	}
 	status, _ := h["status"].(string)
 
 	var assetID int64
@@ -405,7 +409,15 @@ func (s *Server) syncHost(i *integration, h map[string]any) (int, error) {
 	return s.updateFromHost(assetID, name, status, inv)
 }
 
-func assetKind(virt string) string {
+func assetKind(hostType, virt string) string {
+	switch hostType {
+	case "proxmox", "physical":
+		return "physical"
+	case "vm", "vps":
+		return "vm"
+	case "lxc":
+		return "lxc"
+	}
 	switch strings.ToLower(virt) {
 	case "", "none":
 		return "physical"
@@ -498,7 +510,7 @@ func inventoryCols(inv hostInventory) map[string]any {
 
 func (s *Server) createFromHost(i *integration, hostID int64, name, status string, inv hostInventory) (int, error) {
 	cols := inventoryCols(inv)
-	cols["kind"] = assetKind(inv.Virtualization)
+	cols["kind"] = assetKind(inv.HostType, inv.Virtualization)
 	cols["display_name"] = clip(name, 120)
 	cols["hostname"] = clip(strings.ToLower(inv.Hostname), 253)
 	if !hostnameRe.MatchString(cols["hostname"].(string)) {

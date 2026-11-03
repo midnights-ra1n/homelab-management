@@ -1,7 +1,8 @@
 //! Node.js apps of the base-node playbook (its node-app command). node-app runs as root, so the
 //! agent only drops requests for the root-owned node-app-helper.sh (hlm-agent-node-read.path,
-//! hlm-agent-node-action.path) and reads its answers here. The helper never hands out an app's
-//! variables (.env): the structs below would drop them anyway.
+//! hlm-agent-node-action.path) and reads its answers here. An app's variables (.env), its creation
+//! and its deploy key go through hub reads only (answer to the asking user, never stored in the
+//! snapshot), and the helper refuses them when the host is read-only (NODE_APPS_ACTIONS=0).
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -140,11 +141,16 @@ fn answer(seq: u64) -> Option<Answer> {
 /// Reads go through the helper one at a time: (hub request id, None for a state collection; args).
 pub struct Reader {
     seq: u64,
-    queue: VecDeque<(Option<String>, Vec<String>)>,
-    current: Option<(u64, Option<String>, u64)>, // seq, hub id, started at
+    queue: VecDeque<(Option<String>, Vec<String>, Option<String>)>, // hub id, args, payload
+    current: Option<(u64, Option<String>, u64, u64)>, // seq, hub id, started at, timeout (s)
 }
 
 pub type Finished = (Option<String>, Result<Answer, String>);
+
+/// Hub reads that change the host (the state is collected again after them).
+pub const WRITES: &[&str] = &["setenv", "create", "newkey", "importkey"];
+/// Largest payload (.env text, creation request, private key) handed to the helper.
+const MAX_PAYLOAD: usize = 256 * 1024;
 
 impl Reader {
     pub fn new() -> Self {
@@ -159,19 +165,20 @@ impl Reader {
     /// Queues a state collection, unless one is already waiting or running.
     pub fn collect(&mut self) {
         if !self.queue.iter().any(|q| q.0.is_none()) && !self.current.as_ref().is_some_and(|c| c.1.is_none()) {
-            self.queue.push_back((None, vec!["collect".into()]));
+            self.queue.push_back((None, vec!["collect".into()], None));
         }
     }
 
-    /// Queues a read asked by the hub (logs, oplog); refused when too many are waiting.
-    pub fn ask(&mut self, id: String, args: Vec<String>) -> Option<Finished> {
+    /// Queues a read asked by the hub (logs, oplog, env…), with its payload for the helper
+    /// (written to the state directory, never logged); refused when too many are waiting.
+    pub fn ask(&mut self, id: String, args: Vec<String>, payload: Option<String>) -> Option<Finished> {
         if self.queue.len() >= 8 {
             return Some((Some(id), Err("Trop de lectures en attente sur cet hôte".into())));
         }
-        if args.is_empty() || args.len() > 4 || !args.iter().all(|a| safe_word(a)) {
+        if args.is_empty() || args.len() > 4 || !args.iter().all(|a| safe_word(a)) || payload.as_ref().is_some_and(|p| p.len() > MAX_PAYLOAD) {
             return Some((Some(id), Err("Lecture invalide".into())));
         }
-        self.queue.push_back((Some(id), args));
+        self.queue.push_back((Some(id), args, payload));
         None
     }
 
@@ -180,23 +187,27 @@ impl Reader {
         let now = crate::actions::now();
         match &self.current {
             None => {
-                let (id, args) = self.queue.pop_front()?;
+                let (id, args, payload) = self.queue.pop_front()?;
                 self.seq += 1;
-                match crate::actions::drop_request("node-read", &format!("{} {}", self.seq, args.join(" "))) {
+                // Cloning a repository or restarting an app can take minutes; reads answer within seconds.
+                let timeout = match args[0].as_str() { "create" => 600, "setenv" => 300, _ => 40 };
+                // Written only when there is one (the helper deletes it at each read): no disk write per collection.
+                let dropped = payload.as_deref().map_or(Ok(()), |p| crate::actions::drop_request("node-payload", p));
+                match dropped.and_then(|_| crate::actions::drop_request("node-read", &format!("{} {}", self.seq, args.join(" ")))) {
                     Ok(()) => {
-                        self.current = Some((self.seq, id, now));
+                        self.current = Some((self.seq, id, now, timeout));
                         None
                     }
                     Err(e) => Some((id, Err(e))),
                 }
             }
-            Some((seq, _, since)) => {
+            Some((seq, _, since, timeout)) => {
                 let res = match answer(*seq) {
                     Some(a) => Ok(a),
-                    None if now > since + 40 => Err("Le helper node-app n'a pas répondu".into()),
+                    None if now > since + timeout => Err("Le helper node-app n'a pas répondu".into()),
                     None => return None,
                 };
-                let (_, id, _) = self.current.take()?;
+                let (_, id, _, _) = self.current.take()?;
                 Some((id, res))
             }
         }
@@ -231,8 +242,10 @@ mod tests {
         r.collect();
         r.collect();
         assert_eq!(r.queue.len(), 1, "one collection queued");
-        assert!(r.ask("x".into(), vec!["logs".into(), "a b".into()]).is_some(), "spaces refused");
-        assert!(r.ask("y".into(), vec!["logs".into(), "site".into(), "200".into()]).is_none());
-        assert_eq!(r.queue.len(), 2);
+        assert!(r.ask("x".into(), vec!["logs".into(), "a b".into()], None).is_some(), "spaces refused");
+        assert!(r.ask("y".into(), vec!["logs".into(), "site".into(), "200".into()], None).is_none());
+        assert!(r.ask("z".into(), vec!["setenv".into(), "site".into()], Some("A=1\n".repeat(100_000))).is_some(), "payload too large");
+        assert!(r.ask("z".into(), vec!["setenv".into(), "site".into()], Some("A=1\n".into())).is_none());
+        assert_eq!(r.queue.len(), 3);
     }
 }

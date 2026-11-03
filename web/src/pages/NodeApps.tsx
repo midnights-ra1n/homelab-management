@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Download, ExternalLink, GitPullRequestArrow, LoaderCircle, Package, RotateCw, Square, Trash2 } from "../shared/icons";
-import { actionBusy, api, fmtAgo, fmtDate, type Host, type NodeAction, type NodeApp, type NodeOp } from "../api";
+import { Download, ExternalLink, Eye, GitPullRequestArrow, KeyRound, LoaderCircle, Package, Plus, RotateCw, Square, Trash2, Upload } from "../shared/icons";
+import { actionBusy, api, ApiError, fmtAgo, fmtDate, type Host, type NodeAction, type NodeApp, type NodeOp } from "../api";
 import {
-  Alert, Badge, Button, ButtonAnchor, Card, Checkbox, CodeBlock, Dialog, Segmented, Skeleton, StatusIcon, cn,
-  type StatusKind, type Tone, usePoll,
+  Alert, Badge, Button, ButtonAnchor, Card, Checkbox, CodeBlock, Dialog, Field, FIELD_ROW, Segmented, Skeleton, StatusIcon, cn,
+  inputClass, textareaClass, type StatusKind, type Tone, usePoll, useToast,
 } from "../ui";
 import { useHostAction } from "./AgentVersion";
 
@@ -90,6 +90,187 @@ function AppLogs({ h, app }: { h: Host; app: string }) {
   );
 }
 
+/** Why the secret-bearing requests (variables, keys, creation) are unavailable, if they are. */
+const writeBlock = (h: Host) => (!h.connected ? "Agent hors ligne" : !h.node_apps?.actions ? "Hôte en lecture seule (NODE_APPS_ACTIONS=0)" : undefined);
+const isSshRepo = (url: string) => /^(ssh:\/\/|[A-Za-z0-9._-]+@[^/:]+:)/.test(url.trim());
+
+/** The app's variables (.env), like node-app-ui: loaded on demand, saved with a restart of the app. */
+function EnvEditor({ h, app }: { h: Host; app: string }) {
+  const toast = useToast();
+  const [text, setText] = useState<string>();
+  const [busy, setBusy] = useState<"load" | "save">();
+  const [error, setError] = useState<string>();
+  const blocked = writeBlock(h);
+  const load = async () => {
+    setBusy("load"); setError(undefined);
+    try { setText((await api.get<{ text: string }>(`/api/hosts/${h.id}/node-apps/${app}/env`)).text); } catch (e) { setError((e as Error).message); }
+    setBusy(undefined);
+  };
+  const save = async () => {
+    setBusy("save");
+    try {
+      await api.put(`/api/hosts/${h.id}/node-apps/${app}/env`, { text: text ?? "" });
+      toast("Variables enregistrées, application redémarrée", "success");
+    } catch (e) { toast((e as Error).message, "error"); }
+    setBusy(undefined);
+  };
+  if (text === undefined) {
+    return (
+      <div className="grid justify-items-start gap-3">
+        <p className="text-sm text-meta">Les variables ne sont jamais conservées par le monitoring : elles sont lues sur l'hôte à la demande.</p>
+        {error && <Alert kind="error" title="Lecture impossible">{error}</Alert>}
+        <Button variant="secondary" size="sm" icon={<Eye size={14} />} loading={busy === "load"} disabled={!!blocked} title={blocked} onClick={load}>Afficher les variables</Button>
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-3">
+      <Field label="Fichier .env" htmlFor={`env-${app}`} hint="Une variable par ligne (NOM=valeur). L'app redémarre après l'enregistrement.">
+        <textarea id={`env-${app}`} className={cn(textareaClass, "min-h-64 font-mono text-xs")} spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
+      </Field>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="secondary" size="sm" onClick={() => setText(undefined)}>Masquer</Button>
+        <Button size="sm" loading={busy === "save"} disabled={!!blocked} title={blocked} onClick={save}>Enregistrer et redémarrer</Button>
+      </div>
+    </div>
+  );
+}
+
+/** Deploy key of an app: replace it by a new one, or import an existing private key. */
+function KeyActions({ h, app, onChanged }: { h: Host; app: string; onChanged?: () => void }) {
+  const toast = useToast();
+  const [dialog, setDialog] = useState<"new" | "import">();
+  const [priv, setPriv] = useState("");
+  const [busy, setBusy] = useState(false);
+  const blocked = writeBlock(h);
+  const send = async (body: object) => {
+    setBusy(true);
+    try {
+      await api.post(`/api/hosts/${h.id}/node-apps/${app}/key`, body);
+      toast("Deploy key remplacée : ajoutez-la au dépôt", "success");
+      setDialog(undefined); setPriv(""); onChanged?.();
+    } catch (e) { toast((e as Error).message, "error"); }
+    setBusy(false);
+  };
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" size="sm" icon={<KeyRound size={14} />} disabled={!!blocked} title={blocked} onClick={() => setDialog("new")}>Nouvelle clé</Button>
+        <Button variant="secondary" size="sm" icon={<Upload size={14} />} disabled={!!blocked} title={blocked} onClick={() => setDialog("import")}>Importer une clé</Button>
+      </div>
+      <Dialog open={!!dialog} onClose={() => setDialog(undefined)} size="sm" title={dialog === "new" ? "Nouvelle deploy key" : "Importer une clé SSH"}
+        description={dialog === "new" ? "L'ancienne clé est supprimée de l'hôte : ajoutez la nouvelle au dépôt avant le prochain déploiement." : "Clé privée existante (clé de compte, autre serveur), sans phrase de passe. Elle remplace la deploy key de l'app."}
+        footer={<><Button variant="secondary" onClick={() => setDialog(undefined)}>Annuler</Button>
+          {dialog === "new"
+            ? <Button icon={<KeyRound size={16} />} loading={busy} onClick={() => send({ regenerate: true })}>Remplacer la clé</Button>
+            : <Button icon={<Upload size={16} />} loading={busy} disabled={!priv.trim()} onClick={() => send({ private_key: priv })}>Importer</Button>}</>}>
+        {dialog === "import" && (
+          <Field label="Clé privée" htmlFor={`key-${app}`}>
+            <textarea id={`key-${app}`} className={cn(textareaClass, "min-h-40 font-mono text-xs")} spellCheck={false} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" value={priv} onChange={(e) => setPriv(e.target.value)} />
+          </Field>
+        )}
+      </Dialog>
+    </>
+  );
+}
+
+const PRESETS = ["nextjs", "nextjs-standalone", "nextjs-export", "nuxt", "sveltekit", "astro-node", "astro-static", "react-router", "nestjs", "vite-spa", "static", "node"];
+
+/** New app, like node-app-ui's form: recorded on the host (clone, detection), then deployed in the background. */
+function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => void; onChanged?: () => void }) {
+  const toast = useToast();
+  const [f, setF] = useState({ name: "", source: "", branch: "", preset: "", port: "", start: "", migrate: "", env: "", env_wins: true, private_key: "", auto_deploy: true, auto_update: true });
+  const [key, setKey] = useState<string>();
+  const [warnings, setWarnings] = useState<string>();
+  const [busy, setBusy] = useState<"key" | "create">();
+  const [error, setError] = useState<string>();
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setF({ ...f, [k]: e.target instanceof HTMLInputElement && e.target.type === "checkbox" ? e.target.checked : e.target.value });
+  const ssh = isSshRepo(f.source);
+  const showKey = async () => {
+    setBusy("key"); setError(undefined);
+    try { setKey((await api.post<{ key: string }>(`/api/hosts/${h.id}/node-apps/${f.name}/key`, {})).key); } catch (e) { setError((e as Error).message); }
+    setBusy(undefined);
+  };
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy("create"); setError(undefined);
+    try {
+      const r = await api.post<{ warnings: string }>(`/api/hosts/${h.id}/node-apps`, {
+        name: f.name, source: f.source, branch: f.branch, preset: f.preset, port: Number(f.port) || 0, start: f.start, migrate: f.migrate,
+        env: f.env, env_merge: f.env.trim() ? (f.env_wins ? "saisie" : "code") : "", private_key: f.private_key, auto_deploy: f.auto_deploy, auto_update: f.auto_update,
+      });
+      onChanged?.();
+      toast(`${f.name} créée, déploiement lancé`, "success");
+      if (r.warnings) setWarnings(r.warnings); else onClose();
+    } catch (err) {
+      if (err instanceof ApiError && typeof err.data.need_key === "string") setKey(err.data.need_key);
+      setError((err as Error).message);
+    }
+    setBusy(undefined);
+  };
+  return (
+    <Dialog open onClose={onClose} size="lg" title={`Nouvelle application sur ${h.name}`}
+      description="Même détection que node-app new : framework, commande de démarrage, migration et port sont proposés automatiquement si vous laissez les champs vides."
+      footer={warnings !== undefined ? <Button onClick={onClose}>Terminer</Button> : <><Button variant="secondary" onClick={onClose}>Annuler</Button>
+        <Button type="submit" form="node-create" icon={<Plus size={16} />} loading={busy === "create"}>Créer et déployer</Button></>}>
+      {warnings !== undefined ? (
+        <Alert kind="warning" title="Application créée, avec des avertissements"><pre className="font-mono text-xs whitespace-pre-wrap">{warnings}</pre></Alert>
+      ) : (
+        <form id="node-create" className="grid gap-5" onSubmit={create}>
+          {error && <Alert kind="error" title="Création impossible">{error}</Alert>}
+          <div className={FIELD_ROW}>
+            <Field label="Nom" htmlFor="nc-name" hint="Minuscules, chiffres, - et _" required>
+              <input id="nc-name" className={inputClass} value={f.name} onChange={set("name")} required pattern="[a-z0-9][a-z0-9_\-]*" maxLength={100} autoFocus />
+            </Field>
+            <Field label="Branche ou tag" htmlFor="nc-branch" hint="Vide : branche par défaut du dépôt">
+              <input id="nc-branch" className={inputClass} value={f.branch} onChange={set("branch")} maxLength={200} />
+            </Field>
+          </div>
+          <Field label="Dépôt git" htmlFor="nc-source" required hint="Public : https://… · privé : git@github.com:compte/depot.git (deploy key) ou https://<token>@github.com/…">
+            <input id="nc-source" className={cn(inputClass, "font-mono text-xs")} value={f.source} onChange={set("source")} required placeholder="git@github.com:compte/depot.git" />
+          </Field>
+          {ssh && (
+            <div className="grid gap-3 rounded-xl border border-line p-4">
+              <p className="text-sm text-body">Dépôt privé en SSH : ajoutez la deploy key de l'app au dépôt, en lecture seule (GitHub : Settings › Deploy keys).</p>
+              {key ? <CodeBlock text={key} /> : (
+                <Button variant="secondary" size="sm" icon={<KeyRound size={14} />} className="justify-self-start" loading={busy === "key"} disabled={!/^[a-z0-9][a-z0-9_-]*$/.test(f.name)} title={f.name ? undefined : "Indiquez d'abord le nom"} onClick={showKey}>Afficher la deploy key</Button>
+              )}
+              <details>
+                <summary className="cursor-pointer text-sm text-meta">Utiliser une clé SSH existante</summary>
+                <textarea aria-label="Clé privée existante" className={cn(textareaClass, "mt-2 min-h-32 font-mono text-xs")} spellCheck={false} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" value={f.private_key} onChange={set("private_key")} />
+              </details>
+            </div>
+          )}
+          <div className={FIELD_ROW}>
+            <Field label="Préréglage" htmlFor="nc-preset" hint="Impose la commande de démarrage d'un framework">
+              <select id="nc-preset" className={inputClass} value={f.preset} onChange={set("preset")}>
+                <option value="">Détection automatique</option>
+                {PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </Field>
+            <Field label="Port" htmlFor="nc-port" hint="Vide : PORT du .env, sinon le premier libre à partir de 3000">
+              <input id="nc-port" type="number" min={1} max={65535} className={inputClass} value={f.port} onChange={set("port")} />
+            </Field>
+            <Field label="Commande de démarrage" htmlFor="nc-start" hint="Vide : détectée">
+              <input id="nc-start" className={cn(inputClass, "font-mono text-xs")} value={f.start} onChange={set("start")} maxLength={500} />
+            </Field>
+            <Field label="Migration de base" htmlFor="nc-migrate" hint="Vide : détectée (Prisma, Drizzle…) · - : aucune">
+              <input id="nc-migrate" className={cn(inputClass, "font-mono text-xs")} value={f.migrate} onChange={set("migrate")} maxLength={500} />
+            </Field>
+          </div>
+          <Field label="Variables d'environnement" htmlFor="nc-env" hint="Format .env, ajoutées au .env du code s'il en a un">
+            <textarea id="nc-env" className={cn(textareaClass, "min-h-32 font-mono text-xs")} spellCheck={false} placeholder="DATABASE_URL=postgres://…" value={f.env} onChange={set("env")} />
+          </Field>
+          {f.env.trim() && <Checkbox label="Ces variables remplacent celles du .env du code" hint="Décoché : le .env du code l'emporte en cas de doublon" checked={f.env_wins} onChange={set("env_wins")} />}
+          <Checkbox label="Déployer chaque nouveau commit" hint="Vérifié toutes les 2 minutes, retour au commit précédent en cas d'échec" checked={f.auto_deploy} onChange={set("auto_deploy")} />
+          <Checkbox label="Mettre à jour les dépendances chaque semaine" hint="pnpm update, retour arrière si l'app ne redémarre pas" checked={f.auto_update} onChange={set("auto_update")} />
+        </form>
+      )}
+    </Dialog>
+  );
+}
+
 function Spec({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
@@ -101,7 +282,7 @@ function Spec({ label, children }: { label: string; children: React.ReactNode })
 
 function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onClose: () => void; onChanged?: () => void }) {
   const { run, busy } = useHostAction(() => onChanged?.());
-  const [tab, setTab] = useState<"history" | "logs">("history");
+  const [tab, setTab] = useState<"history" | "logs" | "env">("history");
   const [picked, setPicked] = useState<string>();
   const [remove, setRemove] = useState<{ purge: boolean }>();
   const latest = app.history[0];
@@ -148,8 +329,8 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
         </div>
 
         <div className="grid gap-4">
-          <Segmented label="Vue" value={tab} onChange={setTab} options={[["history", "Historique"], ["logs", "Logs de l'app"]]} />
-          {tab === "logs" ? <AppLogs h={h} app={app.name} /> : (
+          <Segmented label="Vue" value={tab} onChange={setTab} options={[["history", "Historique"], ["logs", "Logs de l'app"], ["env", "Variables"]]} />
+          {tab === "env" ? <EnvEditor h={h} app={app.name} /> : tab === "logs" ? <AppLogs h={h} app={app.name} /> : (
             <>
               {app.history.length === 0 ? <p className="text-sm text-meta">Aucune opération enregistrée.</p> : (
                 <div className="mm-table-wrap rounded-xl border border-line">
@@ -174,10 +355,11 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
           )}
         </div>
 
-        {app.deploy_key && (
+        {(app.deploy_key || isSshRepo(app.repo)) && (
           <div className="grid gap-2">
             <p className="mm-label-caps">Deploy key (à ajouter au dépôt, en lecture seule)</p>
-            <CodeBlock text={app.deploy_key} />
+            {app.deploy_key && <CodeBlock text={app.deploy_key} />}
+            <KeyActions h={h} app={app.name} onChanged={onChanged} />
           </div>
         )}
       </div>
@@ -198,19 +380,24 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
 /** Node.js apps of one host (node-app of the base-node playbook): state, actions, history and logs. */
 export function NodeAppsPanel({ h, onChanged }: { h: Host; onChanged?: () => void }) {
   const [open, setOpen] = useState<string>();
+  const [creating, setCreating] = useState(false);
   const snap = h.node_apps!;
+  const blocked = writeBlock(h);
   const current = snap.apps.find((a) => a.name === open);
   const ui = snap.ui_port > 0 ? `https://${hostAddress(h)}:${snap.ui_port}` : "";
   return (
     <div className="grid gap-4">
       <Card flush title={`${snap.online}/${snap.apps.length} en ligne`} sub={`Relevé ${fmtAgo(snap.collected_at)}${snap.actions ? "" : " · lecture seule"}`}
-        actions={ui && <ButtonAnchor variant="secondary" size="sm" icon={<ExternalLink size={14} />} href={ui} target="_blank" rel="noreferrer" title="Variables d'environnement, nouvelle app et clés SSH : ces données sensibles ne passent pas par le monitoring">node-app-ui</ButtonAnchor>}>
+        actions={<span className="flex flex-wrap gap-2">
+          <Button size="sm" icon={<Plus size={14} />} disabled={!!blocked} title={blocked} onClick={() => setCreating(true)}>Nouvelle app</Button>
+          {ui && <ButtonAnchor variant="secondary" size="sm" icon={<ExternalLink size={14} />} href={ui} target="_blank" rel="noreferrer" title="Interface node-app-ui de l'hôte (certificat auto-signé à accepter au premier accès)">Ouvrir Node.js UI</ButtonAnchor>}
+        </span>}>
         {snap.error && <Alert kind="error" title="node-app a signalé une erreur" className="m-4">{snap.error}</Alert>}
         <div className="mm-table-wrap">
           <table className="mm-table min-w-[52rem]">
             <thead><tr><th scope="col">Application</th><th scope="col">État</th><th scope="col" className="mm-col-num">Port</th><th scope="col" className="mm-col-num">Mémoire</th><th scope="col">Dernière opération</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
-              {snap.apps.length === 0 && <tr><td colSpan={6} className="text-center text-meta">Aucune application. Créez-en une avec node-app new ou depuis node-app-ui.</td></tr>}
+              {snap.apps.length === 0 && <tr><td colSpan={6} className="text-center text-meta">Aucune application. Créez-en une avec « Nouvelle app », ou node-app new sur l'hôte.</td></tr>}
               {snap.apps.map((a) => {
                 const [st, stTone] = STATUS[a.status] ?? [a.status, "muted" as Tone];
                 const last = a.history[0];
@@ -242,7 +429,7 @@ export function NodeAppsPanel({ h, onChanged }: { h: Host; onChanged?: () => voi
         </div>
       </Card>
       {snap.ssh_keys.length > 0 && (
-        <Card flush title="Clés SSH" sub="Clés partagées (essayées pour tous les dépôts) et deploy keys des apps. Création et import : node-app-ui.">
+        <Card flush title="Clés SSH" sub="Clés partagées (essayées pour tous les dépôts) et deploy keys des apps. Remplacement et import : fiche de l'app (Gérer).">
           <div className="mm-table-wrap">
             <table className="mm-table">
               <thead><tr><th scope="col">Clé</th><th scope="col">Type</th><th scope="col">Empreinte</th></tr></thead>
@@ -254,6 +441,7 @@ export function NodeAppsPanel({ h, onChanged }: { h: Host; onChanged?: () => voi
         </Card>
       )}
       {current && <AppDialog h={h} app={current} onClose={() => setOpen(undefined)} onChanged={onChanged} />}
+      {creating && <CreateAppDialog h={h} onClose={() => setCreating(false)} onChanged={onChanged} />}
     </div>
   );
 }

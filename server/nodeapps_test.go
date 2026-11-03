@@ -44,3 +44,50 @@ func TestNodeAppAlertsAndReads(t *testing.T) {
 		t.Fatal("operation id rule")
 	}
 }
+
+func TestNodeCreateAndHostType(t *testing.T) {
+	ok := nodeCreate{Name: "site", Source: "git@github.com:moi/site.git", Branch: "main", Port: 3000}
+	if p := ok.problem(); p != "" {
+		t.Fatal(p)
+	}
+	for _, bad := range []nodeCreate{
+		{Name: "site", Source: "/root"}, // a path on the server: refused
+		{Name: "site", Source: "https://x/r.git", Branch: "--upload-pack=x"},
+		{Name: "site", Source: "https://x/r.git", Start: "a\nb"},
+		{Name: "Site", Source: "https://x/r.git"},
+	} {
+		if bad.problem() == "" {
+			t.Fatalf("%+v accepted", bad)
+		}
+	}
+
+	for _, c := range []struct {
+		manual, declared, virt, want string
+		pve                          bool
+	}{
+		{"", "", "none", "physical", false},
+		{"", "", "none", "proxmox", true},
+		{"", "", "kvm", "vm", false},
+		{"", "vps", "kvm", "vps", false},
+		{"physical", "vps", "kvm", "physical", false},
+		{"", "bogus", "lxc", "lxc", false},
+	} {
+		if got := hostType(c.manual, c.declared, c.pve, c.virt); got != c.want {
+			t.Fatalf("%+v: got %s", c, got)
+		}
+	}
+	if assetKind("vps", "kvm") != "vm" || assetKind("proxmox", "") != "physical" || assetKind("", "lxc") != "lxc" {
+		t.Fatal("inventory kind")
+	}
+
+	s, _ := newTestServer(t)
+	res, _ := s.db.Exec(`INSERT INTO hosts(name,token_hash,created_at,info) VALUES('vm',x'04',0,'{"virtualization":"kvm","host_type":"vps"}')`)
+	id, _ := res.LastInsertId()
+	if h, _ := s.loadHosts("WHERE id=?", id); h[0].HostType != "vps" || h[0].HostTypeManual {
+		t.Fatalf("declared type: %+v", h[0])
+	}
+	s.db.Exec(`UPDATE hosts SET host_type='physical' WHERE id=?`, id)
+	if h, _ := s.loadHosts("WHERE id=?", id); h[0].HostType != "physical" || !h[0].HostTypeManual {
+		t.Fatalf("manual type: %+v", h[0])
+	}
+}

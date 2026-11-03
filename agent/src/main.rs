@@ -364,8 +364,13 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                     }
                     if m["type"] == "node_read" {
                         let id = m["id"].as_str().unwrap_or("").to_string();
-                        let args = m["args"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
-                        let refused = if node_on { node_reads.ask(id.clone(), args).map(|f| f.1.err().unwrap_or_default()) } else { Some("Applications Node.js non installées sur cette machine (node-app absent, ou relancez install.sh)".into()) };
+                        let args: Vec<String> = m["args"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
+                        let write = args.first().is_some_and(|v| node::WRITES.contains(&v.as_str()));
+                        let payload = m["payload"].as_str().map(String::from);
+                        let refused = if node_on { node_reads.ask(id.clone(), args, payload).map(|f| f.1.err().unwrap_or_default()) } else { Some("Applications Node.js non installées sur cette machine (node-app absent, ou relancez install.sh)".into()) };
+                        if write && refused.is_none() {
+                            node_reads.collect(); // report the change right after it
+                        }
                         if let Some(e) = refused {
                             let r = serde_json::json!({"type": "node_read", "read": {"id": id, "ok": false, "error": e}});
                             if let Err(e) = ws.send(Message::Text(r.to_string().into())).await {

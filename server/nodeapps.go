@@ -2,7 +2,8 @@ package main
 
 // Node.js apps of the hosts deployed with the base-node playbook (its node-app command),
 // reported by agents: see agent/src/node.rs and agent/node-app-helper.sh. Deploys, restarts…
-// are host actions (node_*); logs are read on demand through the agent (nodeRead).
+// are host actions (node_*); logs, variables, deploy keys and app creation go through the agent
+// on demand (askNode), like node-app-ui's API: secrets are answered to the user, never stored.
 
 import (
 	"cmp"
@@ -183,12 +184,20 @@ func deliverNodeRead(host int64, res *nodeReadResult) {
 }
 
 func (s *Server) nodeRead(w http.ResponseWriter, r *http.Request, id int64, args ...string) {
+	if res, ok := s.askNode(w, r, id, "", 45*time.Second, args...); ok {
+		writeJSON(w, 200, res)
+	}
+}
+
+// askNode sends one request to the host's root helper, with an optional payload, and waits for
+// its answer; on failure it has already written the HTTP error.
+func (s *Server) askNode(w http.ResponseWriter, r *http.Request, id int64, payload string, wait time.Duration, args ...string) (nodeReadResult, bool) {
 	s.agentsMu.Lock()
 	conn := s.agents[id]
 	s.agentsMu.Unlock()
 	if conn == nil {
 		writeErr(w, 409, "L'agent n'est pas connecté")
-		return
+		return nodeReadResult{}, false
 	}
 	req := nodeReadWait{host: id, ch: make(chan nodeReadResult, 1)}
 	rid := randHex(16)
@@ -200,24 +209,29 @@ func (s *Server) nodeRead(w http.ResponseWriter, r *http.Request, id int64, args
 		delete(nodeReads.m, rid)
 		nodeReads.Unlock()
 	}()
+	msg := map[string]any{"type": "node_read", "id": rid, "args": args}
+	if payload != "" {
+		msg["payload"] = payload
+	}
 	ctx, cancel := context.WithTimeout(conn.ctx, 10*time.Second)
-	err := wsjson.Write(ctx, conn.conn, map[string]any{"type": "node_read", "id": rid, "args": args})
+	err := wsjson.Write(ctx, conn.conn, msg)
 	cancel()
 	if err != nil {
 		writeErr(w, 502, "Impossible de joindre l'agent : "+err.Error())
-		return
+		return nodeReadResult{}, false
 	}
 	select {
 	case res := <-req.ch:
 		if !res.OK {
 			writeErr(w, 502, cmp.Or(res.Error, "Lecture impossible sur l'hôte"))
-			return
+			return nodeReadResult{}, false
 		}
-		writeJSON(w, 200, res)
-	case <-time.After(45 * time.Second):
+		return res, true
+	case <-time.After(wait):
 		writeErr(w, 504, "L'agent n'a pas répondu (agent trop ancien, ou applications Node.js non installées ?)")
 	case <-r.Context().Done():
 	}
+	return nodeReadResult{}, false
 }
 
 func nodeAppParam(w http.ResponseWriter, r *http.Request) (int64, string, bool) {
@@ -259,4 +273,136 @@ func (s *Server) handleNodeOplog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.nodeRead(w, r, id, "oplog", app, op, fmt.Sprint(offset))
+}
+
+/* ---------- Variables, deploy keys and creation (node-app-ui's API, through the agent) ---------- */
+
+// GET /api/hosts/{id}/node-apps/{app}/env: the raw .env file (comments included).
+func (s *Server) handleNodeEnv(w http.ResponseWriter, r *http.Request) {
+	id, app, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	if res, ok := s.askNode(w, r, id, "", 45*time.Second, "env", app); ok {
+		writeJSON(w, 200, map[string]string{"text": res.Text})
+	}
+}
+
+// PUT /api/hosts/{id}/node-apps/{app}/env {text}: replaces the variables, then restarts the app.
+func (s *Server) handleNodeSetEnv(w http.ResponseWriter, r *http.Request) {
+	id, app, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Text string `json:"text"`
+	}
+	if !readJSONLimit(w, r, &req, 256<<10) {
+		return
+	}
+	logName(r, app+" (variables)")
+	if res, ok := s.askNode(w, r, id, req.Text, 5*time.Minute, "setenv", app); ok {
+		writeJSON(w, 200, map[string]string{"output": res.Text})
+	}
+}
+
+// POST /api/hosts/{id}/node-apps/{app}/key {regenerate?, private_key?}: the app's deploy key,
+// created if needed (before the app itself too), replaced, or imported.
+func (s *Server) handleNodeKey(w http.ResponseWriter, r *http.Request) {
+	id, app, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Regenerate bool   `json:"regenerate"`
+		PrivateKey string `json:"private_key"`
+	}
+	if !readJSONLimit(w, r, &req, 64<<10) {
+		return
+	}
+	verb, payload := "key", ""
+	switch {
+	case strings.TrimSpace(req.PrivateKey) != "":
+		verb, payload = "importkey", req.PrivateKey
+		logName(r, app+" (clé SSH importée)")
+	case req.Regenerate:
+		verb = "newkey"
+		logName(r, app+" (nouvelle clé SSH)")
+	default:
+		logName(r, app+" (clé SSH)")
+	}
+	if res, ok := s.askNode(w, r, id, payload, time.Minute, verb, app); ok {
+		writeJSON(w, 200, map[string]string{"key": strings.TrimSpace(res.Text)})
+	}
+}
+
+// nodeCreate is POST /api/apps of node-app-ui; the host's helper checks it again.
+type nodeCreate struct {
+	Name       string `json:"name"`
+	Source     string `json:"source"`
+	Branch     string `json:"branch,omitempty"`
+	Port       int    `json:"port,omitempty"`
+	Preset     string `json:"preset,omitempty"`
+	Start      string `json:"start,omitempty"`
+	Migrate    string `json:"migrate,omitempty"`
+	Env        string `json:"env,omitempty"`
+	EnvMerge   string `json:"env_merge,omitempty"`
+	PrivateKey string `json:"private_key,omitempty"`
+	AutoDeploy *bool  `json:"auto_deploy,omitempty"`
+	AutoUpdate *bool  `json:"auto_update,omitempty"`
+}
+
+var nodeGitURL = regexp.MustCompile(`^(https?://|ssh://|[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:)\S{1,490}$`)
+
+func (c nodeCreate) problem() string {
+	switch {
+	case !nodeAppName.MatchString(c.Name):
+		return "Nom invalide (minuscules, chiffres, - et _)"
+	case !nodeGitURL.MatchString(c.Source):
+		return "Source invalide : URL git attendue (https://… ou git@hôte:compte/dépôt.git)"
+	case c.Port < 0 || c.Port > 65535:
+		return "Port invalide"
+	case len(c.Branch) > 200 || strings.HasPrefix(c.Branch, "-"):
+		return "Branche ou tag invalide"
+	case len(c.Start) > 500 || len(c.Migrate) > 500 || strings.ContainsAny(c.Start+c.Migrate, "\r\n"):
+		return "Commande invalide"
+	case c.EnvMerge != "" && c.EnvMerge != "saisie" && c.EnvMerge != "code":
+		return "Fusion des variables invalide"
+	}
+	return ""
+}
+
+// POST /api/hosts/{id}/node-apps: records the app (clone, detection) then deploys it in the
+// background. 201 {warnings}, 409 {need_key, error} when the deploy key must be added first.
+func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req nodeCreate
+	if !readJSONLimit(w, r, &req, 256<<10) {
+		return
+	}
+	req.Source, req.Branch = strings.TrimSpace(req.Source), strings.TrimSpace(req.Branch)
+	if msg := req.problem(); msg != "" {
+		writeErr(w, 400, msg)
+		return
+	}
+	logName(r, req.Name)
+	b, _ := json.Marshal(req)
+	res, ok := s.askNode(w, r, id, string(b), 10*time.Minute, "create", req.Name)
+	if !ok {
+		return
+	}
+	var out struct {
+		Warnings string `json:"warnings"`
+		NeedKey  string `json:"need_key"`
+	}
+	json.Unmarshal([]byte(res.Text), &out)
+	if out.NeedKey != "" {
+		logSkip(r) // nothing created yet
+		writeJSON(w, 409, map[string]string{"need_key": out.NeedKey, "error": "Ajoutez la deploy key au dépôt, puis réessayez."})
+		return
+	}
+	writeJSON(w, 201, map[string]string{"warnings": out.Warnings})
 }

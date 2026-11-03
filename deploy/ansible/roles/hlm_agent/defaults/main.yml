@@ -10,6 +10,10 @@ hlm_agent_token: ""
 # Hub public key, the same for every host.
 hlm_key: ""
 
+# Deployment type shown by the hub: auto (detected), proxmox, physical, vm, lxc or vps.
+# The dashboard can still change it (its choice wins).
+hlm_host_type: auto
+
 # binary: the release binary in /opt/hlm-agent, updated daily by the agent (as install.sh).
 # deb: the hlm-agent .deb of the release, updated by this role or the dashboard's button.
 hlm_install_method: binary

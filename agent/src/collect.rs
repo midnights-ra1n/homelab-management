@@ -8,6 +8,9 @@ use sysinfo::{
     Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, System,
 };
 
+/// Values of HOST_TYPE, same list as hostTypes in server/hosts.go ("auto" or anything else: detected).
+const HOST_TYPES: &[&str] = &["proxmox", "physical", "vm", "lxc", "vps"];
+
 // Wire format shared with server/hosts.go (agentInfo / agentMetrics). Keep both in sync.
 #[derive(Serialize)]
 pub struct Info {
@@ -25,6 +28,9 @@ pub struct Info {
     pve_node: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pve_ctid: Option<u32>,
+    // Deployment type declared at install (HOST_TYPE in agent.env, Ansible hlm_host_type); None = auto.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    host_type: Option<String>,
     #[serde(flatten)]
     inventory: crate::inventory::Inventory,
 }
@@ -148,6 +154,7 @@ impl Collector {
             boot_time: System::boot_time(),
             pve_node: std::env::var("PVE_NODE").ok().filter(|n| !n.is_empty()),
             pve_ctid: std::env::var("PVE_CTID").ok().and_then(|id| id.parse().ok()),
+            host_type: std::env::var("HOST_TYPE").ok().filter(|t| HOST_TYPES.contains(&t.as_str())),
             inventory: crate::inventory::collect(),
         }
     }
