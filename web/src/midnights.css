@@ -13,11 +13,11 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Surfaces — un rôle = une teinte */
+  /* Surfaces — un rôle = une teinte ; la page descend au plus profond (Vide), chaque niveau d'un cran */
   --mm-crust: #060B1F;      /* Vide : sidebar, barre d'onglets */
-  --mm-bg: #0B1130;         /* Minuit : page */
-  --mm-surface: #121A42;    /* Crépuscule : carte, panneau, tableau */
-  --mm-overlay: #1A2558;    /* Indigo : menu, popover, modale */
+  --mm-bg: #060B1F;         /* Vide : page */
+  --mm-surface: #0B1130;    /* Minuit : carte, panneau, tableau */
+  --mm-overlay: #121A42;    /* Crépuscule : menu, popover, modale */
   --mm-field: #060B1F;      /* Vide : saisie, select, textarea */
   --mm-hover: #EEEBFF0d;    /* survol de ligne / item (5 %) */
   --mm-pressed: #EEEBFF17;  /* pressé (9 %) */
@@ -33,7 +33,8 @@
   --mm-subtle: #BDB6EC;  /* Voile 9.7 libellés, en-têtes de tableau */
   --mm-muted: #9A92D6;   /* Brouillard 6.6 aide, placeholder, métadonnées */
 
-  /* Accent — Lavande */
+  /* Accent — Lavande par défaut ; chaque section de navigation a le sien (styles.css, data-accent) */
+  --mm-lavande: #C3BAFE;
   --mm-accent: #C3BAFE;
   --mm-accent-text: #C3BAFE;
   --mm-accent-hover: #DAD5FE;
@@ -124,6 +125,7 @@
   --mm-subtle: #404468;  /* Ardoise */
   --mm-muted: #585B8A;   /* Brouillard profond */
 
+  --mm-lavande: #5F47AE;
   --mm-accent: #5F47AE;
   --mm-accent-text: #5F47AE;
   --mm-accent-hover: #4E3896;
@@ -208,6 +210,7 @@
   --mm-subtle: #404468;  /* Ardoise */
   --mm-muted: #585B8A;   /* Brouillard profond */
 
+  --mm-lavande: #5F47AE;
   --mm-accent: #5F47AE;
   --mm-accent-text: #5F47AE;
   --mm-accent-hover: #4E3896;
@@ -739,6 +742,8 @@
 }
 .mm-nav-item[aria-current="page"] { background: var(--mm-accent-soft); color: var(--mm-bright); }
 .mm-nav-item[aria-current="page"] .mm-icon { color: var(--mm-accent-text); }
+/* Icônes de la barre latérale à la couleur de leur section : de la lumière, pas des aplats */
+.mm-sidebar__section[data-accent] .mm-nav-item svg { color: var(--mm-accent-text); }
 .mm-nav-item__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mm-nav-item__count { flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; background: var(--mm-neutral-soft); color: var(--mm-subtle); font: 500 var(--mm-text-xs)/1 var(--mm-font-sans); font-variant-numeric: tabular-nums; }
 .mm-sidebar__foot { flex: none; position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px; padding-bottom: calc(8px + var(--mm-safe-bottom)); border-top: 1px solid var(--mm-border); }

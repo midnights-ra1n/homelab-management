@@ -114,7 +114,7 @@ func (s *Server) mgWorkOptions(w http.ResponseWriter, r *http.Request) {
 		   COALESCE(SUM(status = 'done'), 0) AS done,
 		   COALESCE(SUM(status != 'done' AND due_date IS NOT NULL AND due_date < ?), 0) AS overdue FROM tasks`, []any{today}},
 		"open_tasks": {taskSelect + ` WHERE t.status != 'done' ORDER BY
-		   CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END, t.due_date,
+		   CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END, t.due_date, COALESCE(t.due_time, '99'),
 		   CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END LIMIT 8`, nil},
 	} {
 		rows, err := s.rows(q.q, q.args...)
@@ -420,7 +420,7 @@ func (s *Server) mgListTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := s.rows(sqlq+` ORDER BY t.position,
 	  CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
-	  COALESCE(t.due_date, '9999'), t.id DESC`, args...)
+	  COALESCE(t.due_date, '9999'), COALESCE(t.due_time, '99'), t.id DESC`, args...)
 	writeRows(w, rows, err)
 }
 
@@ -436,14 +436,31 @@ func (s *Server) mgSaveTask(w http.ResponseWriter, r *http.Request) {
 	cols := map[string]any{
 		"title": f.required("title", "Le titre", 200), "description": f.text("description", 5000),
 		"status": f.enum("status", taskStatuses...), "priority": f.enum("priority", priorities...),
-		"due_date": f.optDate("due_date"), "tags": f.tags("tags"), "asset_id": f.optID("asset_id"),
-		"deployment_id": f.optID("deployment_id"),
+		"due_date": f.optDate("due_date"), "due_time": f.optTime("due_time"), "tags": f.tags("tags"),
+		"asset_id": f.optID("asset_id"), "deployment_id": f.optID("deployment_id"),
+	}
+	if cols["due_time"] != nil && cols["due_date"] == nil {
+		f.fail("due_time", "Choisis aussi une date")
+	}
+	// The Nextcloud list is only sent by the forms that show it (several lists set up).
+	_, hasList := r.PostForm["caldav_list"]
+	if hasList {
+		cols["caldav_list"] = f.optID("caldav_list")
+		if l := cols["caldav_list"]; l != nil && s.db.QueryRow(`SELECT 1 FROM integrations WHERE id = ? AND type = 'nextcloud'`, l).Scan(new(int)) != nil {
+			f.fail("caldav_list", "Liste Nextcloud introuvable")
+		}
 	}
 	if !f.valid() {
 		formInvalid(w, f)
 		return
 	}
 	var err error
+	if id > 0 && hasList {
+		// Another list: the copy in the old one is deleted, the next sync sends the task to the new one.
+		moved := `id = ? AND caldav_href != '' AND caldav_list IS NOT ?`
+		s.db.Exec(`INSERT OR IGNORE INTO caldav_deleted (href) SELECT caldav_href FROM tasks WHERE `+moved, id, cols["caldav_list"])
+		s.db.Exec(`UPDATE tasks SET caldav_href = '', caldav_etag = '' WHERE `+moved, id, cols["caldav_list"])
+	}
 	if id > 0 {
 		if err = s.updateRow(s.db, "tasks", id, cols); err == nil {
 			s.db.Exec(`UPDATE tasks SET caldav_dirty = caldav_dirty + 1,

@@ -155,6 +155,7 @@ function TaskCard({
           <span className={cn("flex items-center gap-1 font-mono", late && "text-red")}>
             <CalendarDays size={12} aria-hidden="true" />
             {formatDate(task.due_date, tr.locale)}
+            {task.due_time && ` · ${task.due_time}`}
           </span>
         )}
         {task.asset_id && (

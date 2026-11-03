@@ -11,6 +11,10 @@ export type Task = {
   status: TaskStatus;
   priority: Priority;
   due_date: string | null;
+  /** Heure locale HH:MM ; null = toute la journée. */
+  due_time: string | null;
+  /** Liste Nextcloud (id d'intégration) ; null = la première active. */
+  caldav_list: number | null;
   tags: string[];
   asset_id: number | null;
   asset_name: string | null;

@@ -1,6 +1,6 @@
 package main
 
-// Two-way sync of the tasks with a Nextcloud task list (CalDAV VTODO). Apple Reminders syncs with
+// Two-way sync of the tasks with Nextcloud task lists (CalDAV VTODO), one integration per list. Apple Reminders syncs with
 // the same list once the Nextcloud account is added on the device (CalDAV account), so one link
 // covers Nextcloud, iOS and macOS. The VTODO received is kept: a push only rewrites the fields the
 // tasks know, so alarms, times and Apple's own properties survive an edit made here.
@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -24,7 +25,10 @@ import (
 	"time"
 )
 
-var taskSyncMu sync.Mutex
+var (
+	taskSyncMu   sync.Mutex
+	taskSyncKick = make(chan struct{}, 1)
+)
 
 type remoteTodo struct{ etag, data string }
 
@@ -118,6 +122,32 @@ func caldavList(ctx context.Context, i *integration) (map[string]remoteTodo, err
 	return out, nil
 }
 
+// caldavCTag returns the list's change tag (CalendarServer getctag and the WebDAV sync token).
+func caldavCTag(ctx context.Context, i *integration) (string, error) {
+	code, _, b, err := caldavReq(ctx, i, "PROPFIND", "", map[string]string{"Depth": "0", "Content-Type": "application/xml; charset=utf-8"},
+		`<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/"><d:prop><cs:getctag/><d:sync-token/></d:prop></d:propfind>`)
+	if err != nil {
+		return "", err
+	}
+	if code != 207 {
+		return "", integrationErr(fmt.Sprintf("HTTP %d", code))
+	}
+	var ms struct {
+		Prop []struct {
+			CTag  string `xml:"getctag"`
+			Token string `xml:"sync-token"`
+		} `xml:"response>propstat>prop"`
+	}
+	if err := xml.Unmarshal(b, &ms); err != nil {
+		return "", err
+	}
+	var tag string
+	for _, p := range ms.Prop {
+		tag += p.CTag + p.Token
+	}
+	return tag, nil
+}
+
 /* ------------------------------------------------------------ iCalendar */
 
 var (
@@ -164,13 +194,61 @@ func eachVTODOLine(lines []string, fn func(i int, name, value string)) {
 // taskFields is what a task and a VTODO share.
 type taskFields struct {
 	title, description, status, priority string
-	due                                  sql.NullString
+	due, dueTime                         sql.NullString // local date and HH:MM (NULL: all day)
 	tags                                 []string
+}
+
+// icsParam returns a parameter of a content line ("DUE;TZID=Europe/Paris:…" → Europe/Paris).
+func icsParam(line, key string) string {
+	_, value := icsProp(line)
+	head := line[:len(line)-len(value)]
+	for _, p := range strings.Split(strings.TrimSuffix(head, ":"), ";")[1:] {
+		if k, v, ok := strings.Cut(p, "="); ok && strings.EqualFold(k, key) {
+			return strings.Trim(v, `"`)
+		}
+	}
+	return ""
+}
+
+// icsDue reads a DUE line in the server's time zone: a date (all day), or a UTC, TZID or
+// floating date-time.
+func icsDue(line string) (day, at sql.NullString) {
+	_, v := icsProp(line)
+	if len(v) < 15 || v[8] != 'T' {
+		if d, err := time.Parse("20060102", v[:min(len(v), 8)]); err == nil {
+			day = sql.NullString{String: d.Format(time.DateOnly), Valid: true}
+		}
+		return
+	}
+	loc := localTZ()
+	if strings.HasSuffix(v, "Z") {
+		loc = time.UTC
+	} else if tz := icsParam(line, "TZID"); tz != "" {
+		if l, err := time.LoadLocation(tz); err == nil {
+			loc = l // an unknown zone (Windows name) is read as local time
+		}
+	}
+	t, err := time.ParseInLocation("20060102T150405", v[:15], loc)
+	if err != nil {
+		return
+	}
+	t = t.In(localTZ())
+	return sql.NullString{String: t.Format(time.DateOnly), Valid: true}, sql.NullString{String: t.Format("15:04"), Valid: true}
+}
+
+// icsDueLine writes the due date: a date-time in UTC when the task has a time.
+func icsDueLine(t taskFields) string {
+	if !t.dueTime.Valid {
+		return "DUE;VALUE=DATE:" + strings.ReplaceAll(t.due.String, "-", "")
+	}
+	at, _ := time.ParseInLocation("2006-01-02 15:04", t.due.String+" "+t.dueTime.String, localTZ())
+	return "DUE:" + at.UTC().Format("20060102T150405Z")
 }
 
 func parseVTODO(data string) (t taskFields, uid, modified string, completed bool) {
 	t.status, t.priority = "todo", "medium"
-	eachVTODOLine(icsLines(data), func(_ int, name, value string) {
+	lines := icsLines(data)
+	eachVTODOLine(lines, func(i int, name, value string) {
 		switch name {
 		case "UID":
 			uid = value
@@ -190,11 +268,7 @@ func parseVTODO(data string) (t taskFields, uid, modified string, completed bool
 		case "PRIORITY":
 			t.priority = priorityFromICS(value)
 		case "DUE":
-			if len(value) >= 8 {
-				if d, err := time.Parse("20060102", value[:8]); err == nil {
-					t.due = sql.NullString{String: d.Format("2006-01-02"), Valid: true}
-				}
-			}
+			t.due, t.dueTime = icsDue(lines[i])
 		case "CATEGORIES":
 			for _, c := range strings.Split(value, ",") {
 				if c = strings.TrimSpace(icsUnescape.Replace(c)); c != "" && !slices.Contains(t.tags, c) {
@@ -239,28 +313,46 @@ func buildVTODO(base, uid string, t taskFields, now time.Time) string {
 	drop := map[int]bool{}
 	end := -1
 	keepDue := false
-	eachVTODOLine(lines, func(i int, name, value string) {
+	eachVTODOLine(lines, func(i int, name, _ string) {
 		switch {
 		case slices.Contains(vtodoManaged, name):
 			drop[i] = true
 		case name == "DUE":
-			// Same day: the line stays, with the time Apple Reminders may have set.
-			keepDue = t.due.Valid && len(value) >= 8 && value[:8] == strings.ReplaceAll(t.due.String, "-", "")
+			// Same moment: the line stays as written (Apple Reminders' TZID).
+			day, at := icsDue(lines[i])
+			keepDue = t.due.Valid && day == t.due && at == t.dueTime
 			drop[i] = !keepDue
 		}
 	})
 	if !keepDue { // the start would otherwise risk falling after the new due date
 		eachVTODOLine(lines, func(i int, name, _ string) { drop[i] = drop[i] || name == "DTSTART" })
 	}
-	depth := 0
+	// Alarms: when the due date changes, those set at a fixed moment are stale; the relative ones
+	// follow the new date.
+	depth, alarm, alarms, fixed := 0, -1, 0, false
 	for i, l := range lines {
 		name, value := icsProp(l)
-		if name == "BEGIN" && (depth > 0 || strings.EqualFold(value, "VTODO")) {
-			depth++
-		} else if name == "END" && depth > 0 {
+		switch {
+		case name == "BEGIN" && (depth > 0 || strings.EqualFold(value, "VTODO")):
+			if depth++; depth == 2 && strings.EqualFold(value, "VALARM") {
+				alarm, fixed = i, false
+			}
+		case name == "END" && depth > 0:
+			if depth == 2 && alarm >= 0 {
+				if fixed && !keepDue {
+					for j := alarm; j <= i; j++ {
+						drop[j] = true
+					}
+				} else {
+					alarms++
+				}
+				alarm = -1
+			}
 			if depth--; depth == 0 {
 				end = i
 			}
+		case depth == 2 && alarm >= 0 && name == "TRIGGER":
+			fixed = strings.EqualFold(icsParam(l, "VALUE"), "DATE-TIME")
 		}
 	}
 	stamp := now.UTC().Format("20060102T150405Z")
@@ -278,7 +370,11 @@ func buildVTODO(base, uid string, t taskFields, now time.Time) string {
 		props = append(props, "STATUS:NEEDS-ACTION")
 	}
 	if t.due.Valid && !keepDue {
-		props = append(props, "DUE;VALUE=DATE:"+strings.ReplaceAll(t.due.String, "-", ""))
+		props = append(props, icsDueLine(t))
+		if t.dueTime.Valid && alarms == 0 { // a time set here notifies on the devices, like Rappels does
+			props = append(props, "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:"+icsEscape.Replace(t.title),
+				"TRIGGER;RELATED=END:PT0S", "END:VALARM")
+		}
 	}
 	if len(t.tags) > 0 {
 		esc := make([]string, len(t.tags))
@@ -320,25 +416,100 @@ type syncedTask struct {
 	f                taskFields
 	rowID            int64
 	href, etag, data string
+	linked           string // caldav_href as read: a push only links the task if it is unchanged
 	dirty            int64
 	updated          string
 }
 
-func (s *Server) runTaskSync(ctx context.Context) {
-	t := time.NewTicker(time.Minute)
-	defer t.Stop()
-	for {
-		sctx, cancel := context.WithTimeout(ctx, 50*time.Second)
-		if _, err := s.syncTasks(sctx); err != nil {
-			slog.Warn("task sync", "err", err)
+// kickTaskSync wraps a task write: the change leaves for Nextcloud right away, not at the next poll.
+func kickTaskSync(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		h(w, r)
+		select {
+		case taskSyncKick <- struct{}{}:
+		default: // a sync is already queued
 		}
-		cancel()
+	}
+}
+
+// runTaskSync keeps the lists in step within seconds. Every 10 s it only asks each list for its
+// change tag (one small PROPFIND, which Nextcloud bumps on every edit from Rappels); the full sync
+// runs when a tag moved, after a write here, while local changes wait, and every 5 min regardless.
+func (s *Server) runTaskSync(ctx context.Context) {
+	tick := time.NewTicker(10 * time.Second)
+	defer tick.Stop()
+	var tags string
+	var last time.Time
+	failed := false
+	select { // first sync at start-up
+	case taskSyncKick <- struct{}{}:
+	default:
+	}
+	for {
+		now := tags
+		kicked := false
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-taskSyncKick:
+			kicked = true
+			select { // a drag and drop or a burst of edits: one sync
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+			}
+			select {
+			case <-taskSyncKick:
+			default:
+			}
+		case <-tick.C:
+			now = s.taskListTags(ctx)
 		}
+		// Without tags (a server that gives none) and for changes left over, once a minute as before.
+		minute := time.Since(last) >= time.Minute
+		due := time.Since(last) >= 5*time.Minute || (!failed && (now != tags || (minute && (now == "" || s.tasksPending()))))
+		if kicked {
+			now = s.taskListTags(ctx) // taken before the sync: an edit made during it is seen next time
+		}
+		tags = now
+		if !kicked && !due {
+			continue
+		}
+		sctx, cancel := context.WithTimeout(ctx, 50*time.Second)
+		_, err := s.syncTasks(sctx)
+		cancel()
+		if failed = err != nil; failed {
+			slog.Warn("task sync", "err", err) // retried after a write here or within 5 min
+		}
+		last = time.Now()
 	}
+}
+
+// taskListTags is the change tags of the enabled lists ("" when a server gives none or is down).
+func (s *Server) taskListTags(ctx context.Context) string {
+	lists, err := s.loadIntegrations(`WHERE type = 'nextcloud' AND enabled = 1`)
+	if err != nil {
+		return ""
+	}
+	var b strings.Builder
+	for k := range lists {
+		cctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		tag, err := caldavCTag(cctx, &lists[k])
+		cancel()
+		if err != nil || tag == "" {
+			return ""
+		}
+		fmt.Fprintf(&b, "%d=%s;", lists[k].ID, tag)
+	}
+	return b.String()
+}
+
+// tasksPending tells whether local changes still wait to be sent.
+func (s *Server) tasksPending() bool {
+	var n int
+	s.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM caldav_deleted) OR EXISTS (SELECT 1 FROM tasks
+	  WHERE (caldav_dirty > 0 OR caldav_href = '') AND (caldav_list IS NULL OR caldav_list IN (SELECT id FROM integrations WHERE type = 'nextcloud' AND enabled = 1)))`).Scan(&n)
+	return n == 1
 }
 
 func (s *Server) mgSyncTasks(w http.ResponseWriter, r *http.Request) {
@@ -356,35 +527,80 @@ func (s *Server) mgSyncTasks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true, "message": msg})
 }
 
-// syncTasks runs one two-way sync; it returns "" when no Nextcloud list is set up.
+// syncTasks runs one two-way sync of every enabled list; it returns "" when none is set up.
+// Each task belongs to one list (caldav_list); a list's own errors do not stop the others.
 func (s *Server) syncTasks(ctx context.Context) (string, error) {
-	list, err := s.loadIntegrations(`WHERE type = 'nextcloud' AND enabled = 1`)
-	if err != nil || len(list) == 0 {
-		return "", err
-	}
-	i := &list[0] // shortcut: one task list is synced, the first enabled; several lists would need a list per task.
-	base, err := caldavBase(i)
-	if err != nil {
+	lists, err := s.loadIntegrations(`WHERE type = 'nextcloud' AND enabled = 1`)
+	if err != nil || len(lists) == 0 {
 		return "", err
 	}
 	taskSyncMu.Lock()
 	defer taskSyncMu.Unlock()
-	var pushed, pulled, imported, deleted int
+	bases := make([]*url.URL, len(lists))
+	for k := range lists {
+		if bases[k], err = caldavBase(&lists[k]); err != nil {
+			return "", err
+		}
+	}
+	// Tasks without a list, or whose list was deleted: the list their link points to, else the first.
+	orphan := `(caldav_list IS NULL OR caldav_list NOT IN (SELECT id FROM integrations WHERE type = 'nextcloud'))`
+	for k, b := range bases {
+		if _, err := s.db.Exec(`UPDATE tasks SET caldav_list = ? WHERE `+orphan+` AND caldav_href != '' AND instr(caldav_href, ?) = 1`, lists[k].ID, b.Path); err != nil {
+			return "", err
+		}
+	}
+	if _, err := s.db.Exec(`UPDATE tasks SET caldav_list = ? WHERE `+orphan, lists[0].ID); err != nil {
+		return "", err
+	}
 
-	// Tasks deleted here, then the server's state.
+	var msgs []string
+	failed := false
+	for k := range lists {
+		msg, err := s.syncTaskList(ctx, &lists[k], bases[k])
+		if err != nil {
+			var ie *integrationError
+			if !errors.As(err, &ie) {
+				return "", err
+			}
+			msg, failed = fmt.Sprintf("« %s » : %s.", lists[k].Name, strings.TrimSuffix(ie.msg, ".")), true
+		}
+		msgs = append(msgs, msg)
+	}
+	// Deletions left for a list that is no longer synced have nowhere to go.
 	gone, err := queryStrings(s.db, `SELECT href FROM caldav_deleted`)
 	if err != nil {
 		return "", err
 	}
 	for _, href := range gone {
-		if strings.HasPrefix(href, base.Path) {
-			code, _, _, err := caldavReq(ctx, i, "DELETE", href, nil, "")
-			if err != nil {
-				return "", err
-			}
-			if code >= 300 && code != 404 && code != 410 {
-				continue // retried at the next sync
-			}
+		if !slices.ContainsFunc(bases, func(b *url.URL) bool { return strings.HasPrefix(href, b.Path) }) {
+			s.db.Exec(`DELETE FROM caldav_deleted WHERE href = ?`, href)
+		}
+	}
+	if failed {
+		return "", integrationErr(strings.Join(msgs, " "))
+	}
+	return strings.Join(msgs, " "), nil
+}
+
+// syncTaskList syncs one Nextcloud list with the tasks that belong to it.
+func (s *Server) syncTaskList(ctx context.Context, i *integration, base *url.URL) (string, error) {
+	var pushed, pulled, imported, deleted int
+
+	// Tasks deleted here (or moved to another list), then the server's state.
+	gone, err := queryStrings(s.db, `SELECT href FROM caldav_deleted`)
+	if err != nil {
+		return "", err
+	}
+	for _, href := range gone {
+		if !strings.HasPrefix(href, base.Path) {
+			continue // another list's
+		}
+		code, _, _, err := caldavReq(ctx, i, "DELETE", href, nil, "")
+		if err != nil {
+			return "", err
+		}
+		if code >= 300 && code != 404 && code != 410 {
+			continue // retried at the next sync
 		}
 		s.db.Exec(`DELETE FROM caldav_deleted WHERE href = ?`, href)
 	}
@@ -393,7 +609,7 @@ func (s *Server) syncTasks(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	tasks, err := s.syncedTasks()
+	tasks, err := s.syncedTasks(i.ID)
 	if err != nil {
 		return "", err
 	}
@@ -409,13 +625,16 @@ func (s *Server) syncTasks(ctx context.Context) (string, error) {
 	}
 	for _, t := range tasks {
 		if t.href != "" && !strings.HasPrefix(t.href, base.Path) {
-			t.href, t.etag, t.data = "", "", "" // linked to another list: sent again to this one
+			// Linked to another list (its URL changed): sent to this one, removed from there.
+			s.db.Exec(`INSERT OR IGNORE INTO caldav_deleted (href) VALUES (?)`, t.href)
+			t.href, t.etag = "", ""
 		}
 		r, onServer := remote[t.href]
 		delete(remote, t.href)
 		switch {
 		case t.href == "":
-			if err := s.pushTask(ctx, i, base, t, "", ""); err != nil {
+			// A task moved from another list keeps its VTODO (alarms, Apple's properties).
+			if err := s.pushTask(ctx, i, base, t, t.data, ""); err != nil {
 				return "", err
 			}
 			pushed++
@@ -442,15 +661,19 @@ func (s *Server) syncTasks(ctx context.Context) (string, error) {
 			pushed++
 		}
 	}
+	pending, err := queryStrings(s.db, `SELECT href FROM caldav_deleted`)
+	if err != nil {
+		return "", err
+	}
 	for href, r := range remote {
 		f, _, _, completed := parseVTODO(r.data)
-		if completed || strings.TrimSpace(f.title) == "" {
-			continue // the history of finished reminders stays in Nextcloud
+		if completed || strings.TrimSpace(f.title) == "" || slices.Contains(pending, href) {
+			continue // the history of finished reminders stays in Nextcloud; a deletion is retried
 		}
 		tags, _ := json.Marshal(nonNil(f.tags))
-		res, err := s.db.Exec(`INSERT INTO tasks (title, description, status, priority, due_date, tags, position, caldav_href, caldav_etag, caldav_data, caldav_dirty)
-		  VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(position), 0) - 1 FROM tasks WHERE status = ?), ?, ?, ?, 0)`,
-			clip(f.title, 200), clip(f.description, 5000), f.status, f.priority, f.due, string(tags), f.status, href, r.etag, r.data)
+		res, err := s.db.Exec(`INSERT INTO tasks (title, description, status, priority, due_date, due_time, tags, position, caldav_list, caldav_href, caldav_etag, caldav_data, caldav_dirty)
+		  VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(position), 0) - 1 FROM tasks WHERE status = ?), ?, ?, ?, ?, 0)`,
+			clip(f.title, 200), clip(f.description, 5000), f.status, f.priority, f.due, f.dueTime, string(tags), f.status, i.ID, href, r.etag, r.data)
 		if err != nil {
 			return "", err
 		}
@@ -485,8 +708,9 @@ func affected(res sql.Result) bool {
 	return n > 0
 }
 
-func (s *Server) syncedTasks() ([]syncedTask, error) {
-	rows, err := s.db.Query(`SELECT id, title, description, status, priority, due_date, tags, caldav_href, caldav_etag, caldav_data, caldav_dirty, updated_at FROM tasks`)
+func (s *Server) syncedTasks(list int64) ([]syncedTask, error) {
+	rows, err := s.db.Query(`SELECT id, title, description, status, priority, due_date, due_time, tags, caldav_href, caldav_etag, caldav_data, caldav_dirty, updated_at
+	  FROM tasks WHERE caldav_list = ?`, list)
 	if err != nil {
 		return nil, err
 	}
@@ -495,10 +719,11 @@ func (s *Server) syncedTasks() ([]syncedTask, error) {
 	for rows.Next() {
 		var t syncedTask
 		var tags string
-		if err := rows.Scan(&t.rowID, &t.f.title, &t.f.description, &t.f.status, &t.f.priority, &t.f.due, &tags,
+		if err := rows.Scan(&t.rowID, &t.f.title, &t.f.description, &t.f.status, &t.f.priority, &t.f.due, &t.f.dueTime, &tags,
 			&t.href, &t.etag, &t.data, &t.dirty, &t.updated); err != nil {
 			return nil, err
 		}
+		t.linked = t.href
 		json.Unmarshal([]byte(tags), &t.f.tags)
 		out = append(out, t)
 	}
@@ -546,8 +771,13 @@ func (s *Server) pushTask(ctx context.Context, i *integration, list *url.URL, t 
 		return integrationErr(fmt.Sprintf("Nextcloud a refusé la tâche « %s » (HTTP %d)", t.f.title, code))
 	}
 	// Without an ETag the next sync takes the server's copy back, which is this same content.
-	_, err = s.db.Exec(`UPDATE tasks SET caldav_href = ?, caldav_etag = ?, caldav_data = ?,
-	  caldav_dirty = CASE WHEN caldav_dirty = ? THEN 0 ELSE caldav_dirty END WHERE id = ?`, href, h.Get("ETag"), data, t.dirty, t.rowID)
+	res, err := s.db.Exec(`UPDATE tasks SET caldav_href = ?, caldav_etag = ?, caldav_data = ?,
+	  caldav_dirty = CASE WHEN caldav_dirty = ? THEN 0 ELSE caldav_dirty END
+	  WHERE id = ? AND caldav_list = ? AND caldav_href = ?`, href, h.Get("ETag"), data, t.dirty, t.rowID, i.ID, t.linked)
+	if err == nil && !affected(res) && href != t.linked {
+		// Moved to another list or deleted meanwhile: the copy just created is not imported back.
+		_, err = s.db.Exec(`INSERT OR IGNORE INTO caldav_deleted (href) VALUES (?)`, href)
+	}
 	return err
 }
 
@@ -558,16 +788,16 @@ func (s *Server) pullTask(t syncedTask, r remoteTodo) bool {
 		f.title = t.f.title
 	}
 	tags, _ := json.Marshal(nonNil(f.tags))
-	res, _ := s.db.Exec(`UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, due_date = ?, tags = ?,
+	res, _ := s.db.Exec(`UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, due_date = ?, due_time = ?, tags = ?,
 	    completed_at = CASE WHEN ? = 'done' THEN COALESCE(completed_at, datetime('now')) ELSE NULL END,
 	    caldav_etag = ?, caldav_data = ?, caldav_dirty = 0, updated_at = datetime('now')
 	  WHERE id = ? AND caldav_dirty = ?`,
-		clip(f.title, 200), clip(f.description, 5000), f.status, f.priority, f.due, string(tags), f.status, r.etag, r.data, t.rowID, t.dirty)
+		clip(f.title, 200), clip(f.description, 5000), f.status, f.priority, f.due, f.dueTime, string(tags), f.status, r.etag, r.data, t.rowID, t.dirty)
 	if !affected(res) {
 		return false
 	}
 	if f.title != t.f.title || f.description != t.f.description || f.status != t.f.status || f.priority != t.f.priority ||
-		f.due != t.f.due || !slices.Equal(f.tags, t.f.tags) {
+		f.due != t.f.due || f.dueTime != t.f.dueTime || !slices.Equal(f.tags, t.f.tags) {
 		s.logEvent("synchronisation", "task", t.rowID, "update", "Tâche « "+f.title+" » modifiée dans Nextcloud")
 	}
 	return true

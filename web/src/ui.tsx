@@ -36,6 +36,17 @@ export function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 }
 
+/** Section colours of the DA (styles.css, data-accent); status colours are kept out. */
+export type Accent = "lavande" | "ciel" | "rose" | "mauve";
+
+/** Gives the page the colour of its navigation section (lavande outside the sections). */
+export function usePageAccent(sections: { accent: Accent; items: { href: string }[] }[], pathname: string) {
+  const accent = sections.find((s) => s.items.some((i) => isActive(pathname, i.href)))?.accent ?? "lavande";
+  useEffect(() => {
+    document.documentElement.dataset.accent = accent;
+  }, [accent]);
+}
+
 export function Link({ to, children, ...rest }: { to: string; children: ReactNode } & React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   return (
     <a href={to} {...rest} onClick={(e) => {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toaster";
 import { useT } from "@/i18n/client";
 
-/** Synchronise tout de suite avec la liste Nextcloud (et donc Rappels), sans attendre la minute. */
+/** Synchronise tout de suite avec les listes Nextcloud (et donc Rappels), sans attendre la vérification suivante. */
 export function TaskSync() {
   const tr = useT();
   const [busy, setBusy] = useState(false);

@@ -82,12 +82,12 @@ func (s *Server) mgRoutes(mux *http.ServeMux) {
 	h("POST /api/mg/steps/{id}/toggle", s.mgToggleStep)
 	h("DELETE /api/mg/steps/{id}", s.mgDeleteStep)
 	h("GET /api/mg/tasks", s.mgListTasks)
-	h("POST /api/mg/tasks", s.mgSaveTask)
-	h("POST /api/mg/tasks/clear-done", s.mgClearDoneTasks)
+	h("POST /api/mg/tasks", kickTaskSync(s.mgSaveTask))
+	h("POST /api/mg/tasks/clear-done", kickTaskSync(s.mgClearDoneTasks))
 	h("POST /api/mg/tasks/sync", s.mgSyncTasks)
-	h("POST /api/mg/tasks/{id}", s.mgSaveTask)
-	h("DELETE /api/mg/tasks/{id}", s.mgDelete("tasks", "task", "title", "Suppression de la tâche « %s »"))
-	h("POST /api/mg/tasks/{id}/move", s.mgMoveTask)
+	h("POST /api/mg/tasks/{id}", kickTaskSync(s.mgSaveTask))
+	h("DELETE /api/mg/tasks/{id}", kickTaskSync(s.mgDelete("tasks", "task", "title", "Suppression de la tâche « %s »")))
+	h("POST /api/mg/tasks/{id}/move", kickTaskSync(s.mgMoveTask))
 
 	// Start page and map
 	h("GET /api/mg/shortcuts", s.mgShortcuts)

@@ -116,6 +116,18 @@ func (f *form) optDate(k string) any {
 	return v
 }
 
+func (f *form) optTime(k string) any {
+	v := strings.TrimSpace(f.raw(k))
+	if v == "" {
+		return nil
+	}
+	if _, err := time.Parse("15:04", v); err != nil {
+		f.fail(k, "Heure invalide")
+		return nil
+	}
+	return v
+}
+
 func (f *form) check(k string) bool {
 	v := f.raw(k)
 	return v == "on" || v == "true" || v == "1"

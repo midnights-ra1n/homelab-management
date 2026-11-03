@@ -139,7 +139,7 @@ export const INTEGRATION_META: Record<
   },
   nextcloud: {
     label: "Nextcloud",
-    description: "Une liste de tâches Nextcloud synchronisée dans les deux sens avec les tâches, et par elle avec Rappels sur iPhone, iPad et Mac.",
+    description: "Une liste de tâches Nextcloud synchronisée dans les deux sens avec les tâches, et par elle avec Rappels sur iPhone, iPad et Mac. Ajoute une intégration par liste : chaque tâche choisit la sienne.",
     icon: "nextcloud",
     urlPlaceholder: "https://cloud.exemple.fr/remote.php/dav/calendars/moi/rappels/",
   },

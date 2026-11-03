@@ -1,7 +1,7 @@
-// Caches the app shell so the PWA opens offline; API calls always go to the network.
-const CACHE = "hlm-shell-v3";
+// Shows offline.html when a page cannot be loaded (offline or server down); API calls always go to the network.
+const CACHE = "hlm-shell-v4";
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/theme.js", "/icon.svg", "/favicon.ico", "/manifest.webmanifest"])));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/offline.html", "/theme.js", "/icon.svg", "/favicon.ico", "/manifest.webmanifest"])));
   self.skipWaiting();
 });
 self.addEventListener("activate", (e) => {
@@ -12,7 +12,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
   if (e.request.mode === "navigate") {
-    e.respondWith(fetch(e.request).catch(() => caches.match("/")));
+    e.respondWith(fetch(e.request).catch(() => caches.match("/offline.html")));
     return;
   }
   e.respondWith(

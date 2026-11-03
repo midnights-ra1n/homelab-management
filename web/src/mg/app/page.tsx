@@ -403,7 +403,7 @@ function TasksWidget() {
                   <span className="min-w-0 flex-1 truncate text-sm text-h2">{t.title}</span>
                   {t.status === "in_progress" && <Badge tone="accent">{tr("En cours")}</Badge>}
                   {t.due_date && (
-                    <span className={cn("shrink-0 font-mono text-xs", late ? "text-red" : "text-meta")}>{formatDate(t.due_date, tr.locale)}</span>
+                    <span className={cn("shrink-0 font-mono text-xs", late ? "text-red" : "text-meta")}>{formatDate(t.due_date, tr.locale)}{t.due_time && ` · ${t.due_time}`}</span>
                   )}
                 </li>
               );

@@ -27,6 +27,23 @@
   }
 }
 
+/* Une couleur par section (DA : une couleur, une forme). data-accent est posé sur <html> pour la
+   page courante, et sur chaque section de la barre latérale. Les pastels --mm-* suivent le thème
+   (cran 300 la nuit, 700 à l'aube) ; menthe, grenadine et pêche restent aux statuts. */
+:root[data-accent="lavande"], [data-accent="lavande"] { --mm-accent: var(--mm-lavande); }
+:root[data-accent="ciel"], [data-accent="ciel"] { --mm-accent: var(--mm-blue); }
+:root[data-accent="rose"], [data-accent="rose"] { --mm-accent: var(--mm-pink); }
+:root[data-accent="mauve"], [data-accent="mauve"] { --mm-accent: var(--mm-purple); }
+:root[data-accent], [data-accent] {
+  --mm-accent-text: var(--mm-accent);
+  --mm-focus: var(--mm-accent);
+  --mm-accent-hover: color-mix(in oklab, var(--mm-accent) 78%, var(--mm-bright));
+  --mm-accent-active: color-mix(in oklab, var(--mm-accent) 64%, var(--mm-bright));
+  --mm-accent-soft: color-mix(in srgb, var(--mm-accent) 14%, transparent);
+  --mm-accent-border: color-mix(in srgb, var(--mm-accent) 40%, transparent);
+  --mm-selection: color-mix(in srgb, var(--mm-accent) 25%, transparent);
+}
+
 @theme inline {
   --color-*: initial;
   --font-sans: var(--mm-font-sans);

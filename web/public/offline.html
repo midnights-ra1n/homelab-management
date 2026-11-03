@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#060B1F" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#EAEAF9" />
+    <title>Hors ligne</title>
+    <script src="/theme.js"></script>
+    <!-- Page servie par sw.js quand le serveur est injoignable : autonome (pas de bundle), styles inline autorisés par la CSP. -->
+    <style>
+      :root, [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #060B1F; --surface: #0B1130; --border: #263478; --bright: #EEEBFF; --muted: #9A92D6;
+        --accent: #C3BAFE; --accent-hover: #DAD5FE; --on-accent: #0B1130; --warn: #FFBE8D;
+      }
+      [data-theme="light"] {
+        color-scheme: light;
+        --bg: #F5F5FE; --surface: #FDFDFF; --border: #D8D8EE; --bright: #0B1130; --muted: #585B8A;
+        --accent: #5F47AE; --accent-hover: #4E3896; --on-accent: #FDFDFF; --warn: #953A1C;
+      }
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme]) {
+          color-scheme: light;
+          --bg: #F5F5FE; --surface: #FDFDFF; --border: #D8D8EE; --bright: #0B1130; --muted: #585B8A;
+          --accent: #5F47AE; --accent-hover: #4E3896; --on-accent: #FDFDFF; --warn: #953A1C;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px;
+        background: var(--bg); color: var(--muted);
+        font: 15px/1.5 "Geist Variable", "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main {
+        max-width: 420px; width: 100%; text-align: center; padding: 32px 28px;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      }
+      svg { color: var(--warn); }
+      h1 { margin: 16px 0 8px; font-size: 20px; font-weight: 600; color: var(--bright); }
+      p { margin: 0 0 24px; }
+      a {
+        display: inline-block; padding: 9px 18px; border-radius: 10px; font-weight: 500; text-decoration: none;
+        background: var(--accent); color: var(--on-accent);
+      }
+      a:hover { background: var(--accent-hover); }
+      a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 20h.01" /><path d="M8.5 16.43a5 5 0 0 1 7 0" /><path d="M5 12.86a10 10 0 0 1 5.17-2.69" />
+        <path d="M19 12.86a10 10 0 0 0-2-1.43" /><path d="M2 8.82a15 15 0 0 1 4.18-2.65" /><path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76" />
+        <path d="m2 2 20 20" />
+      </svg>
+      <h1>Vous êtes hors ligne</h1>
+      <p>Impossible de joindre le serveur. Vérifiez votre connexion réseau ou que le serveur est démarré, puis réessayez.</p>
+      <a href="">Réessayer</a>
+    </main>
+  </body>
+</html>

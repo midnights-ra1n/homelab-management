@@ -439,6 +439,12 @@ var mgMigrations = []string{
   ALTER TABLE hardware_items ADD COLUMN condition TEXT NOT NULL DEFAULT 'ok' CHECK (condition IN ('ok','warning','faulty'));
   UPDATE hardware_items SET condition = 'faulty' WHERE status = 'faulty';
 	`,
+	// Time of day of the due date (local HH:MM, NULL = all day) and the Nextcloud list (an
+	// integration id; NULL = the first enabled one) a task syncs with.
+	`
+  ALTER TABLE tasks ADD COLUMN due_time TEXT;
+  ALTER TABLE tasks ADD COLUMN caldav_list INTEGER;
+	`,
 }
 
 // hardwareNetworkMigration adds network equipment to the stock (rebuilding hardware_items for its

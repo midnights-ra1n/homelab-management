@@ -10,6 +10,8 @@ import { useT } from "@/i18n/client";
 export type TaskOptions = {
   assets: { id: number; display_name: string }[];
   deployments: { id: number; title: string }[];
+  /** Listes Nextcloud : le choix n'apparaît qu'à partir de deux. */
+  lists?: { id: number; name: string }[];
 };
 
 export function TaskDialog({
@@ -18,6 +20,7 @@ export function TaskDialog({
   defaultStatus,
   defaultAsset,
   defaultDeployment,
+  defaultDue,
   label = "Nouvelle tâche",
   variant,
 }: {
@@ -26,6 +29,7 @@ export function TaskDialog({
   defaultStatus?: TaskStatus;
   defaultAsset?: number;
   defaultDeployment?: number;
+  defaultDue?: string;
   label?: string;
   variant?: "primary" | "ghost" | "icon";
 }) {
@@ -44,7 +48,7 @@ export function TaskDialog({
     >
       <TextField label={tr("Titre")} name="title" defaultValue={task?.title} placeholder={tr("Renouveler le certificat wildcard")} required autoFocus />
       <TextAreaField label={tr("Description")} name="description" defaultValue={task?.description} rows={3} />
-      <div className="grid gap-5 sm:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2">
         <SelectField
           label={tr("Colonne")}
           name="status"
@@ -57,8 +61,17 @@ export function TaskDialog({
           defaultValue={task?.priority ?? "medium"}
           options={PRIORITIES.map((p) => ({ value: p, label: tr(PRIORITY_META[p].label) }))}
         />
-        <TextField label={tr("Échéance")} name="due_date" type="date" defaultValue={task?.due_date ?? ""} />
+        <TextField label={tr("Échéance")} name="due_date" type="date" defaultValue={task?.due_date ?? defaultDue ?? ""} />
+        <TextField label={tr("Heure")} name="due_time" type="time" defaultValue={task?.due_time ?? ""} hint={tr("Vide : toute la journée")} />
       </div>
+      {options.lists && options.lists.length > 1 && (
+        <SelectField
+          label={tr("Liste Nextcloud")}
+          name="caldav_list"
+          defaultValue={task?.caldav_list ?? options.lists[0].id}
+          options={options.lists.map((l) => ({ value: l.id, label: l.name }))}
+        />
+      )}
       <div className="grid gap-5 sm:grid-cols-2">
         <SelectField
           label={tr("Élément lié")}

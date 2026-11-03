@@ -9,7 +9,7 @@ import { api, type Overview } from "./api";
 import { incidents } from "./pages/Incidents";
 import { NotificationsMenu, type NotifFeed } from "./shared/notifications";
 import { usePolled } from "./shared/poll";
-import { Link, Logo, StatusDot, StatusIcon, STATUS_TONE, ThemeSwitch, TONE_VAR, SEARCH_KEY, cn, isActive, navigate, toggleRail, usePath, useRail } from "./ui";
+import { Link, Logo, StatusDot, StatusIcon, STATUS_TONE, ThemeSwitch, TONE_VAR, SEARCH_KEY, cn, isActive, navigate, toggleRail, usePageAccent, usePath, useRail, type Accent } from "./ui";
 
 type NavItem = { href: string; label: string; short: string; icon: IconType };
 
@@ -31,11 +31,11 @@ const NAV_ITEMS: NavItem[] = [
 ];
 const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
 
-const NAV_SECTIONS: { label?: string; items: NavItem[] }[] = [
-  { items: ["/", "/incidents"].map(byHref) },
-  { label: "Infrastructure", items: ["/hosts", "/supervision", "/map", "/containers", "/disks"].map(byHref) },
-  { label: "Surveillance", items: ["/monitors", "/bandwidth", "/updates", "/reports", "/energy", "/logs"].map(byHref) },
-  { label: "Public", items: ["/status-page"].map(byHref) },
+const NAV_SECTIONS: { label?: string; accent: Accent; items: NavItem[] }[] = [
+  { accent: "lavande", items: ["/", "/incidents"].map(byHref) },
+  { label: "Infrastructure", accent: "ciel", items: ["/hosts", "/supervision", "/map", "/containers", "/disks"].map(byHref) },
+  { label: "Surveillance", accent: "rose", items: ["/monitors", "/bandwidth", "/updates", "/reports", "/energy", "/logs"].map(byHref) },
+  { label: "Public", accent: "mauve", items: ["/status-page"].map(byHref) },
 ];
 /** Main tabs of the mobile bar (the rest is under "Plus"). */
 const MOBILE_TABS = ["/", "/hosts", "/monitors", "/incidents"];
@@ -68,6 +68,7 @@ export function AppShell({ username, version, onLogout, children }: { username: 
 
 function AppSidebar({ version, account }: { version: string; account: ReactNode }) {
   const pathname = usePath();
+  usePageAccent(NAV_SECTIONS, pathname);
   return (
     <aside className="mm-sidebar" aria-label="Navigation principale">
       <SideHead version={version} />
@@ -78,7 +79,7 @@ function AppSidebar({ version, account }: { version: string; account: ReactNode 
           <kbd className="mm-nav-item__count font-mono">{SEARCH_KEY}</kbd>
         </button>
         {NAV_SECTIONS.map((section, i) => (
-          <div key={i} className="mm-sidebar__section">
+          <div key={i} className="mm-sidebar__section" data-accent={section.accent}>
             {section.label && <div className="mm-label-caps">{section.label}</div>}
             {section.items.map((item) => <SideLink key={item.href} item={item} active={isActive(pathname, item.href)} />)}
             {section.label === "Public" && (

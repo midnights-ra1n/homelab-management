@@ -9,7 +9,7 @@ import { NAV_SECTIONS, isActive, type NavItem } from "./nav-items";
 import { usePathname, useT } from "@/i18n/client";
 import { useSession } from "@/session";
 import { ArrowUpRight } from "../../../shared/icons";
-import { SEARCH_KEY } from "../../../ui";
+import { SEARCH_KEY, usePageAccent } from "../../../ui";
 import { NotificationsButton } from "../alert-banner";
 
 /**
@@ -19,6 +19,7 @@ import { NotificationsButton } from "../alert-banner";
 export function AppSidebar({ userSlot }: { userSlot: ReactNode }) {
   const tr = useT();
   const pathname = usePathname();
+  usePageAccent(NAV_SECTIONS, pathname);
   return (
     <aside className="mm-sidebar" aria-label={tr("Navigation principale")}>
       <SideHead />
@@ -29,7 +30,7 @@ export function AppSidebar({ userSlot }: { userSlot: ReactNode }) {
           <kbd className="mm-nav-item__count font-mono">{SEARCH_KEY}</kbd>
         </button>
         {NAV_SECTIONS.map((section, i) => (
-          <div key={i} className="mm-sidebar__section">
+          <div key={i} className="mm-sidebar__section" data-accent={section.accent}>
             {section.label && <div className="mm-label-caps">{tr(section.label)}</div>}
             {section.items.map((item) => (
               <SideLink key={item.href} item={item} active={isActive(pathname, item.href)} />

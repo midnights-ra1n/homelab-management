@@ -1,3 +1,4 @@
+import type { Accent } from "../../../ui";
 import {
   Activity,
   AppWindow,
@@ -36,12 +37,12 @@ export const NAV_ITEMS: NavItem[] = [
 const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
 
 /** Sections de la barre latérale (label en capitales ; la première n'en a pas). */
-export type NavSection = { label?: string; items: NavItem[] };
+export type NavSection = { label?: string; accent: Accent; items: NavItem[] };
 export const NAV_SECTIONS: NavSection[] = [
-  { items: ["/", "/applications", "/monitoring", "/energie"].map(byHref) },
-  { label: "Infrastructure", items: ["/inventaire", "/stock", "/reseau", "/carte"].map(byHref) },
-  { label: "Suivi", items: ["/deploiements", "/taches", "/journaux"].map(byHref) },
-  { label: "Serveurs", items: ["/proxmox", "/webmin"].map(byHref) },
+  { accent: "lavande", items: ["/", "/applications", "/monitoring", "/energie"].map(byHref) },
+  { label: "Infrastructure", accent: "ciel", items: ["/inventaire", "/stock", "/reseau", "/carte"].map(byHref) },
+  { label: "Suivi", accent: "rose", items: ["/deploiements", "/taches", "/journaux"].map(byHref) },
+  { label: "Serveurs", accent: "mauve", items: ["/proxmox", "/webmin"].map(byHref) },
 ];
 
 /** Onglets principaux de la barre mobile (le reste est dans « Plus »). */
