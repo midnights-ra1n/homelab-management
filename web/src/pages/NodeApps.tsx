@@ -6,6 +6,8 @@ import {
   inputClass, textareaClass, type StatusKind, type Tone, usePoll, useToast,
 } from "../ui";
 import { useHostAction } from "./AgentVersion";
+import { EnvVars } from "./EnvVars";
+import { GitHook, PauseEditor } from "./NodePause";
 
 /** Base of a host's Node.js routes: the monitoring's own, or the management's relay to it (mg_nodeapps.go). */
 const NodeBase = createContext<string | undefined>(undefined);
@@ -13,7 +15,7 @@ const useBase = (h: Host) => useContext(NodeBase) ?? `/api/hosts/${h.id}`;
 
 export const STATUS: Record<string, [string, Tone]> = {
   online: ["En ligne", "green"], stopped: ["Arrêtée", "muted"], errored: ["En erreur", "red"],
-  launching: ["Démarre", "yellow"], stopping: ["S'arrête", "yellow"],
+  launching: ["Démarre", "yellow"], stopping: ["S'arrête", "yellow"], paused: ["En pause", "yellow"],
 };
 const RESULT: Record<string, [string, Tone]> = {
   running: ["En cours", "blue"], success: ["Réussi", "green"], failed: ["Échec", "red"],
@@ -33,7 +35,7 @@ const opResult = (o: NodeOp) => (o.result === "running" && Date.now() / 1000 - o
 const short = (c: string) => (c && c !== "local" ? c.slice(0, 7) : c);
 const noAnsi = (s: string) => s.replace(/\u001b\[[0-9;]*m/g, "");
 const appKind = (a: NodeApp): StatusKind =>
-  a.status === "errored" ? "down" : a.status === "online" ? (a.failed_commit ? "warn" : "ok") : a.status === "stopped" ? "paused" : "warn";
+  a.status === "errored" ? "down" : a.status === "online" ? (a.failed_commit ? "warn" : "ok") : a.status === "stopped" || a.status === "paused" ? "paused" : "warn";
 
 /** Address of the host for the node-app-ui link: first IPv4 that is not loopback or a bridge (as hostAddress in Go). */
 const hostAddress = (h: Host) =>
@@ -108,6 +110,8 @@ function EnvEditor({ h, app }: { h: Host; app: string }) {
   const base = useBase(h);
   const toast = useToast();
   const [text, setText] = useState<string>();
+  const [draft, setDraft] = useState({ text: "", invalid: false });
+  const [saved, setSaved] = useState<string>(); // the blocks' text when loaded or last saved
   const [busy, setBusy] = useState<"load" | "save">();
   const [error, setError] = useState<string>();
   const blocked = writeBlock(h);
@@ -119,7 +123,8 @@ function EnvEditor({ h, app }: { h: Host; app: string }) {
   const save = async () => {
     setBusy("save");
     try {
-      await api.put(`${base}/node-apps/${app}/env`, { text: text ?? "" });
+      await api.put(`${base}/node-apps/${app}/env`, { text: draft.text });
+      setSaved(draft.text);
       toast("Variables enregistrées, application redémarrée", "success");
     } catch (e) { toast((e as Error).message, "error"); }
     setBusy(undefined);
@@ -135,12 +140,11 @@ function EnvEditor({ h, app }: { h: Host; app: string }) {
   }
   return (
     <div className="grid gap-3">
-      <Field label="Fichier .env" htmlFor={`env-${app}`} hint="Une variable par ligne (NOM=valeur). L'app redémarre après l'enregistrement.">
-        <textarea id={`env-${app}`} className={cn(textareaClass, "min-h-64 font-mono text-xs")} spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
-      </Field>
+      <EnvVars initial={text} onChange={(t, invalid) => { setDraft({ text: t, invalid }); setSaved((s) => s ?? t); }} />
+      <p className="mm-help">L'app redémarre après l'enregistrement.</p>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="secondary" size="sm" onClick={() => setText(undefined)}>Masquer</Button>
-        <Button size="sm" loading={busy === "save"} disabled={!!blocked} title={blocked} onClick={save}>Enregistrer et redémarrer</Button>
+        <Button variant="secondary" size="sm" onClick={() => { setText(undefined); setSaved(undefined); }}>Masquer</Button>
+        <Button size="sm" loading={busy === "save"} disabled={!!blocked || draft.invalid || draft.text === saved} title={blocked ?? (draft.invalid ? "Variables à corriger" : undefined)} onClick={save}>Enregistrer et redémarrer</Button>
       </div>
     </div>
   );
@@ -191,7 +195,7 @@ const PRESETS = ["nextjs", "nextjs-standalone", "nextjs-export", "nuxt", "svelte
 function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => void; onChanged?: () => void }) {
   const base = useBase(h);
   const toast = useToast();
-  const [f, setF] = useState({ name: "", source: "", branch: "", preset: "", port: "", start: "", migrate: "", env: "", env_wins: true, private_key: "", auto_deploy: true, auto_update: true });
+  const [f, setF] = useState({ name: "", source: "", branch: "", preset: "", port: "", start: "", migrate: "", env: "", env_invalid: false, env_wins: true, private_key: "", auto_deploy: true, auto_update: true });
   const [key, setKey] = useState<string>();
   const [warnings, setWarnings] = useState<string>();
   const [busy, setBusy] = useState<"key" | "create">();
@@ -225,7 +229,7 @@ function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => vo
     <Dialog open onClose={onClose} size="lg" title={`Nouvelle application sur ${h.name}`}
       description="Même détection que node-app new : framework, commande de démarrage, migration et port sont proposés automatiquement si vous laissez les champs vides."
       footer={warnings !== undefined ? <Button onClick={onClose}>Terminer</Button> : <><Button variant="secondary" onClick={onClose}>Annuler</Button>
-        <Button type="submit" form="node-create" icon={<Plus size={16} />} loading={busy === "create"}>Créer et déployer</Button></>}>
+        <Button type="submit" form="node-create" icon={<Plus size={16} />} loading={busy === "create"} disabled={f.env_invalid} title={f.env_invalid ? "Variables à corriger" : undefined}>Créer et déployer</Button></>}>
       {warnings !== undefined ? (
         <Alert kind="warning" title="Application créée, avec des avertissements"><pre className="font-mono text-xs whitespace-pre-wrap">{warnings}</pre></Alert>
       ) : (
@@ -271,9 +275,11 @@ function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => vo
               <input id="nc-migrate" className={cn(inputClass, "font-mono text-xs")} value={f.migrate} onChange={set("migrate")} maxLength={500} />
             </Field>
           </div>
-          <Field label="Variables d'environnement" htmlFor="nc-env" hint="Format .env, ajoutées au .env du code s'il en a un">
-            <textarea id="nc-env" className={cn(textareaClass, "min-h-32 font-mono text-xs")} spellCheck={false} placeholder="DATABASE_URL=postgres://…" value={f.env} onChange={set("env")} />
-          </Field>
+          <div className="mm-field" role="group" aria-label="Variables d'environnement">
+            <span className="mm-field__label">Variables d'environnement</span>
+            <EnvVars onChange={(env, env_invalid) => setF((p) => ({ ...p, env, env_invalid }))} />
+            <p className="mm-help">Ajoutées au .env du code s'il en a un</p>
+          </div>
           {f.env.trim() && <Checkbox label="Ces variables remplacent celles du .env du code" hint="Décoché : le .env du code l'emporte en cas de doublon" checked={f.env_wins} onChange={set("env_wins")} />}
           <Checkbox label="Déployer chaque nouveau commit" hint="Vérifié toutes les 2 minutes, retour au commit précédent en cas d'échec" checked={f.auto_deploy} onChange={set("auto_deploy")} />
           <Checkbox label="Mettre à jour les dépendances chaque semaine" hint="pnpm update, retour arrière si l'app ne redémarre pas" checked={f.auto_update} onChange={set("auto_update")} />
@@ -294,7 +300,8 @@ function Spec({ label, children }: { label: string; children: React.ReactNode })
 
 function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onClose: () => void; onChanged?: () => void }) {
   const { run, busy } = useHostAction(() => onChanged?.(), useContext(NodeBase));
-  const [tab, setTab] = useState<"history" | "logs" | "env">("history");
+  const base = useBase(h);
+  const [tab, setTab] = useState<"history" | "logs" | "env" | "pause">("history");
   const [picked, setPicked] = useState<string>();
   const [remove, setRemove] = useState<{ purge: boolean }>();
   const latest = app.history[0];
@@ -341,8 +348,8 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
         </div>
 
         <div className="grid gap-4">
-          <Segmented label="Vue" value={tab} onChange={setTab} options={[["history", "Historique"], ["logs", "Logs de l'app"], ["env", "Variables"]]} />
-          {tab === "env" ? <EnvEditor h={h} app={app.name} /> : tab === "logs" ? <AppLogs h={h} app={app.name} /> : (
+          <Segmented label="Vue" value={tab} onChange={setTab} options={[["history", "Historique"], ["logs", "Logs de l'app"], ["env", "Variables"], ["pause", "Pause"]]} />
+          {tab === "pause" ? <PauseEditor base={base} app={app.name} paused={app.status === "paused"} blocked={blocked} onChanged={onChanged} /> : tab === "env" ? <EnvEditor h={h} app={app.name} /> : tab === "logs" ? <AppLogs h={h} app={app.name} /> : (
             <>
               {app.history.length === 0 ? <p className="text-sm text-meta">Aucune opération enregistrée.</p> : (
                 <div className="mm-table-wrap rounded-xl border border-line">
@@ -366,6 +373,8 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
             </>
           )}
         </div>
+
+        {app.source === "git" && <GitHook base={base} app={app.name} auto={app.auto_deploy} />}
 
         {(app.deploy_key || isSshRepo(app.repo)) && (
           <div className="grid gap-2">

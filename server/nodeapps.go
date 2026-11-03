@@ -8,6 +8,9 @@ package main
 import (
 	"cmp"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -228,7 +231,7 @@ func (s *Server) askNode(w http.ResponseWriter, r *http.Request, id int64, paylo
 		}
 		return res, true
 	case <-time.After(wait):
-		writeErr(w, 504, "L'agent n'a pas répondu (agent trop ancien, ou applications Node.js non installées ?)")
+		writeErr(w, 504, "L'agent n'a pas répondu (agent trop ancien, helper non installé, ou connexion coupée ?)")
 	case <-r.Context().Done():
 	}
 	return nodeReadResult{}, false
@@ -405,4 +408,132 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 201, map[string]string{"warnings": out.Warnings})
+}
+
+/* ---------- Pause page and git push ---------- */
+
+// The page's fields are checked on the host, by node-app: the JSON only passes through here.
+func pauseConfig(w http.ResponseWriter, r *http.Request) (string, bool) {
+	var raw json.RawMessage
+	if !readJSONLimit(w, r, &raw, 256<<10) {
+		return "", false
+	}
+	return string(raw), true
+}
+
+// GET /api/hosts/{id}/node-apps/{app}/pause: the page's last configuration.
+func (s *Server) handleNodePauseShow(w http.ResponseWriter, r *http.Request) {
+	id, app, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	if res, ok := s.askNode(w, r, id, "", 45*time.Second, "pauseshow", app); ok {
+		if !json.Valid([]byte(res.Text)) {
+			res.Text = "{}"
+		}
+		writeJSON(w, 200, json.RawMessage(res.Text))
+	}
+}
+
+// PUT /api/hosts/{id}/node-apps/{app}/pause {page}: pauses the app, or changes the page of a paused one.
+func (s *Server) handleNodePause(w http.ResponseWriter, r *http.Request) {
+	id, app, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	cfg, ok := pauseConfig(w, r)
+	if !ok {
+		return
+	}
+	logName(r, app)
+	if res, ok := s.askNode(w, r, id, cfg, 2*time.Minute+15*time.Second, "pause", app); ok {
+		writeJSON(w, 200, map[string]string{"output": res.Text})
+	}
+}
+
+// POST /api/hosts/{id}/node-apps/{app}/resume: the app runs again, on its latest deployed version.
+func (s *Server) handleNodeResume(w http.ResponseWriter, r *http.Request) {
+	id, app, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	logName(r, app)
+	if res, ok := s.askNode(w, r, id, "", 2*time.Minute+15*time.Second, "resume", app); ok {
+		writeJSON(w, 200, map[string]string{"output": res.Text})
+	}
+}
+
+// POST /api/hosts/{id}/node-apps/{app}/pause/preview {page}: the page as the host renders it, changing nothing.
+func (s *Server) handleNodePausePreview(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	cfg, ok := pauseConfig(w, r)
+	if !ok {
+		return
+	}
+	if res, ok := s.askNode(w, r, id, cfg, 45*time.Second, "pausepreview"); ok {
+		writeJSON(w, 200, map[string]string{"html": res.Text})
+	}
+}
+
+// nodeHookToken is derived from the hub's key: nothing to store.
+// shortcut: no rotation, a leaked URL only makes the host look for a new commit; add a per-app salt if that ever matters.
+func (s *Server) nodeHookToken(id int64, app string) string {
+	m := hmac.New(sha256.New, s.priv.Seed())
+	fmt.Fprintf(m, "node-hook|%d|%s", id, app)
+	return hex.EncodeToString(m.Sum(nil))[:40]
+}
+
+// GET /api/hosts/{id}/node-apps/{app}/hook: the webhook URL to give to the git forge.
+func (s *Server) handleNodeHookURL(w http.ResponseWriter, r *http.Request) {
+	id, app, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	writeJSON(w, 200, map[string]string{"url": fmt.Sprintf("%s/api/hooks/node/%d/%s/%s", s.baseURL(r), id, app, s.nodeHookToken(id, app))})
+}
+
+// POST /api/hooks/node/{id}/{app}/{token}: deploys the app's new commit, if any, right after a push.
+// Same as node_pull: a push on another branch finds nothing new, so the payload is not read, and
+// any git forge works. A push that arrives during an action is picked up by the host's timer.
+func (s *Server) handleNodeHook(w http.ResponseWriter, r *http.Request) {
+	id, app, ok := nodeAppParam(w, r)
+	if !ok {
+		return
+	}
+	if !hmac.Equal([]byte(r.PathValue("token")), []byte(s.nodeHookToken(id, app))) {
+		writeErr(w, 404, "Introuvable")
+		return
+	}
+	logName(r, app)
+	hosts, err := s.loadHosts("WHERE id=?", id)
+	if err != nil {
+		serverErr(w, err)
+		return
+	}
+	enabled := false
+	if len(hosts) == 1 && hosts[0].NodeApps != nil {
+		for _, a := range hosts[0].NodeApps.Apps {
+			enabled = enabled || (a.Name == app && a.AutoDeploy)
+		}
+	}
+	state := "started"
+	switch {
+	case !enabled:
+		state = "auto_deploy_off"
+	case actionBusy(hosts[0].Action):
+		state = "busy"
+	default:
+		if err := s.agentSend(id, map[string]string{"type": "action", "action": "node_pull", "target": app}); err != nil {
+			state = "agent_offline"
+		} else {
+			s.setHostActionTarget(id, "node_pull", app, "pending", "")
+		}
+	}
+	if state != "started" {
+		logSkip(r)
+	}
+	writeJSON(w, 202, map[string]string{"state": state})
 }

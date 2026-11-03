@@ -290,3 +290,60 @@
     enabled: true
     state: started
     daemon_reload: "{{ _hlm_unit is changed }}"
+
+- name: Firewall of the host (any host)
+  vars:
+    _hlm_fw_on: "{{ hlm_iptables | string | lower != 'false' }}"
+  block:
+    - name: Install the root-owned iptables helper
+      ansible.builtin.copy:
+        src: iptables-helper.sh
+        dest: /usr/local/lib/hlm-agent/
+        owner: root
+        group: root
+        mode: "0755"
+        directory_mode: "0755"
+      when: _hlm_fw_on | bool
+
+    - name: Install the iptables units
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /etc/systemd/system/
+        mode: "0644"
+      loop: [hlm-agent-iptables.path, hlm-agent-iptables.service]
+      register: _hlm_fw_units
+      when: _hlm_fw_on | bool
+
+    - name: Enable the iptables trigger
+      ansible.builtin.systemd_service:
+        name: hlm-agent-iptables.path
+        enabled: true
+        state: started
+        daemon_reload: "{{ _hlm_fw_units is changed }}"
+      when: _hlm_fw_on | bool
+
+    - name: Record the firewall choice (true or read, read by the helper)
+      ansible.builtin.copy:
+        dest: /etc/hlm-agent/iptables
+        content: "{{ hlm_iptables | string | lower }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Disable the iptables trigger
+      ansible.builtin.systemd_service:
+        name: hlm-agent-iptables.path
+        enabled: false
+        state: stopped
+      failed_when: false
+      when: not _hlm_fw_on | bool
+
+    - name: Remove the iptables helper
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /usr/local/lib/hlm-agent/iptables-helper.sh
+        - /etc/systemd/system/hlm-agent-iptables.path
+        - /etc/systemd/system/hlm-agent-iptables.service
+      when: not _hlm_fw_on | bool

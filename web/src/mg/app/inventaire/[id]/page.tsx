@@ -40,6 +40,7 @@ import { getT } from "@/i18n/server";
 import { invalidate } from "@/lib/resource";
 import { actionBusy, type Host } from "../../../../api";
 import { NodeAppsPanel } from "../../../../pages/NodeApps";
+import { IptablesPanel } from "../../../../shared/iptables";
 
 export default function AssetPage({ params }: PageProps<"/[lang]/inventaire/[id]">) {
   return (
@@ -238,6 +239,7 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
           {/* Applications Node.js du monitoring */}
           <Suspense fallback={null}>
             <NodeApps asset={asset} />
+            <Firewall asset={asset} />
           </Suspense>
 
           {/* Hébergés */}
@@ -543,6 +545,19 @@ function NodeApps({ asset }: { asset: Asset }) {
     <section id="node" aria-labelledby="node-title" className="grid gap-3">
       <h2 id="node-title" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Applications Node.js")}</h2>
       <NodeAppsPanel h={h} base={`/api/mg/assets/${asset.id}/node`} onChanged={invalidate} />
+    </section>
+  );
+}
+
+/** iptables of the linked monitoring host, any machine with a connected agent (relay: mg_nodeapps.go). */
+function Firewall({ asset }: { asset: Asset }) {
+  const tr = use(getT());
+  const h = use(assetMonitoring(asset.id)).host as unknown as Host | undefined;
+  if (!h?.connected) return null;
+  return (
+    <section id="iptables" aria-labelledby="fw-title" className="grid gap-3">
+      <h2 id="fw-title" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Pare-feu (iptables)")}</h2>
+      <IptablesPanel base={`/api/mg/assets/${asset.id}/node`} />
     </section>
   );
 }

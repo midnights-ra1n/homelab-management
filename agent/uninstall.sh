@@ -13,6 +13,7 @@ REMOVE=$(cat <<'EOS'
 units="hlm-agent.service hlm-agent-smart.timer hlm-agent-smart.path hlm-agent-smart.service hlm-agent-apt.path hlm-agent-apt.service
        hlm-agent-docker.timer hlm-agent-docker.service hlm-agent-docker-update.path hlm-agent-docker-update.service
        hlm-agent-node-read.path hlm-agent-node-read.service hlm-agent-node-action.path hlm-agent-node-action.service
+       hlm-agent-iptables.path hlm-agent-iptables.service
        hlm-agent-lxc.timer hlm-agent-lxc.service"
 if command -v systemctl >/dev/null 2>&1; then
   for u in $units; do systemctl disable --now "$u" 2>/dev/null || true; done

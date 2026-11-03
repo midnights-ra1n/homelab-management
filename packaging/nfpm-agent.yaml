@@ -64,6 +64,13 @@ contents:
   - src: agent/node-app-helper.sh
     dst: /usr/share/hlm-agent/node-app-helper.sh
     file_info: { mode: 0755 }
+  - src: agent/hlm-agent-iptables.path
+    dst: /usr/share/hlm-agent/hlm-agent-iptables.path
+  - src: agent/hlm-agent-iptables.service
+    dst: /usr/share/hlm-agent/hlm-agent-iptables.service
+  - src: agent/iptables-helper.sh
+    dst: /usr/share/hlm-agent/iptables-helper.sh
+    file_info: { mode: 0755 }
   - src: agent/hlm-agent-lxc.service
     dst: /usr/share/hlm-agent/hlm-agent-lxc.service
   - src: agent/hlm-agent-lxc.timer

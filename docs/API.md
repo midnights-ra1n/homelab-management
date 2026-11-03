@@ -203,6 +203,10 @@ L'état global est le pire état parmi les hôtes et les sondes actives.
 | `GET` | [`/hosts/{id}`](#get-apiv1hostsid) | `hosts:read` | Un hôte, avec la liste des paquets |
 | `DELETE` | [`/hosts/{id}`](#delete-apiv1hostsid) | `hosts:write` | Supprimer un hôte |
 | `POST` | [`/hosts/{id}/agent-update`](#post-apiv1hostsidagent-update) | `hosts:write` | Demander la mise à jour de l'agent |
+| `GET` `PUT` | `/hosts/{id}/node-apps/{app}/pause` | `hosts:read`, `hosts:write` | Page de pause d'une application : lecture, ou mise en pause. `POST …/pause/preview` (`hosts:read`) la rend sans rien changer, `POST …/resume` (`hosts:write`) relance l'application |
+| `GET` | `/hosts/{id}/node-apps/{app}/hook` | `hosts:write` | Adresse du webhook de déploiement sur git push |
+| `GET` | `/hosts/{id}/iptables` | `hosts:read` | Règles iptables de l'hôte, lues par l'agent |
+| `POST` | `/hosts/{id}/iptables` | `hosts:write` | `{ "op": … }` : `add`, `delete`, `policy`, `save` (`netfilter-persistent save`) ou `install`. Voir [AGENT.md](AGENT.md#pare-feu-iptables) |
 | `GET` | [`/hosts/{id}/metrics`](#get-apiv1hostsidmetricsrange24h) | `metrics:read` | Historique des métriques |
 | `PUT` | [`/hosts/{id}/maintenance`](#put-apiv1hostsidmaintenance) | `maintenance:write` | Maintenance d'un hôte |
 | `GET` | [`/monitors`](#get-apiv1monitors) | `monitors:read` | Sondes et disponibilité sur 90 jours |

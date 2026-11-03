@@ -96,6 +96,17 @@ Si Docker est installé au moment de l'installation de l'agent, le suivi Docker 
   - « Inconnu » pour un registre privé ou injoignable.
 - **Mettre à jour un conteneur** depuis la page *Conteneurs* ou la fiche de l'hôte. Ce n'est possible que pour les conteneurs **Docker Compose**. Le helper root lit les labels Compose du conteneur et lance, dans son dossier, `docker compose pull <service>` puis `docker compose up -d <service>`. Les volumes sont conservés et le journal s'affiche au retour. Les conteneurs lancés avec `docker run` sont signalés, mais pas recréés : leur commande d'origine n'est pas connue. Comme pour apt, `REMOTE_UPDATES=false` retire cette possibilité.
 
+## Pare-feu iptables
+
+La fiche de chaque hôte connecté (monitoring) et de chaque élément relié (gestion, *Inventaire*) affiche le panneau **Pare-feu (iptables)**, avec ou sans Node.js. `IPTABLES=read` le garde en lecture seule, `IPTABLES=false` le retire. Un agent déjà installé le reçoit en relançant `install.sh`, ou avec *Type de déploiement* → *Appliquer sur l'hôte*.
+
+- **Lecture** : règles, politiques par défaut et tables `nat`, `mangle`… en IPv4 et IPv6. Le helper root `iptables-helper.sh`, lancé par `hlm-agent-iptables.path`, répond à la demande : rien n'est stocké par le hub. Les chaînes de Docker, fail2ban, Proxmox et ufw restent affichées sans être modifiables.
+- **Modification** : ajout ou suppression d'une règle de la table `filter`, politique de `INPUT`, `FORWARD` et `OUTPUT`. Le changement s'applique tout de suite, sans survivre à un redémarrage.
+- **Retour arrière** : le helper sauvegarde la table avant chaque changement et arme un minuteur de 60 s. Le hub confirme dès qu'il joint de nouveau l'agent. Si le changement a coupé la connexion, la confirmation n'arrive pas et l'ancienne table revient. Une règle qui bloque seulement SSH ne coupe pas l'agent : elle se corrige depuis le panneau.
+- **Enregistrer** lance `netfilter-persistent save` : `/etc/iptables/rules.v4` et `rules.v6` sont rechargés au démarrage. Les chaînes `f2b-*` sont retirées de ces fichiers : fail2ban les recrée, et les garder rendrait les bannissements du moment définitifs.
+- **Installer** : sans `netfilter-persistent` ou sans `iptables`, le bouton installe `iptables` et `iptables-persistent`. Il refuse si `ufw` est présent, car apt le supprimerait.
+- **Playbooks** : les chaînes `FW-*` restent gérées par le rôle `firewall`. Ce qui y est ajouté à la main disparaît au prochain passage du rôle : les règles à garder vont dans `INPUT` (le rôle les conserve et enregistre le résultat) ou dans `firewall_extra_tcp_ports`.
+
 ## Applications Node.js (playbook base-node)
 
 Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gère les applications Node.js (pnpm, PM2, déploiement git, retour arrière). Si `/usr/local/bin/node-app` existe à l'installation de l'agent, le suivi s'active tout seul (`NODE_APPS=true|false` pour le forcer). La fiche de l'hôte affiche alors une section *Applications Node.js*, comme le tableau de bord `node-app-ui`.
@@ -105,6 +116,8 @@ Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gèr
 - **Logs** de l'app (PM2) et journaux des déploiements, lus à la demande.
 - **Alerte** (*Paramètres → Notifications*, activée par défaut) : app en erreur, déploiement en échec ou dernière opération annulée par un retour arrière. Chaque problème est signalé une fois.
 - **Variables, nouvelle app et deploy keys**, comme dans `node-app-ui` : onglet *Variables* de l'app (lu à la demande, enregistré avec redémarrage), bouton *Nouvelle app* (dépôt git uniquement : un chemin sur le serveur est refusé ; la deploy key s'affiche pour un dépôt SSH privé, ou une clé existante s'importe), *Nouvelle clé* et *Importer une clé*. Ces secrets transitent par la connexion chiffrée de l'agent et sont remis à l'utilisateur qui les demande : le hub ne les enregistre pas. Le helper root vérifie à nouveau chaque demande, et les refuse sur un hôte en lecture seule (`NODE_APPS_ACTIONS=0`).
+- **Pause** : onglet *Pause* de l'app. `node-app pause` remplace le site par une page sur le même port (code 503), sans toucher au reverse proxy. Titre, message, couleurs, police, logo, image de fond, bouton, compte à rebours, CSS, ou HTML libre, avec un aperçu rendu par l'hôte. Les déploiements continuent sans rouvrir le site, et la dernière version démarre à la reprise. Refusé en écriture sur un hôte en lecture seule (`NODE_APPS_ACTIONS=0`).
+- **Git push** : une app en déploiement automatique est déployée au plus tard 2 minutes après un push (timer de l'hôte). Pour un déploiement immédiat, la fiche de l'app donne une adresse à ajouter aux webhooks du dépôt : `POST /api/hooks/node/{hôte}/{app}/{jeton}`. Le hub demande alors à l'agent de déployer les nouveaux commits, comme *Nouveaux commits*. Le corps de la requête n'est pas lu : un push sur une autre branche ne trouve rien, et toute forge convient. Seul le hub doit être joignable depuis la forge. Une adresse divulguée permet seulement de déclencher cette vérification. Sans `auto_deploy`, l'appel ne fait rien.
 - Le bouton **Ouvrir Node.js UI** ouvre l'interface `node-app-ui` de l'hôte (tableau de bord système, même historique).
 
 ## Type de déploiement
@@ -130,6 +143,7 @@ Sur la fiche de l'hôte, ligne *Type de déploiement*, bouton *Changer* : Proxmo
 | `DOCKER` | `auto` | Suivi Docker : activé si `docker` est installé |
 | `NODE_APPS` | `auto` | Applications Node.js : activé si `/usr/local/bin/node-app` existe (playbook base-node) |
 | `NODE_APPS_ACTIONS` | `1` | `0` : applications Node.js en lecture seule (ni déploiement, ni redémarrage, ni variables, ni création, ni deploy keys) |
+| `IPTABLES` | `true` | Panneau pare-feu : `read` en lecture seule, `false` désactivé. Sans cette variable, une réinstallation garde le choix en place |
 | `HOST_TYPE` | détecté | Type de déploiement affiché par le hub : `proxmox`, `physical`, `vm`, `lxc` ou `vps` (`auto` : détecté). Appliqué aussi sans `TOKEN`, comme `AUTO_UPDATE` |
 | `LXC` | — | `all` sur un Proxmox : installer aussi dans chaque conteneur LXC Debian démarré, puis dans les nouveaux (timer), chacun avec son propre jeton ; `none` : arrêter le timer |
 | `VERSION` | dernière | Installer une release précise (`v0.1.4`) |
@@ -164,6 +178,10 @@ Cela retire les services, le timer SMART, le binaire, la configuration, l'état 
 | `/usr/local/lib/hlm-agent/node-app-helper.sh` | `root`, `0755` | Lectures et actions `node-app` (liste fermée ; `.env`, création et deploy keys seulement à la demande du hub, hors lecture seule) |
 | `/etc/systemd/system/hlm-agent-node-{read,action}.{path,service}` | `root` | Lancent le helper quand l'agent dépose une lecture ou une action |
 | `/var/lib/hlm-agent/node-apps/` | `root:hlm-agent`, `0750` | Relevé des applications, réponse de la dernière lecture et journal de la dernière action |
+| `/usr/local/lib/hlm-agent/iptables-helper.sh` | `root`, `0755` | Lecture et modification de la table `filter`, `netfilter-persistent save` (valeurs vérifiées une à une, aucun argument iptables brut) |
+| `/etc/systemd/system/hlm-agent-iptables.{path,service}` | `root` | Lancent le helper quand l'agent dépose une demande |
+| `/etc/hlm-agent/iptables` | `root`, `0644` | Choix `IPTABLES` (`true` ou `read`) lu par le helper ; absent, l'hôte est en lecture seule |
+| `/var/lib/hlm-agent/iptables/` | `root:hlm-agent`, `0750` | Réponse de la dernière demande |
 
 Root n'exécute jamais le binaire de l'agent : l'agent peut le réécrire pour se mettre à jour, ce qui ouvrirait une élévation de privilèges.
 

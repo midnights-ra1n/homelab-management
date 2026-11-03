@@ -34,5 +34,7 @@ hlm_docker: auto
 hlm_node_apps: auto
 # Deploy / restart / remove buttons for those apps; false keeps them read-only.
 hlm_node_apps_actions: true
+# Firewall panel of the dashboard: true, read (read-only) or false.
+hlm_iptables: true
 # SMART collection; off by default on virtual machines and containers.
 hlm_smart: "{{ ansible_facts.virtualization_role | default('host') != 'guest' }}"

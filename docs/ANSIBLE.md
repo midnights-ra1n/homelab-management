@@ -159,6 +159,7 @@ Le rôle écrit `/etc/hlm-agent/agent.env` et `install.env`, télécharge `hlm-a
 | `hlm_docker` | `auto` | Suivi Docker : `auto` (si docker est installé), `true` ou `false` |
 | `hlm_node_apps` | `auto` | Applications Node.js du playbook base-node : `auto` (si `node-app` est installé), `true` ou `false` |
 | `hlm_node_apps_actions` | `true` | Boutons *Déployer*, *Redémarrer*, *Supprimer*… de ces applications, ainsi que leurs variables, la création d'app et les deploy keys |
+| `hlm_iptables` | `true` | Panneau *Pare-feu (iptables)* de la fiche de l'hôte : `true`, `read` (lecture seule) ou `false` |
 | `hlm_host_type` | `auto` | Type de déploiement affiché par le hub : `auto` (détecté), `proxmox`, `physical`, `vm`, `lxc` ou `vps`. Modifiable ensuite dans le hub (*Modifier* sur la fiche de l'hôte), dont le choix l'emporte |
 
 Conteneurs LXC d'un Proxmox : ajoutez-les simplement à votre inventaire (Ansible s'y connecte en SSH comme à n'importe quelle machine), ou utilisez la commande `LXC=all` de l'assistant, qui les équipe depuis le Proxmox sans SSH.

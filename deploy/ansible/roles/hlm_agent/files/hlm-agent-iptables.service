@@ -1,0 +1,12 @@
+[Unit]
+Description=Midnights Monitoring agent: read or change the firewall
+Documentation=https://github.com/midnights-ra1n/homelab-management
+
+[Service]
+Type=oneshot
+# Root-owned helper: closed list of operations on the filter table, each value checked, each
+# change undone after 60 s unless confirmed; see iptables-helper.sh.
+ExecStart=/usr/local/lib/hlm-agent/iptables-helper.sh read
+# Installing iptables-persistent runs apt.
+TimeoutStartSec=6min
+Nice=10

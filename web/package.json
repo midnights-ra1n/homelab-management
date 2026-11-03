@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && touch ../server/web/dist/.gitkeep",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/*.test.ts\""
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

@@ -11,7 +11,7 @@
     state: stopped
     enabled: false
   loop: [hlm-agent.service, hlm-agent-smart.timer, hlm-agent-smart.path, hlm-agent-apt.path, hlm-agent-docker.timer, hlm-agent-docker-update.path,
-         hlm-agent-node-read.path, hlm-agent-node-action.path]
+         hlm-agent-node-read.path, hlm-agent-node-action.path, hlm-agent-iptables.path]
   failed_when: false
 
 - name: Remove files
@@ -33,6 +33,8 @@
     - /etc/systemd/system/hlm-agent-node-read.service
     - /etc/systemd/system/hlm-agent-node-action.path
     - /etc/systemd/system/hlm-agent-node-action.service
+    - /etc/systemd/system/hlm-agent-iptables.path
+    - /etc/systemd/system/hlm-agent-iptables.service
     - /opt/hlm-agent
     - /etc/hlm-agent
     - /usr/local/lib/hlm-agent

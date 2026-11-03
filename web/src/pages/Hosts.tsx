@@ -13,6 +13,7 @@ import { AgentVersion, useHostAction } from "./AgentVersion";
 import { ContainersTable } from "./Containers";
 import { ActionStatus, UpgradeDialog } from "./Updates";
 import { NodeAppsPanel } from "./NodeApps";
+import { IptablesPanel } from "../shared/iptables";
 
 /** Proxmox ID of a VM or LXC container (from its node, else from install.sh LXC=all). */
 export const guestId = (h: Host) => h.vmid || h.info.pve_ctid;
@@ -351,6 +352,13 @@ export function HostDetailPage({ id }: { id: number }) {
           <section aria-labelledby="node-title">
             <SectionTitle id="node-title">Applications Node.js</SectionTitle>
             <NodeAppsPanel h={h} onChanged={host.refresh} />
+          </section>
+        )}
+
+        {h.connected && (
+          <section aria-labelledby="fw-title">
+            <SectionTitle id="fw-title">Pare-feu (iptables)</SectionTitle>
+            <IptablesPanel base={`/api/hosts/${h.id}`} />
           </section>
         )}
 

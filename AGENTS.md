@@ -27,7 +27,7 @@ Fusion of homelab-management and homelab-monitoring (see README.md). The interfa
 ## Checks before finishing
 
 ```sh
-cd web && npm run build
+cd web && npm run build && npm test
 cd server && go vet ./... && go test ./...
 cd agent && cargo test
 ```

@@ -11,16 +11,16 @@ import (
 	"time"
 )
 
-// mgNodeProxy relays the Node.js apps panel of an inventory item to the monitoring host it is
-// linked to (/api/v1/hosts/{id}/action and /node-apps…, see api.go), with the integration's
-// account: the same panel as the monitoring's host page, from the management interface.
+// mgNodeProxy relays the Node.js apps and firewall panels of an inventory item to the monitoring
+// host it is linked to (/api/v1/hosts/{id}/action, /node-apps… and /iptables, see api.go), with the
+// integration's account: the same panels as the monitoring's host page, from the management interface.
 func (s *Server) mgNodeProxy(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	rest := r.PathValue("rest")
-	if rest != "action" && rest != "node-apps" && !strings.HasPrefix(rest, "node-apps/") || strings.Contains(rest, "..") {
+	if rest != "action" && rest != "iptables" && rest != "node-apps" && !strings.HasPrefix(rest, "node-apps/") || strings.Contains(rest, "..") {
 		writeErr(w, 404, "Route inconnue")
 		return
 	}
@@ -73,8 +73,14 @@ func (s *Server) mgNodeProxy(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 502, err.Error())
 		return
 	}
-	if r.Method != "GET" {
-		s.mgLog(r, "asset", id, "action", "Applications Node.js de « "+name+" » : "+nodeProxyWhat(rest, body))
+	if r.Method != "GET" && !strings.HasSuffix(rest, "/preview") {
+		if rest == "iptables" {
+			var a map[string]string
+			json.Unmarshal(body, &a)
+			s.mgLog(r, "asset", id, "action", "Pare-feu de « "+name+" » : "+iptablesWhat(a))
+		} else {
+			s.mgLog(r, "asset", id, "action", "Applications Node.js de « "+name+" » : "+nodeProxyWhat(rest, body))
+		}
 	}
 	writeJSON(w, 200, out)
 }
@@ -91,6 +97,12 @@ func nodeProxyWhat(rest string, body []byte) string {
 		var a struct{ Name string }
 		json.Unmarshal(body, &a)
 		return "création de " + a.Name
+	case strings.HasSuffix(rest, "/pause/preview"):
+		return "aperçu de la page de pause de " + app
+	case strings.HasSuffix(rest, "/pause"):
+		return app + " mise en pause"
+	case strings.HasSuffix(rest, "/resume"):
+		return app + " relancée"
 	case strings.HasSuffix(rest, "/env"):
 		return "variables de " + app + " modifiées"
 	default:

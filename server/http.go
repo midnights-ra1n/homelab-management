@@ -82,6 +82,15 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/hosts/{id}/node-apps/{app}/env", auth(s.handleNodeEnv))
 	mux.HandleFunc("PUT /api/hosts/{id}/node-apps/{app}/env", auth(s.handleNodeSetEnv))
 	mux.HandleFunc("POST /api/hosts/{id}/node-apps/{app}/key", auth(s.handleNodeKey))
+	mux.HandleFunc("GET /api/hosts/{id}/node-apps/{app}/pause", auth(s.handleNodePauseShow))
+	mux.HandleFunc("PUT /api/hosts/{id}/node-apps/{app}/pause", auth(s.handleNodePause))
+	mux.HandleFunc("POST /api/hosts/{id}/node-apps/{app}/pause/preview", auth(s.handleNodePausePreview))
+	mux.HandleFunc("POST /api/hosts/{id}/node-apps/{app}/resume", auth(s.handleNodeResume))
+	mux.HandleFunc("GET /api/hosts/{id}/node-apps/{app}/hook", auth(s.handleNodeHookURL))
+	// Called by the git forge: the token in the URL is the only authentication.
+	mux.HandleFunc("POST /api/hooks/node/{id}/{app}/{token}", s.handleNodeHook)
+	mux.HandleFunc("GET /api/hosts/{id}/iptables", auth(s.handleIptables))
+	mux.HandleFunc("POST /api/hosts/{id}/iptables", auth(s.handleIptablesWrite))
 
 	mux.HandleFunc("GET /api/monitors", auth(s.handleListMonitors))
 	mux.HandleFunc("POST /api/monitors", auth(s.handleCreateMonitor))

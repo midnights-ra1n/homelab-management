@@ -75,6 +75,13 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/hosts/{id}/node-apps/{app}/env", t("hosts:write", s.handleNodeEnv)) // secrets
 	mux.HandleFunc("PUT /api/v1/hosts/{id}/node-apps/{app}/env", t("hosts:write", s.handleNodeSetEnv))
 	mux.HandleFunc("POST /api/v1/hosts/{id}/node-apps/{app}/key", t("hosts:write", s.handleNodeKey))
+	mux.HandleFunc("GET /api/v1/hosts/{id}/node-apps/{app}/pause", t("hosts:read", s.handleNodePauseShow))
+	mux.HandleFunc("PUT /api/v1/hosts/{id}/node-apps/{app}/pause", t("hosts:write", s.handleNodePause))
+	mux.HandleFunc("POST /api/v1/hosts/{id}/node-apps/{app}/pause/preview", t("hosts:read", s.handleNodePausePreview))
+	mux.HandleFunc("POST /api/v1/hosts/{id}/node-apps/{app}/resume", t("hosts:write", s.handleNodeResume))
+	mux.HandleFunc("GET /api/v1/hosts/{id}/node-apps/{app}/hook", t("hosts:write", s.handleNodeHookURL)) // secret
+	mux.HandleFunc("GET /api/v1/hosts/{id}/iptables", t("hosts:read", s.handleIptables))
+	mux.HandleFunc("POST /api/v1/hosts/{id}/iptables", t("hosts:write", s.handleIptablesWrite))
 	mux.HandleFunc("GET /api/v1/hosts/{id}/metrics", t("metrics:read", s.handleHostMetrics))
 	mux.HandleFunc("PUT /api/v1/hosts/{id}/maintenance", t("maintenance:write", s.apiHostMaintenance))
 	mux.HandleFunc("GET /api/v1/monitors", t("monitors:read", s.handleListMonitors))

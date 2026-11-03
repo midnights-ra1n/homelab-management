@@ -219,6 +219,9 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // and logs on demand, all read one at a time through the root helper.
     let node_on = std::path::Path::new(node::HELPER).exists();
     let mut node_reads = node::Reader::new();
+    let fw_on = std::path::Path::new(node::FW_HELPER).exists();
+    let mut fw_reads = node::Reader::firewall();
+    let mut fw_poll = tokio::time::interval(Duration::from_millis(250));
     let mut node_last = 0u64;
     let mut node_tick = tokio::time::interval(Duration::from_secs(5));
     let mut node_poll = tokio::time::interval(Duration::from_millis(250));
@@ -315,17 +318,17 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                     None => None,
                     Some((None, Ok(_))) => node::read_snapshot().map(|s| serde_json::json!({"type": "node_apps", "node_apps": s})),
                     Some((None, Err(e))) => { eprintln!("hlm-agent: node-app: {e}"); None }
-                    Some((Some(id), res)) => Some(match res {
-                        Ok(a) if a.code == 0 => serde_json::json!({"type": "node_read", "read": {"id": id, "ok": true, "text": a.text, "offset": a.offset, "operation": a.operation}}),
-                        Ok(a) => {
-                            let tail: String = a.text.chars().rev().take(500).collect::<Vec<_>>().into_iter().rev().collect();
-                            serde_json::json!({"type": "node_read", "read": {"id": id, "ok": false, "error": tail.trim()}})
-                        }
-                        Err(e) => serde_json::json!({"type": "node_read", "read": {"id": id, "ok": false, "error": e}}),
-                    }),
+                    Some((Some(id), res)) => Some(node::reply(id, res)),
                 };
                 if let Some(m) = m {
                     if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                        return Failure::Retry(e.to_string());
+                    }
+                }
+            }
+            _ = fw_poll.tick(), if fw_reads.active() => {
+                if let Some((Some(id), res)) = fw_reads.poll() {
+                    if let Err(e) = ws.send(Message::Text(node::reply(id, res).to_string().into())).await {
                         return Failure::Retry(e.to_string());
                     }
                 }
@@ -381,7 +384,9 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         let args: Vec<String> = m["args"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
                         let write = args.first().is_some_and(|v| node::WRITES.contains(&v.as_str()));
                         let payload = m["payload"].as_str().map(String::from);
-                        let refused = if node_on { node_reads.ask(id.clone(), args, payload).map(|f| f.1.err().unwrap_or_default()) } else { Some("Applications Node.js non installées sur cette machine (node-app absent, ou relancez install.sh)".into()) };
+                        let refused = if args.first().is_some_and(|v| v.starts_with("fw-")) {
+                            if fw_on { fw_reads.ask(id.clone(), args, payload).map(|f| f.1.err().unwrap_or_default()) } else { Some("Pare-feu non installé sur cette machine (relancez install.sh, sans IPTABLES=false)".into()) }
+                        } else if node_on { node_reads.ask(id.clone(), args, payload).map(|f| f.1.err().unwrap_or_default()) } else { Some("Applications Node.js non installées sur cette machine (node-app absent, ou relancez install.sh)".into()) };
                         if write && refused.is_none() {
                             node_reads.collect(); // report the change right after it
                         }

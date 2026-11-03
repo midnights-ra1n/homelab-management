@@ -9,6 +9,8 @@
 #   DOCKER=false|true     Docker monitoring (default: enabled when docker is installed)
 #   NODE_APPS=false|true  Node.js apps of the base-node playbook (default: enabled when
 #                         /usr/local/bin/node-app exists); NODE_APPS_ACTIONS=0 keeps them read-only
+#   IPTABLES=read|false   firewall panel of the dashboard: read-only, or off (default: true;
+#                         a re-run without IPTABLES keeps the current choice)
 #   LXC=all               on a Proxmox host, also install in every running Debian LXC container,
 #                         each with its own token asked to the hub (no shared token), then
 #                         every 2 minutes in each new one (hlm-agent-lxc.timer, tag a CT
@@ -36,6 +38,7 @@ FILES="install.sh hlm-agent.service hlm-agent-smart.service hlm-agent-smart.time
        hlm-agent-docker-update.service docker-helper.sh
        hlm-agent-node-read.path hlm-agent-node-read.service hlm-agent-node-action.path
        hlm-agent-node-action.service node-app-helper.sh
+       hlm-agent-iptables.path hlm-agent-iptables.service iptables-helper.sh
        hlm-agent-lxc.service hlm-agent-lxc.timer lxc-sync.sh"
 
 die() { echo "hlm-agent install: $*" >&2; exit 1; }
@@ -172,7 +175,11 @@ if [ "$node" = auto ]; then if [ -x /usr/local/bin/node-app ]; then node=true; e
 nodeact=false; [ "$node" = true ] && [ "${NODE_APPS_ACTIONS:-1}" != 0 ] && nodeact=true
 helper "$node" hlm-agent-node-read.path node-app-helper.sh hlm-agent-node-read.path hlm-agent-node-read.service
 helper "$nodeact" hlm-agent-node-action.path hlm-agent-node-action.path hlm-agent-node-action.service
-say "options: SMART=$smart, remote updates=$remote, Docker=$docker, Node.js apps=$node (actions=$nodeact)"
+iptables=${IPTABLES:-$(cat "$CONF_DIR/iptables" 2>/dev/null || echo true)}
+case "$iptables" in true | read) fw=true ;; false) fw=false ;; *) die "IPTABLES must be true, read or false" ;; esac
+helper "$fw" hlm-agent-iptables.path iptables-helper.sh hlm-agent-iptables.path hlm-agent-iptables.service
+echo "$iptables" > "$CONF_DIR/iptables"
+say "options: SMART=$smart, remote updates=$remote, Docker=$docker, Node.js apps=$node (actions=$nodeact), firewall=$iptables"
 
 # Installed by the .deb: the package owns the binary, so the agent must not rewrite it.
 if [ "${INSTALL_METHOD:-}" = deb ]; then

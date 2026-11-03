@@ -1,0 +1,10 @@
+[Unit]
+Description=Midnights Monitoring agent: firewall requests from the agent
+Documentation=https://github.com/midnights-ra1n/homelab-management
+
+[Path]
+PathExists=/var/lib/hlm-agent/state/iptables-read
+Unit=hlm-agent-iptables.service
+
+[Install]
+WantedBy=paths.target

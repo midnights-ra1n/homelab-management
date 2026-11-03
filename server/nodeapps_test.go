@@ -1,6 +1,65 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
+)
+
+func TestNodeHookDeploysOnlyWithItsToken(t *testing.T) {
+	s, ts := newTestServer(t)
+	cookie := setupAdmin(t, s, ts)
+	_, created := do(t, ts, "POST", "/api/hosts", cookie, map[string]string{"name": "vm"})
+	token := created["install"].(map[string]any)["token"].(string)
+	nonce := make([]byte, 32)
+	rand.Read(nonce)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(ts.URL, "http")+"/api/agent/ws", &websocket.DialOptions{HTTPHeader: http.Header{
+		"Authorization": {"Bearer " + token}, "X-Agent-Nonce": {base64.StdEncoding.EncodeToString(nonce)}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.CloseNow()
+	var hello map[string]any
+	wsjson.Read(ctx, c, &hello)
+	s.storeNodeApps(1, "vm", &nodeSnapshot{Apps: []nodeApp{{Name: "site", AutoDeploy: true}, {Name: "manual"}}})
+
+	_, out := do(t, ts, "GET", "/api/hosts/1/node-apps/site/hook", cookie, nil)
+	url, _ := out["url"].(string)
+	path := url[strings.Index(url, "/api/hooks/"):]
+	if resp, _ := do(t, ts, "GET", "/api/hosts/1/node-apps/site/hook", "", nil); resp.StatusCode != 401 {
+		t.Fatalf("the URL is a secret, got %d", resp.StatusCode)
+	}
+	for _, bad := range []string{path[:len(path)-1] + "x", strings.Replace(path, "/site/", "/manual/", 1), strings.Replace(path, "/1/", "/2/", 1)} {
+		if resp, _ := do(t, ts, "POST", bad, "", nil); resp.StatusCode != 404 {
+			t.Fatalf("%s accepted: %d", bad, resp.StatusCode)
+		}
+	}
+	resp, got := do(t, ts, "POST", path, "", nil)
+	if resp.StatusCode != 202 || got["state"] != "started" {
+		t.Fatalf("hook: %d %v", resp.StatusCode, got)
+	}
+	var m map[string]string
+	if err := wsjson.Read(ctx, c, &m); err != nil || m["action"] != "node_pull" || m["target"] != "site" {
+		t.Fatalf("agent received %v %v", m, err)
+	}
+	if _, got := do(t, ts, "POST", path, "", nil); got["state"] != "busy" {
+		t.Fatalf("a push during an action is left to the timer: %v", got)
+	}
+	_, out = do(t, ts, "GET", "/api/hosts/1/node-apps/manual/hook", cookie, nil)
+	manual := out["url"].(string)
+	if _, got := do(t, ts, "POST", manual[strings.Index(manual, "/api/hooks/"):], "", nil); got["state"] != "auto_deploy_off" {
+		t.Fatalf("auto deploy is off for this app: %v", got)
+	}
+}
 
 func TestNodeAppAlertsAndReads(t *testing.T) {
 	s, _ := newTestServer(t)

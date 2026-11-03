@@ -7,6 +7,8 @@
 #           unit), the requests of node-app-ui that carry secrets, answered to the asking user
 #           only: "env", "setenv", "key", "newkey", "importkey" and "create" <app>, with their
 #           payload (.env text, private key, creation JSON) in the agent's node-payload file.
+#           "pauseshow", "pausepreview", "pause" (page JSON as payload) and "resume" <app>: the
+#           pause page of an app, the last two refused on a read-only host.
 #   action  (hlm-agent-node-action.path, absent with NODE_APPS_ACTIONS=0): "<verb> <app>",
 #           verb = deploy, pull, update (started with systemd-run, followed in the history),
 #           restart, stop, remove or purge.
@@ -162,7 +164,7 @@ read_req() {
   [[ ${seq:-} =~ ^[0-9]{1,18}$ ]] || exit 0
   : > "$OUT/read.out"; publish "$OUT/read.out"
   case "${verb:-}" in
-    env | setenv | key | newkey | importkey | create)
+    env | setenv | key | newkey | importkey | create | pause | resume)
       if ! can_write; then echo "Hôte en lecture seule (NODE_APPS_ACTIONS=0)" > "$OUT/read.out"; answer "$seq" 1 0; exit 0; fi ;;
   esac
   case "${verb:-}" in
@@ -187,6 +189,17 @@ read_req() {
     setenv)
       valid_app "${app:-}" || { echo "Application inconnue" > "$OUT/read.out"; answer "$seq" 1 0; exit 0; }
       timeout 5m "$NODE_APP" env "$app" --stdin < "$pl" > "$OUT/read.out" 2>&1
+      answer "$seq" "$?" 0 ;;
+    pauseshow | pause | resume)
+      valid_app "${app:-}" || { echo "Application inconnue" > "$OUT/read.out"; answer "$seq" 1 0; exit 0; }
+      case "$verb" in
+        pauseshow) timeout 20 "$NODE_APP" pause "$app" --show ;;
+        pause) timeout 2m "$NODE_APP" pause "$app" --stdin < "$pl" ;;
+        resume) timeout 2m "$NODE_APP" resume "$app" ;;
+      esac > "$OUT/read.out" 2>&1
+      answer "$seq" "$?" 0 ;;
+    pausepreview)
+      timeout 20 "$NODE_APP" pause-render < "$pl" > "$OUT/read.out" 2>&1
       answer "$seq" "$?" 0 ;;
     key | newkey | importkey)
       # Before its creation too (private repository): the name only has to be valid.
