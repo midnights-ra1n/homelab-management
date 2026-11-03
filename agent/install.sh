@@ -10,12 +10,13 @@
 #   NODE_APPS=false|true  Node.js apps of the base-node playbook (default: enabled when
 #                         /usr/local/bin/node-app exists); NODE_APPS_ACTIONS=0 keeps them read-only
 #   LXC=all               on a Proxmox host, also install in every running Debian LXC container,
-#                         with the shared enrollment token LXC_TOKEN (enr_…, defaults to TOKEN),
-#                         then every 2 minutes in each new one (hlm-agent-lxc.timer, tag a CT
+#                         each with its own token asked to the hub (no shared token), then
+#                         every 2 minutes in each new one (hlm-agent-lxc.timer, tag a CT
 #                         no-hlm to leave it out); the hub drops the hosts of deleted containers.
 #                         LXC=none stops that; without LXC, a re-run keeps the current choice
 #   HOST_TYPE=vps         deployment type shown by the hub: proxmox, physical, vm, lxc or vps
-#                         (default: detected; the dashboard can change it)
+#                         (auto or unset: detected; applied on a re-run without TOKEN too, like
+#                         AUTO_UPDATE; the dashboard can change it)
 #   VERSION=v0.1.12       pin a release (default: latest)
 #   REPO=owner/name       GitHub repository hosting the releases
 #   INSTALL_METHOD=deb    set by the hlm-agent .deb: no self-update, updates go through the package
@@ -115,6 +116,14 @@ if [ -n "${TOKEN:-}" ] || [ ! -f "$CONF" ]; then
   say "configuration written to $CONF (hub $HUB_URL)"
 else
   say "keeping the configuration of $CONF"
+  # Changed on a re-run without TOKEN too (dashboard: "Type de déploiement").
+  set_conf() { # KEY VALUE: the line is replaced, or removed for an empty value
+    grep -v "^$1=" "$CONF" > "$CONF.tmp" || true
+    [ -z "$2" ] || echo "$1=$2" >> "$CONF.tmp"
+    chown root:hlm-agent "$CONF.tmp"; chmod 0640 "$CONF.tmp"; mv "$CONF.tmp" "$CONF"
+  }
+  case "${HOST_TYPE:-}" in auto) set_conf HOST_TYPE "" ;; proxmox | physical | vm | lxc | vps) set_conf HOST_TYPE "$HOST_TYPE" ;; esac
+  case "${AUTO_UPDATE:-}" in true) set_conf AUTO_UPDATE "" ;; false) set_conf AUTO_UPDATE false ;; esac
 fi
 
 install -m 0644 "$TMP/hlm-agent.service" "$SYSTEMD/hlm-agent.service"
@@ -207,13 +216,10 @@ echo "hlm-agent $("$PREFIX/hlm-agent" --version) installed and running on $(host
 # Proxmox: install the same files in every running Debian LXC container, now and in the new ones.
 if [ "${LXC:-}" = all ]; then
   command -v pct >/dev/null 2>&1 || die "LXC=all only works on a Proxmox host"
-  ctoken=${LXC_TOKEN:-${TOKEN:-}}
-  case "$ctoken" in enr_*) ;; *) die "LXC=all needs a shared enrollment token: LXC_TOKEN=enr_… (Hôtes → Déploiement en masse)" ;; esac
   conf() { sed -n "s/^$1=//p" "$CONF" | head -n1; }
   umask 077
   {
     echo "HUB_URL=${HUB_URL:-$(conf HUB_URL)}"
-    echo "LXC_TOKEN=$ctoken"
     echo "KEY=${KEY:-$(conf KEY)}"
     echo "ALLOW_INSECURE=${ALLOW_INSECURE:-$(conf ALLOW_INSECURE)}"
     echo "AUTO_UPDATE=${AUTO_UPDATE:-}"
@@ -228,7 +234,7 @@ if [ "${LXC:-}" = all ]; then
   say "installing in the running LXC containers (hub $(sed -n 's/^HUB_URL=//p' "$CONF_DIR/lxc.env"))"
   "$LIBEXEC/lxc-sync.sh" all
   systemctl enable --now hlm-agent-lxc.timer >/dev/null 2>&1 || true
-  say "new LXC containers will get the agent within 2 minutes (hlm-agent-lxc.timer)"
+  say "containers without the agent get their own token from the hub, then the agent within 4 minutes (hlm-agent-lxc.timer)"
 elif [ "${LXC:-}" = none ]; then
   helper false hlm-agent-lxc.timer lxc-sync.sh hlm-agent-lxc.service hlm-agent-lxc.timer
   rm -rf "$CONF_DIR/lxc.env" "$LIBEXEC/bundle" "$STATE/lxc"

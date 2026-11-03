@@ -34,7 +34,7 @@ const logClass = "mt-2 max-h-56 overflow-auto rounded-xl border border-line bg-f
 
 export function ActionStatus({ h }: { h: Host }) {
   const a = h.action;
-  if (!a || a.action === "update_agent") return null;
+  if (!a || a.action === "update_agent" || a.action === "reconfigure_agent") return null; // shown by their own row
   const what = a.action === "apply_updates" ? "Installation des mises à jour" : a.action === "enable_lxc" ? "Installation dans les conteneurs LXC" : "Vérification";
   if (actionBusy(h)) return <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-meta"><LoaderCircle size={12} className="animate-spin" aria-hidden />{what} en cours…</span>;
   if (a.state === "pending" || a.state === "running") return <span className="mt-1 block text-xs text-red">{what} sans réponse</span>;

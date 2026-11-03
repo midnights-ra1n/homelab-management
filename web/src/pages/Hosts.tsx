@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Cpu, Download, HardDrive, KeyRound, Pencil, MemoryStick, Plus, RefreshCw, Server, Thermometer, Trash2, Users } from "../shared/icons";
-import { actionBusy, api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, HOST_TYPES, hostTypeLabel, type Host, type HostLatest, type HostSeries, type HostType, type Install } from "../api";
+import { actionBusy, api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, hostTypeLabel, type Host, type HostLatest, type HostSeries, type Install } from "../api";
+import { DeploymentTypeDialog } from "./DeploymentType";
 import {
   Alert, Badge, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
   Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, statusKind, usePoll, useTitle, useToast,
@@ -135,6 +136,12 @@ export function HostsPage() {
                           </span>
                         </Link>
                         {fold(h)}
+                        {h.node_apps && h.node_apps.apps.length > 0 && (
+                          <Link to={`/hosts/${h.id}#node-title`} onClick={(e) => e.stopPropagation()} className="shrink-0 no-underline"
+                            title={`Applications Node.js : ${h.node_apps.online} en ligne sur ${h.node_apps.apps.length}`}>
+                            <Badge tone={h.node_apps.failing ? "red" : h.node_apps.online < h.node_apps.apps.length ? "yellow" : "green"} dot>Node.js {h.node_apps.online}/{h.node_apps.apps.length}</Badge>
+                          </Link>
+                        )}
                       </span>
                     </td>
                     <td><span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} />{h.agent_down && !h.maintenance && <Tag>Agent hors ligne</Tag>}</span></td>
@@ -143,7 +150,9 @@ export function HostsPage() {
                     <td className="mm-col-num font-mono text-xs">{fmtPct(pct(h.latest.mem_used, h.latest.mem_total))}</td>
                     <td className="mm-col-num font-mono text-xs">{fmtPct(pct(h.latest.disk_used, h.latest.disk_total))}</td>
                     <td className="mm-col-num font-mono text-xs">{fmtBytes(h.latest.net_rx, true)} / {fmtBytes(h.latest.net_tx, true)}</td>
-                    <td><AgentVersion h={h} /></td>
+                    <td className="whitespace-nowrap">{h.info.agent_version
+                      ? <span className="inline-flex items-center gap-2"><span className="font-mono text-xs text-h2">{h.info.agent_version}</span><AgentVersion h={h} compact /></span>
+                      : <span className="text-meta">—</span>}</td>
                     <td className="mm-col-muted">{fmtAgo(h.last_seen)}</td>
                   </tr>
                 ))}
@@ -173,12 +182,18 @@ export function HostDetailPage({ id }: { id: number }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [upgrade, setUpgrade] = useState<Host>();
   const [lxc, setLxc] = useState(false);
-  const [edit, setEdit] = useState<{ name: string; parent: number; was: number; type: HostType | "" }>();
+  const [edit, setEdit] = useState<{ name: string; parent: number; was: number }>();
+  const [typeDialog, setTypeDialog] = useState(false);
   const all = usePoll(() => api.get<Host[]>("/api/hosts"), 60000, [], ["hosts"]);
   const toast = useToast();
   const h = host.data;
   useTitle(h?.name ?? "Hôtes");
   const m = metrics.data;
+  // From the hosts list's Node.js badge: show the apps once the host is loaded.
+  const nodeShown = !!h?.node_apps;
+  useEffect(() => {
+    if (nodeShown && location.hash === "#node-title") document.getElementById("node-title")?.scrollIntoView({ block: "start" });
+  }, [nodeShown]);
 
   const charts = useMemo(() => m && {
     t: m.t as number[],
@@ -192,7 +207,7 @@ export function HostDetailPage({ id }: { id: number }) {
     load: [{ label: "Charge (1 min)", values: m.load1 }],
   }, [m]);
 
-  const update = async (patch: Partial<Omit<Host, "host_type">> & { parent?: number; type?: HostType | "" }) => {
+  const update = async (patch: Partial<Host> & { parent?: number }) => {
     try {
       host.setData(await api.patch<Host>(`/api/hosts/${id}`, patch));
       return true;
@@ -215,7 +230,7 @@ export function HostDetailPage({ id }: { id: number }) {
         description={<span className="flex flex-wrap items-center gap-2"><StatusBadge status={h.status} label={hostStatusLabel(h)} />{h.host_type && <Tag>{hostTypeLabel(h.host_type)}</Tag>}{h.info.os && <Tag>{h.info.os}</Tag>}{guestId(h) && <Tag>{h.info.virtualization === "lxc" ? "CT" : "VM"} {guestId(h)}</Tag>}{parent && <Link to={`/hosts/${parent.id}`} className="no-underline"><Tag>Sous {parent.name}</Tag></Link>}{h.connected ? "Agent connecté" : `Dernier contact ${fmtAgo(h.last_seen)}`}</span>}
         actions={<>
           <Switch label="Maintenance" checked={h.maintenance} onChange={(v) => update({ maintenance: v })} />
-          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => { const p = h.parent_manual ? (h.parent_id ?? 0) : -1; setEdit({ name: h.name, parent: p, was: p, type: h.host_type_manual ? h.host_type : "" }); }}>Modifier</Button>
+          <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => { const p = h.parent_manual ? (h.parent_id ?? 0) : -1; setEdit({ name: h.name, parent: p, was: p }); }}>Modifier</Button>
           <Button variant="secondary" icon={<KeyRound size={16} />} onClick={() => api.post<{ install: Install }>(`/api/hosts/${id}/token`).then((r) => setInstall(r.install))}>Régénérer le jeton</Button>
           <Button variant="danger-ghost" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)}>Supprimer</Button>
         </>} />
@@ -280,6 +295,19 @@ export function HostDetailPage({ id }: { id: number }) {
                       loading={agentAction.busy === `${h.id}:apply_updates`} onClick={() => setUpgrade(h)}>Mettre à jour l'hôte</Button>
                   </dd>
                   <ActionStatus h={h} />
+                </div>
+                <div className="col-span-2 min-w-0">
+                  <dt className="mb-1 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">Type de déploiement</dt>
+                  <dd className="flex flex-wrap items-center gap-2">
+                    <span className="text-h2">{hostTypeLabel(h.host_type)}{!h.host_type_manual && <span className="text-meta">{h.info.host_type ? " (installation)" : " (détecté)"}</span>}</span>
+                    <Button size="sm" variant="secondary" icon={<Pencil size={14} />} loading={agentAction.busy === `${h.id}:reconfigure_agent` || (h.action?.action === "reconfigure_agent" && actionBusy(h))} onClick={() => setTypeDialog(true)}>Changer</Button>
+                  </dd>
+                  {h.action?.action === "reconfigure_agent" && !actionBusy(h) && (
+                    <details className="mt-1 text-xs" open={h.action.state === "failed"}>
+                      <summary className={h.action.state === "failed" ? "cursor-pointer text-red" : "cursor-pointer text-meta"}>Réinstallation {h.action.state === "failed" ? "en échec" : "terminée"} {fmtAgo(h.action.at)}</summary>
+                      {h.action.message && <pre className="mt-2 max-h-56 overflow-auto rounded-xl border border-line bg-field p-3 font-mono text-xs whitespace-pre-wrap text-h2">{h.action.message}</pre>}
+                    </details>
+                  )}
                 </div>
                 {h.proxmox && (
                   <div className="col-span-2 min-w-0">
@@ -362,24 +390,19 @@ export function HostDetailPage({ id }: { id: number }) {
         {install && <InstallInstructions install={install} name={h.name} />}
       </Dialog>
       <Dialog open={edit != null} onClose={() => setEdit(undefined)} size="sm" title={`Modifier ${h.name}`}
-        description="Le nom, le type et l'hôte parent sont repris par l'inventaire de la gestion à la prochaine synchronisation."
+        description="Le nom et l'hôte parent sont repris par l'inventaire de la gestion à la prochaine synchronisation."
         footer={<><Button variant="secondary" onClick={() => setEdit(undefined)}>Annuler</Button>
           <Button type="submit" form="edit-form">Enregistrer</Button></>}>
         {edit && (
-          <form id="edit-form" className="grid gap-5" onSubmit={async (e) => { e.preventDefault(); if (await update({ name: edit.name, type: edit.type, ...(edit.parent !== edit.was && { parent: edit.parent }) })) { setEdit(undefined); all.refresh(); } }}>
+          <form id="edit-form" className="grid gap-5" onSubmit={async (e) => { e.preventDefault(); if (await update({ name: edit.name, ...(edit.parent !== edit.was && { parent: edit.parent }) })) { setEdit(undefined); all.refresh(); } }}>
             <Field label="Nom" htmlFor="h-name"><input id="h-name" className={inputClass} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} autoFocus /></Field>
-            <Field label="Type de déploiement" htmlFor="h-type" hint="Automatique : le type indiqué à l'installation de l'agent (hlm_host_type), sinon celui détecté.">
-              <select id="h-type" className={inputClass} value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value as HostType | "" })}>
-                <option value="">Automatique ({hostTypeLabel(h.host_type_manual ? (h.info.host_type ?? "") : h.host_type) || "détecté"})</option>
-                {HOST_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            </Field>
             <Field label="Hôte parent" htmlFor="h-parent" hint="Automatique : le Proxmox qui voit cette machine sur ses bridges. Un choix manuel n'est jamais modifié.">
               <ParentSelect id="h-parent" hosts={all.data ?? []} self={h.id} value={edit.parent} onChange={(parent) => setEdit({ ...edit, parent })} />
             </Field>
           </form>
         )}
       </Dialog>
+      {typeDialog && <DeploymentTypeDialog h={h} open onClose={() => setTypeDialog(false)} onDone={(x) => { host.setData(x); all.refresh(); }} />}
       <UpgradeDialog host={upgrade} onClose={() => setUpgrade(undefined)} onConfirm={(x) => agentAction.run(x, "apply_updates")} />
       <Dialog open={lxc} onClose={() => setLxc(false)} size="sm" title={h.lxc_sync ? "Rééquiper les conteneurs LXC" : "Passer en serveur Proxmox"}
         footer={<><Button variant="secondary" onClick={() => setLxc(false)}>Annuler</Button>
@@ -387,7 +410,7 @@ export function HostDetailPage({ id }: { id: number }) {
         <p className="text-sm leading-relaxed text-body">
           Sans rien réinstaller à la main : l'assistant root de l'agent relance <code className="font-mono text-xs text-h2">install.sh</code> avec <code className="font-mono text-xs text-h2">LXC=all</code>.
           L'agent du Proxmox redémarre quelques secondes, garde sa configuration et active SMART ; il s'installe ensuite dans chaque conteneur Debian démarré, sans les arrêter, puis dans les nouveaux toutes les 2 minutes.
-          Un jeton commun sans expiration est créé pour eux (« LXC de {h.name} », révocable dans Déploiement en masse). Les conteneurs étiquetés <code className="font-mono text-xs text-h2">no-hlm</code> sont ignorés.
+          Chaque conteneur reçoit son propre jeton du hub : aucun jeton commun. Les conteneurs étiquetés <code className="font-mono text-xs text-h2">no-hlm</code> sont ignorés.
         </p>
       </Dialog>
       <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} size="sm" title={`Supprimer ${h.name}`}

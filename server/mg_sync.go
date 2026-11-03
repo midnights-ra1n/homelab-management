@@ -311,15 +311,30 @@ func (s *Server) syncInventory(ctx context.Context) (int, error) {
 	}
 	changed := 0
 	var errs []error
+	// Hosts of every integration first: an item linked to a host that is gone can be taken over.
+	all := make([][]map[string]any, len(list))
+	live := hostLinks{}
 	for k := range list {
 		i := &list[k]
-		var hosts []map[string]any
-		if err := s.hlmGet(ctx, i, "/hosts", &hosts); err != nil {
+		if err := s.hlmGet(ctx, i, "/hosts", &all[k]); err != nil {
 			errs = append(errs, fmt.Errorf("%s : %w", i.Name, err))
+			live[i.ID] = nil // unknown this time: its links are kept
+			continue
+		}
+		live[i.ID] = map[int64]bool{}
+		for _, h := range all[k] {
+			if id, _ := h["id"].(float64); id > 0 {
+				live[i.ID][int64(id)] = true
+			}
+		}
+	}
+	for k := range list {
+		i, hosts := &list[k], all[k]
+		if live[i.ID] == nil {
 			continue
 		}
 		for _, h := range hosts {
-			n, err := s.syncHost(i, h)
+			n, err := s.syncHost(i, h, live)
 			if err != nil {
 				errs = append(errs, err)
 			}
@@ -360,7 +375,24 @@ func (s *Server) syncParents(i *integration, hosts []map[string]any) (int, error
 	return changed, nil
 }
 
-func (s *Server) syncHost(i *integration, h map[string]any) (int, error) {
+// hostLinks: host ids seen per enabled monitoring integration (nil: unreachable this time).
+type hostLinks map[int64]map[int64]bool
+
+// taken: the item's link still points to a host that exists (or that could not be checked).
+func (l hostLinks) taken(integ, host any) bool {
+	iid, ok1 := integ.(int64)
+	hid, ok2 := host.(int64)
+	if !ok1 || !ok2 {
+		return false // not linked
+	}
+	hosts, known := l[iid]
+	if !known {
+		return false // integration removed or disabled
+	}
+	return hosts == nil || hosts[hid]
+}
+
+func (s *Server) syncHost(i *integration, h map[string]any, live hostLinks) (int, error) {
 	hostID, _ := h["id"].(float64)
 	name, _ := h["name"].(string)
 	if hostID <= 0 || name == "" {
@@ -378,24 +410,32 @@ func (s *Server) syncHost(i *integration, h map[string]any) (int, error) {
 	var assetID int64
 	err := s.db.QueryRow(`SELECT id FROM assets WHERE hlm_integration_id = ? AND hlm_host_id = ?`, i.ID, int64(hostID)).Scan(&assetID)
 	if errors.Is(err, sql.ErrNoRows) {
-		// Not linked yet: match an unlinked item by host name, else create one.
+		// Not linked yet: the item of the same machine (by name), else a new one. An item still
+		// linked to another living host is that machine already (two integrations on one hub, or
+		// a duplicate host in the monitoring): no second item. One linked to a host that is gone
+		// (agent enrolled again, integration removed) is taken over instead of duplicated.
 		keys := machineKeys(name, inv.Hostname)
-		rows, err := s.rows(`SELECT id, hostname, display_name FROM assets WHERE hlm_host_id IS NULL AND status != 'decommissioned'`)
+		rows, err := s.rows(`SELECT id, hostname, display_name, hlm_name, hlm_integration_id, hlm_host_id FROM assets WHERE status != 'decommissioned' ORDER BY id`)
 		if err != nil {
 			return 0, err
 		}
+		busy := false
 		for _, a := range rows {
 			hn, _ := a["hostname"].(string)
 			dn, _ := a["display_name"].(string)
-			for _, k := range machineKeys(hn, dn) {
-				if slices.Contains(keys, k) {
-					assetID = a["id"].(int64)
-					break
-				}
+			ln, _ := a["hlm_name"].(string)
+			if !slices.ContainsFunc(machineKeys(hn, dn, ln), func(k string) bool { return slices.Contains(keys, k) }) {
+				continue
 			}
-			if assetID > 0 {
-				break
+			if live.taken(a["hlm_integration_id"], a["hlm_host_id"]) {
+				busy = true
+				continue
 			}
+			assetID = a["id"].(int64)
+			break
+		}
+		if assetID == 0 && busy {
+			return 0, nil
 		}
 		if assetID > 0 {
 			s.db.Exec(`UPDATE assets SET hlm_integration_id = ?, hlm_host_id = ?, hlm_name = ? WHERE id = ?`, i.ID, int64(hostID), name, assetID)

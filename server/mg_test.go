@@ -145,6 +145,51 @@ func TestInventorySyncFromMonitoring(t *testing.T) {
 	}
 }
 
+// The same machine never gets two items: a second integration on the same hub, a duplicate host,
+// or a host enrolled again (new id) reuse the existing item.
+func TestInventorySyncNoDuplicates(t *testing.T) {
+	s, _, _ := newMgTestServer(t)
+	hosts := `[{"id":1,"name":"web","status":"operational","info":{"hostname":"web.lan","virtualization":"kvm"}},
+	           {"id":2,"name":"WEB","status":"operational","info":{"hostname":"web","virtualization":"kvm"}}]`
+	hlm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(hosts)) }))
+	defer hlm.Close()
+	cfg, _ := json.Marshal(integrationConfig{TokenSecret: "hlm_test"})
+	for _, n := range []string{"Monitoring", "Monitoring (bis)"} {
+		s.db.Exec(`INSERT INTO integrations (type, name, url, config) VALUES ('hlm', ?, ?, ?)`, n, hlm.URL, s.encrypt(string(cfg)))
+	}
+	count := func() (n int) { s.db.QueryRow(`SELECT COUNT(*) FROM assets`).Scan(&n); return }
+	s.syncInventory(context.Background())
+	if n := count(); n != 1 {
+		t.Fatalf("two integrations and a duplicate host: %d items", n)
+	}
+	hosts = `[{"id":9,"name":"web","status":"operational","info":{"hostname":"web.lan","virtualization":"kvm"}}]` // enrolled again
+	s.syncInventory(context.Background())
+	var host int64
+	s.db.QueryRow(`SELECT hlm_host_id FROM assets`).Scan(&host)
+	if n := count(); n != 1 || host != 9 {
+		t.Fatalf("host enrolled again: %d items, linked to %d", n, host)
+	}
+}
+
+func TestProxmoxClusterSeenTwice(t *testing.T) {
+	node := func(n string, mem float64) pveResource { return pveResource{"node": n, "maxcpu": 8.0, "maxmem": mem} }
+	view := func() map[string]any {
+		return map[string]any{
+			"nodes":    []pveResource{node("pve-31", 32e9), node("pve-32", 32e9)},
+			"guests":   []pveResource{{"node": "pve-31", "vmid": 100.0}, {"node": "pve-32", "vmid": 101.0}},
+			"storages": []pveResource{{"node": "pve-31", "storage": "local"}},
+		}
+	}
+	other := map[string]any{"nodes": []pveResource{node("pve-31", 16e9)}, "guests": []pveResource{{"node": "pve-31", "vmid": 100.0}}}
+	out := dedupeProxmox([]source[map[string]any]{{ID: 1, Data: view()}, {ID: 2, Data: view()}, {ID: 3, Data: other}})
+	if len(out[0].Data["nodes"].([]pveResource)) != 2 || len(out[1].Data["nodes"].([]pveResource)) != 0 || len(out[1].Data["guests"].([]pveResource)) != 0 {
+		t.Fatalf("same cluster twice: %+v", out[1].Data)
+	}
+	if len(out[2].Data["nodes"].([]pveResource)) != 1 {
+		t.Fatal("another server with the same node name was dropped")
+	}
+}
+
 // Every management MCP tool runs on an empty database without SQL errors.
 func TestManagementMCPTools(t *testing.T) {
 	s, _, _ := newMgTestServer(t)
@@ -259,5 +304,67 @@ func TestProxmoxTicket(t *testing.T) {
 	i.Config.Password = "nope"
 	if err := pve(context.Background(), i, "GET", "/version", nil, &out); err == nil || !strings.Contains(err.Error(), "incorrect") {
 		t.Fatal("bad password:", err)
+	}
+}
+
+// The Node.js panel of an inventory item goes through the management relay to the monitoring.
+func TestNodeAppsRelay(t *testing.T) {
+	s, ts, tok := newMgTestServer(t)
+	var got []string
+	hlm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.Method+" "+r.URL.RequestURI())
+		switch r.URL.Path {
+		case "/api/v1/hosts/7/node-apps":
+			w.WriteHeader(409)
+			w.Write([]byte(`{"need_key":"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGv1bmVyeS1rZXktZm9yLXRlc3RzLW9ubHktMDEyMzQ1Njc4OQ hlm","error":"Ajoutez la deploy key au dépôt, puis réessayez."}`))
+		default:
+			w.Write([]byte(`{"text":"ok"}`))
+		}
+	}))
+	defer hlm.Close()
+	cfg, _ := json.Marshal(integrationConfig{TokenSecret: "hlm_test"})
+	s.db.Exec(`INSERT INTO integrations (type, name, url, config) VALUES ('hlm', 'Monitoring', ?, ?)`, hlm.URL, s.encrypt(string(cfg)))
+	if _, err := s.db.Exec(`INSERT INTO assets (display_name, kind, hlm_integration_id, hlm_host_id) VALUES ('web', 'vm', 1, 7)`); err != nil {
+		t.Fatal(err)
+	}
+	call := func(method, path, body string) (int, map[string]any) {
+		req, _ := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", ts.URL)
+		req.AddCookie(&http.Cookie{Name: mgSessionCookie, Value: tok})
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out map[string]any
+		json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	if code, out := call("GET", "/api/mg/assets/1/node/node-apps/api/logs?lines=100", ""); code != 200 || out["text"] != "ok" {
+		t.Fatalf("logs: %d %v", code, out)
+	}
+	if code, out := call("POST", "/api/mg/assets/1/node/node-apps", `{"name":"api"}`); code != 409 || !strings.HasPrefix(out["need_key"].(string), "ssh-ed25519 ") {
+		t.Fatalf("need_key must reach the panel whole: %d %v", code, out)
+	}
+	for _, bad := range []string{`{"action":"apply_updates"}`, `nope`} {
+		if code, _ := call("POST", "/api/mg/assets/1/node/action", bad); code != 400 {
+			t.Fatalf("%s: only node_* actions are relayed, got %d", bad, code)
+		}
+	}
+	if code, _ := call("GET", "/api/mg/assets/1/node/token", ""); code != 404 {
+		t.Fatalf("other host routes must not be relayed, got %d", code)
+	}
+	if code, _ := call("POST", "/api/mg/assets/1/node/action", `{"action":"node_restart","target":"api"}`); code != 200 {
+		t.Fatalf("restart: %d", code)
+	}
+	want := []string{"GET /api/v1/hosts/7/node-apps/api/logs?lines=100", "POST /api/v1/hosts/7/node-apps", "POST /api/v1/hosts/7/action"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("monitoring calls: %v", got)
+	}
+	var n int
+	s.db.QueryRow(`SELECT COUNT(*) FROM activity WHERE summary LIKE '%Node.js de « web » : restart api%'`).Scan(&n)
+	if n != 1 {
+		t.Fatal("relayed write not in the journal")
 	}
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Download, ExternalLink, Eye, GitPullRequestArrow, KeyRound, LoaderCircle, Package, Plus, RotateCw, Square, Trash2, Upload } from "../shared/icons";
 import { actionBusy, api, ApiError, fmtAgo, fmtDate, type Host, type NodeAction, type NodeApp, type NodeOp } from "../api";
 import {
@@ -7,7 +7,11 @@ import {
 } from "../ui";
 import { useHostAction } from "./AgentVersion";
 
-const STATUS: Record<string, [string, Tone]> = {
+/** Base of a host's Node.js routes: the monitoring's own, or the management's relay to it (mg_nodeapps.go). */
+const NodeBase = createContext<string | undefined>(undefined);
+const useBase = (h: Host) => useContext(NodeBase) ?? `/api/hosts/${h.id}`;
+
+export const STATUS: Record<string, [string, Tone]> = {
   online: ["En ligne", "green"], stopped: ["Arrêtée", "muted"], errored: ["En erreur", "red"],
   launching: ["Démarre", "yellow"], stopping: ["S'arrête", "yellow"],
 };
@@ -35,6 +39,9 @@ const appKind = (a: NodeApp): StatusKind =>
 const hostAddress = (h: Host) =>
   h.info.ips?.find((i) => !i.address.includes(":") && !i.address.startsWith("127.") && !/^(lo|docker|br-|veth|virbr)/.test(i.iface))?.address ?? h.info.hostname;
 
+/** node-app-ui of the host, "" when it has none. */
+export const nodeUiUrl = (h: Host) => (h.node_apps?.ui_port ? `https://${hostAddress(h)}:${h.node_apps.ui_port}` : "");
+
 function ResultBadge({ o }: { o: NodeOp }) {
   const [label, tone] = RESULT[opResult(o)] ?? [o.result, "muted" as Tone];
   return <Badge tone={tone} dot>{label}</Badge>;
@@ -42,6 +49,7 @@ function ResultBadge({ o }: { o: NodeOp }) {
 
 /** Log of one operation, followed while it runs (like node-app-ui: read from an offset every 1.5 s). */
 function OpLog({ h, app, op }: { h: Host; app: string; op: string }) {
+  const base = useBase(h);
   const [text, setText] = useState("");
   const [state, setState] = useState<{ running: boolean; error?: string }>({ running: true });
   useEffect(() => {
@@ -50,7 +58,7 @@ function OpLog({ h, app, op }: { h: Host; app: string; op: string }) {
     setState({ running: true });
     const step = async () => {
       try {
-        const r = await api.get<{ text: string; offset: number; operation: NodeOp | null }>(`/api/hosts/${h.id}/node-apps/${app}/operations/${op}?offset=${offset}`);
+        const r = await api.get<{ text: string; offset: number; operation: NodeOp | null }>(`${base}/node-apps/${app}/operations/${op}?offset=${offset}`);
         if (stop) return;
         offset = r.offset;
         setText((t) => t + noAnsi(r.text));
@@ -77,8 +85,9 @@ function OpLog({ h, app, op }: { h: Host; app: string; op: string }) {
 
 /** PM2 logs of the app, refreshed every 4 s while shown. */
 function AppLogs({ h, app }: { h: Host; app: string }) {
+  const base = useBase(h);
   const [lines, setLines] = useState<"100" | "500" | "2000">("100");
-  const { data, error } = usePoll(() => api.get<{ text: string }>(`/api/hosts/${h.id}/node-apps/${app}/logs?lines=${lines}`), 4000, [h.id, app, lines]);
+  const { data, error } = usePoll(() => api.get<{ text: string }>(`${base}/node-apps/${app}/logs?lines=${lines}`), 4000, [h.id, app, lines]);
   return (
     <div className="grid gap-3">
       <Segmented size="sm" label="Lignes" value={lines} onChange={setLines} options={[["100", "100 lignes"], ["500", "500"], ["2000", "2000"]]} />
@@ -96,6 +105,7 @@ const isSshRepo = (url: string) => /^(ssh:\/\/|[A-Za-z0-9._-]+@[^/:]+:)/.test(ur
 
 /** The app's variables (.env), like node-app-ui: loaded on demand, saved with a restart of the app. */
 function EnvEditor({ h, app }: { h: Host; app: string }) {
+  const base = useBase(h);
   const toast = useToast();
   const [text, setText] = useState<string>();
   const [busy, setBusy] = useState<"load" | "save">();
@@ -103,13 +113,13 @@ function EnvEditor({ h, app }: { h: Host; app: string }) {
   const blocked = writeBlock(h);
   const load = async () => {
     setBusy("load"); setError(undefined);
-    try { setText((await api.get<{ text: string }>(`/api/hosts/${h.id}/node-apps/${app}/env`)).text); } catch (e) { setError((e as Error).message); }
+    try { setText((await api.get<{ text: string }>(`${base}/node-apps/${app}/env`)).text); } catch (e) { setError((e as Error).message); }
     setBusy(undefined);
   };
   const save = async () => {
     setBusy("save");
     try {
-      await api.put(`/api/hosts/${h.id}/node-apps/${app}/env`, { text: text ?? "" });
+      await api.put(`${base}/node-apps/${app}/env`, { text: text ?? "" });
       toast("Variables enregistrées, application redémarrée", "success");
     } catch (e) { toast((e as Error).message, "error"); }
     setBusy(undefined);
@@ -138,6 +148,7 @@ function EnvEditor({ h, app }: { h: Host; app: string }) {
 
 /** Deploy key of an app: replace it by a new one, or import an existing private key. */
 function KeyActions({ h, app, onChanged }: { h: Host; app: string; onChanged?: () => void }) {
+  const base = useBase(h);
   const toast = useToast();
   const [dialog, setDialog] = useState<"new" | "import">();
   const [priv, setPriv] = useState("");
@@ -146,7 +157,7 @@ function KeyActions({ h, app, onChanged }: { h: Host; app: string; onChanged?: (
   const send = async (body: object) => {
     setBusy(true);
     try {
-      await api.post(`/api/hosts/${h.id}/node-apps/${app}/key`, body);
+      await api.post(`${base}/node-apps/${app}/key`, body);
       toast("Deploy key remplacée : ajoutez-la au dépôt", "success");
       setDialog(undefined); setPriv(""); onChanged?.();
     } catch (e) { toast((e as Error).message, "error"); }
@@ -178,6 +189,7 @@ const PRESETS = ["nextjs", "nextjs-standalone", "nextjs-export", "nuxt", "svelte
 
 /** New app, like node-app-ui's form: recorded on the host (clone, detection), then deployed in the background. */
 function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => void; onChanged?: () => void }) {
+  const base = useBase(h);
   const toast = useToast();
   const [f, setF] = useState({ name: "", source: "", branch: "", preset: "", port: "", start: "", migrate: "", env: "", env_wins: true, private_key: "", auto_deploy: true, auto_update: true });
   const [key, setKey] = useState<string>();
@@ -189,14 +201,14 @@ function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => vo
   const ssh = isSshRepo(f.source);
   const showKey = async () => {
     setBusy("key"); setError(undefined);
-    try { setKey((await api.post<{ key: string }>(`/api/hosts/${h.id}/node-apps/${f.name}/key`, {})).key); } catch (e) { setError((e as Error).message); }
+    try { setKey((await api.post<{ key: string }>(`${base}/node-apps/${f.name}/key`, {})).key); } catch (e) { setError((e as Error).message); }
     setBusy(undefined);
   };
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy("create"); setError(undefined);
     try {
-      const r = await api.post<{ warnings: string }>(`/api/hosts/${h.id}/node-apps`, {
+      const r = await api.post<{ warnings: string }>(`${base}/node-apps`, {
         name: f.name, source: f.source, branch: f.branch, preset: f.preset, port: Number(f.port) || 0, start: f.start, migrate: f.migrate,
         env: f.env, env_merge: f.env.trim() ? (f.env_wins ? "saisie" : "code") : "", private_key: f.private_key, auto_deploy: f.auto_deploy, auto_update: f.auto_update,
       });
@@ -281,7 +293,7 @@ function Spec({ label, children }: { label: string; children: React.ReactNode })
 }
 
 function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onClose: () => void; onChanged?: () => void }) {
-  const { run, busy } = useHostAction(() => onChanged?.());
+  const { run, busy } = useHostAction(() => onChanged?.(), useContext(NodeBase));
   const [tab, setTab] = useState<"history" | "logs" | "env">("history");
   const [picked, setPicked] = useState<string>();
   const [remove, setRemove] = useState<{ purge: boolean }>();
@@ -378,14 +390,15 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
 }
 
 /** Node.js apps of one host (node-app of the base-node playbook): state, actions, history and logs. */
-export function NodeAppsPanel({ h, onChanged }: { h: Host; onChanged?: () => void }) {
+export function NodeAppsPanel({ h, onChanged, base }: { h: Host; onChanged?: () => void; base?: string }) {
   const [open, setOpen] = useState<string>();
   const [creating, setCreating] = useState(false);
   const snap = h.node_apps!;
   const blocked = writeBlock(h);
   const current = snap.apps.find((a) => a.name === open);
-  const ui = snap.ui_port > 0 ? `https://${hostAddress(h)}:${snap.ui_port}` : "";
+  const ui = nodeUiUrl(h);
   return (
+    <NodeBase.Provider value={base}>
     <div className="grid gap-4">
       <Card flush title={`${snap.online}/${snap.apps.length} en ligne`} sub={`Relevé ${fmtAgo(snap.collected_at)}${snap.actions ? "" : " · lecture seule"}`}
         actions={<span className="flex flex-wrap gap-2">
@@ -443,5 +456,6 @@ export function NodeAppsPanel({ h, onChanged }: { h: Host; onChanged?: () => voi
       {current && <AppDialog h={h} app={current} onClose={() => setOpen(undefined)} onChanged={onChanged} />}
       {creating && <CreateAppDialog h={h} onClose={() => setCreating(false)} onChanged={onChanged} />}
     </div>
+    </NodeBase.Provider>
   );
 }

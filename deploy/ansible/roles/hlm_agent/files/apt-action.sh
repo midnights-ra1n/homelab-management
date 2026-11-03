@@ -5,14 +5,17 @@
 # "upgrade" (apt-get update + upgrade) and "agentdeb" (install the latest hlm-agent .deb of
 # the GitHub release, after checking its SHA-256). Disable with REMOTE_UPDATES=false.
 # On a Proxmox host, "lxc" re-runs install.sh with LXC=all (agent in the LXC containers, now and
-# in the new ones), with the enrollment token the hub sent in state/lxc-token.
+# in the new ones); each container gets its own token from the hub (lxc-sync.sh).
+# "reinstall" re-runs install.sh with the options of state/reinstall-opts (deployment type of the
+# dashboard: HOST_TYPE, SMART, AUTO_UPDATE, LXC), each checked against a closed list; Docker and
+# Node.js apps are detected again.
 set -u
 REQ=/var/lib/hlm-agent/state/apt-request
 OUT=/var/lib/hlm-agent/apt
 [ -f "$REQ" ] && [ ! -L "$REQ" ] || { rm -f "$REQ"; exit 0; }
 action=$(head -c 16 "$REQ" | tr -dc 'a-z')
 rm -f "$REQ"
-case "$action" in refresh|upgrade|agentdeb|lxc) ;; *) exit 0 ;; esac
+case "$action" in refresh|upgrade|agentdeb|lxc|reinstall) ;; *) exit 0 ;; esac
 
 install -d -o root -g hlm-agent -m 0750 "$OUT"
 status() {
@@ -26,35 +29,59 @@ export DEBIAN_FRONTEND=noninteractive LC_ALL=C
 # The repository comes from the root-owned configuration, never from the agent.
 repo=$(sed -n 's/^UPDATE_REPO=//p' /etc/hlm-agent/agent.env 2>/dev/null | head -n1 | tr -dc 'A-Za-z0-9._/-')
 repo=${repo:-midnights-ra1n/homelab-management}
-if [ "$action" = lxc ]; then
-  TOK=/var/lib/hlm-agent/state/lxc-token
-  # The whole file must be one token: no other file can be read through it (symbolic link).
-  tok=; [ -f "$TOK" ] && [ ! -L "$TOK" ] && tok=$(head -c 101 "$TOK" | grep -Ex 'enr_[A-Za-z0-9_-]{20,96}')
-  rm -f "$TOK"
-  rc=1
-  if ! command -v pct >/dev/null 2>&1; then
-    echo "pct introuvable : cette machine n'est pas un serveur Proxmox" >> "$OUT/log"
-  elif [ -z "$tok" ]; then
-    echo "jeton des conteneurs absent ou invalide" >> "$OUT/log"
-  else
-    L=/usr/local/lib/hlm-agent
+# Re-runs install.sh as it was installed (.deb: the package's own files, nothing downloaded), with "$@".
+run_install() {
+  if [ -f /etc/systemd/system/hlm-agent.service.d/deb.conf ]; then
+    env "$@" INSTALL_METHOD=deb BUNDLE=/usr/share/hlm-agent sh /usr/share/hlm-agent/install.sh >> "$OUT/log" 2>&1
+    return
+  fi
+  tmp=$(mktemp -d); r=1
+  curl -fsSL --proto '=https' -o "$tmp/install.sh" "https://raw.githubusercontent.com/$repo/stable/agent/install.sh" >> "$OUT/log" 2>&1 \
+    && env "$@" REPO="$repo" sh "$tmp/install.sh" >> "$OUT/log" 2>&1 && r=0
+  rm -rf "$tmp"
+  return "$r"
+}
+if [ "$action" = lxc ] || [ "$action" = reinstall ]; then
+  S=/var/lib/hlm-agent/state
+  L=/usr/local/lib/hlm-agent
+  # Each file must be one line of expected words: no other file can be read through it (symbolic link).
+  opts=; [ -f "$S/reinstall-opts" ] && [ ! -L "$S/reinstall-opts" ] && opts=$(head -c 200 "$S/reinstall-opts" | head -n1)
+  rm -f "$S/lxc-token" "$S/reinstall-opts" # lxc-token: left by an older agent
+  rc=1 lxc=0 bad=
+  if [ "$action" = lxc ]; then
+    lxc=1
     # Keep the options as installed: a re-run of install.sh without them would reset them.
-    set -- LXC=all "LXC_TOKEN=$tok" SMART=true
+    set -- SMART=true
     if [ -x "$L/docker-helper.sh" ]; then set -- "$@" DOCKER=true; else set -- "$@" DOCKER=false; fi
     if [ -x "$L/node-app-helper.sh" ]; then set -- "$@" NODE_APPS=true; else set -- "$@" NODE_APPS=false; fi
-    [ -f /etc/systemd/system/hlm-agent-node-action.path ] || set -- "$@" NODE_APPS_ACTIONS=0
     au=$(sed -n 's/^AUTO_UPDATE=//p' /etc/hlm-agent/agent.env | head -n1 | tr -dc 'a-z')
     [ -n "$au" ] && set -- "$@" "AUTO_UPDATE=$au"
-    echo "installation de l'agent dans les conteneurs LXC (le service hlm-agent redémarre)" >> "$OUT/log"
-    if [ -f /etc/systemd/system/hlm-agent.service.d/deb.conf ]; then
-      # Installed by the .deb: the package's own files, nothing downloaded.
-      env "$@" INSTALL_METHOD=deb BUNDLE=/usr/share/hlm-agent sh /usr/share/hlm-agent/install.sh >> "$OUT/log" 2>&1 && rc=0
+  else
+    set -- ; set -f # words only, never file names
+    for w in $opts; do
+      case "$w" in
+        HOST_TYPE=auto | HOST_TYPE=proxmox | HOST_TYPE=physical | HOST_TYPE=vm | HOST_TYPE=lxc | HOST_TYPE=vps \
+        | SMART=true | SMART=false | AUTO_UPDATE=true | AUTO_UPDATE=false | LXC=none) set -- "$@" "$w" ;;
+        LXC=all) lxc=1 ;;
+        LXC=keep) ;;
+        *) bad=$w ;;
+      esac
+    done
+  fi
+  # A host made read-only for its Node.js apps stays so; otherwise they are detected again.
+  [ -x "$L/node-app-helper.sh" ] && [ ! -f /etc/systemd/system/hlm-agent-node-action.path ] && set -- "$@" NODE_APPS_ACTIONS=0
+  if [ -n "$bad" ] || { [ "$action" = reinstall ] && [ -z "$opts" ]; }; then
+    echo "options refusées : ${bad:-aucune}" >> "$OUT/log"
+  elif [ "$lxc" = 1 ] && ! command -v pct >/dev/null 2>&1; then
+    echo "pct introuvable : cette machine n'est pas un serveur Proxmox" >> "$OUT/log"
+  else
+    [ "$lxc" = 1 ] && set -- "$@" LXC=all
+    if [ "$action" = lxc ]; then
+      echo "installation de l'agent dans les conteneurs LXC (le service hlm-agent redémarre)" >> "$OUT/log"
     else
-      tmp=$(mktemp -d)
-      curl -fsSL --proto '=https' -o "$tmp/install.sh" "https://raw.githubusercontent.com/$repo/stable/agent/install.sh" >> "$OUT/log" 2>&1 \
-        && env "$@" REPO="$repo" sh "$tmp/install.sh" >> "$OUT/log" 2>&1 && rc=0
-      rm -rf "$tmp"
+      echo "réinstallation de l'agent ($opts), le service hlm-agent redémarre" >> "$OUT/log"
     fi
+    run_install "$@" && rc=0
   fi
   if [ "$rc" -eq 0 ]; then status done 0; else status failed "$rc"; fi
   exit 0

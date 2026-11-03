@@ -21,7 +21,7 @@ export function MassDeployDialog({ open, onClose }: { open: boolean; onClose: ()
   const [method, setMethod] = useState<"curl" | "ansible">("ansible");
   const [kind, setKind] = useState<Kind>("vm");
   const [withLxc, setWithLxc] = useState(true);
-  const smart = KINDS.find((k) => k.id === kind)!.smart;
+  const { smart, hostType } = KINDS.find((k) => k.id === kind)!;
   const [error, setError] = useState<string>();
   const load = () => api.get<EnrollToken[]>("/api/enroll-tokens").then(setTokens, () => {});
   useEffect(() => { if (open) load(); }, [open]);
@@ -81,8 +81,7 @@ export function MassDeployDialog({ open, onClose }: { open: boolean; onClose: ()
               <>
                 <p className="text-sm text-body">La même ligne fonctionne sur toutes les machines :</p>
                 {kind === "proxmox" && <Switch label="Installer aussi dans les conteneurs LXC Debian démarrés, puis dans les nouveaux" checked={withLxc} onChange={setWithLxc} />}
-                {kind === "proxmox" && withLxc && expiry !== "never" && <Alert kind="info" title="Jeton à durée limitée">Les conteneurs créés après son expiration ne seront plus équipés. Pour eux, créez un jeton valable « Jamais », ou utilisez Passer en serveur Proxmox sur la fiche de l'hôte.</Alert>}
-                <CodeBlock text={installCommand(install, { smart, autoUpdate: true, lxcToken: kind === "proxmox" && withLxc ? install.token : undefined })} />
+                <CodeBlock text={installCommand(install, { smart, autoUpdate: true, hostType, lxc: kind === "proxmox" && withLxc })} />
               </>
             )}
           </>

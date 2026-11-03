@@ -128,3 +128,59 @@ func TestDockerSnapshotAndContainerUpdate(t *testing.T) {
 	}
 	t.Fatal("result not stored")
 }
+
+// A Proxmox node gets one token per new container, never a shared one.
+func TestLXCTokenPerContainer(t *testing.T) {
+	s, ts := newTestServer(t)
+	cookie := setupAdmin(t, s, ts)
+	_, created := do(t, ts, "POST", "/api/hosts", cookie, map[string]string{"name": "pve"})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dial := func(tok string) (*websocket.Conn, error) {
+		nonce := make([]byte, 32)
+		rand.Read(nonce)
+		c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(ts.URL, "http")+"/api/agent/ws", &websocket.DialOptions{HTTPHeader: http.Header{
+			"Authorization": {"Bearer " + tok}, "X-Agent-Nonce": {base64.StdEncoding.EncodeToString(nonce)}}})
+		if err == nil {
+			var hello map[string]any
+			wsjson.Read(ctx, c, &hello)
+		}
+		return c, err
+	}
+	c, err := dial(created["install"].(map[string]any)["token"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.CloseNow()
+	wsjson.Write(ctx, c, map[string]any{"type": "pve", "pve": map[string]any{"guests": []any{}, "cts": []int{105}}})
+	wsjson.Write(ctx, c, map[string]any{"type": "lxc_token", "ct": 999, "name": "rogue"}) // not in the report: no answer
+	ask := func() string {
+		wsjson.Write(ctx, c, map[string]any{"type": "lxc_token", "ct": 105, "name": "web.lan"})
+		var got map[string]any
+		if err := wsjson.Read(ctx, c, &got); err != nil || got["type"] != "lxc_token" || got["ct"] != float64(105) {
+			t.Fatalf("lxc_token answer: %v %v", got, err)
+		}
+		return got["token"].(string)
+	}
+	first, second := ask(), ask()
+	var n, parent, vmid int
+	s.db.QueryRow(`SELECT COUNT(*), MAX(parent_id), MAX(vmid) FROM hosts WHERE name='web'`).Scan(&n, &parent, &vmid)
+	if first == second || n != 1 || parent != 1 || vmid != 105 {
+		t.Fatalf("one host under the node, token replaced: n=%d parent=%d vmid=%d", n, parent, vmid)
+	}
+	if _, err := dial(first); err == nil {
+		t.Fatal("the replaced token must be refused")
+	}
+	ct, err := dial(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ct.CloseNow()
+	wsjson.Write(ctx, c, map[string]any{"type": "lxc_token", "ct": 105, "name": "web"}) // connected: refused
+	var none map[string]any
+	short, stop := context.WithTimeout(ctx, 300*time.Millisecond)
+	defer stop()
+	if wsjson.Read(short, c, &none) == nil {
+		t.Fatalf("a connected container must keep its token, got %v", none)
+	}
+}

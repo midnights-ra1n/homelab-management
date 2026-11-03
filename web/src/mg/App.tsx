@@ -38,6 +38,7 @@ const ROUTES: [string, Page, string][] = [
   ["/proxmox/:id/:node/:type/:vmid", page(() => import("./app/proxmox/[id]/[node]/[type]/[vmid]/page")), "Invité Proxmox"],
   ["/webmin", page(() => import("./app/webmin/page")), "Webmin"],
   ["/monitoring", page(() => import("./app/monitoring/page")), "Monitoring"],
+  ["/nodejs", page(() => import("./app/nodejs/page")), "Applications Node.js"],
   ["/energie", Energy, "Énergie"],
   ["/journaux", Journal, "Journaux"],
   ["/parametres", page(() => import("./app/parametres/page")), "Paramètres"],

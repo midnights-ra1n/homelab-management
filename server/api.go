@@ -67,6 +67,14 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/hosts/{id}", t("hosts:read", s.handleGetHost))
 	mux.HandleFunc("DELETE /api/v1/hosts/{id}", t("hosts:write", s.handleDeleteHost))
 	mux.HandleFunc("POST /api/v1/hosts/{id}/agent-update", t("hosts:write", s.apiUpdateAgent))
+	// Host actions and Node.js apps, for the management role's relay (mg_nodeapps.go).
+	mux.HandleFunc("POST /api/v1/hosts/{id}/action", t("hosts:write", s.handleHostAction))
+	mux.HandleFunc("POST /api/v1/hosts/{id}/node-apps", t("hosts:write", s.handleNodeCreate))
+	mux.HandleFunc("GET /api/v1/hosts/{id}/node-apps/{app}/logs", t("hosts:read", s.handleNodeLogs))
+	mux.HandleFunc("GET /api/v1/hosts/{id}/node-apps/{app}/operations/{op}", t("hosts:read", s.handleNodeOplog))
+	mux.HandleFunc("GET /api/v1/hosts/{id}/node-apps/{app}/env", t("hosts:write", s.handleNodeEnv)) // secrets
+	mux.HandleFunc("PUT /api/v1/hosts/{id}/node-apps/{app}/env", t("hosts:write", s.handleNodeSetEnv))
+	mux.HandleFunc("POST /api/v1/hosts/{id}/node-apps/{app}/key", t("hosts:write", s.handleNodeKey))
 	mux.HandleFunc("GET /api/v1/hosts/{id}/metrics", t("metrics:read", s.handleHostMetrics))
 	mux.HandleFunc("PUT /api/v1/hosts/{id}/maintenance", t("maintenance:write", s.apiHostMaintenance))
 	mux.HandleFunc("GET /api/v1/monitors", t("monitors:read", s.handleListMonitors))

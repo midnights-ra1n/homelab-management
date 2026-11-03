@@ -4,7 +4,8 @@
 //! everyone) gives the guest MAC addresses learned on that port. The hub matches them with the
 //! MAC addresses the guests' own agents report, so nothing has to be installed in the guests.
 //! The root helper hlm-agent-lxc (install.sh LXC=all) adds every CT ID of the cluster, which
-//! lets the hub drop the hosts of deleted containers.
+//! lets the hub drop the hosts of deleted containers, and asks through this agent for the token
+//! of each new container (want/<CT ID>, holding its hostname): every container gets its own.
 
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -12,6 +13,7 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 const CTS_FILE: &str = "/var/lib/hlm-agent/lxc/cts";
+const WANT_DIR: &str = "/var/lib/hlm-agent/lxc/want";
 
 // Wire format shared with server/guests.go (pveReport). Keep both in sync.
 #[derive(Serialize, PartialEq)]
@@ -97,6 +99,25 @@ pub fn read() -> Option<Report> {
     })
 }
 
+/// New containers waiting for their token: (CT ID, hostname written by the root helper).
+pub fn wants() -> Vec<(u32, String)> {
+    let Ok(dir) = std::fs::read_dir(WANT_DIR) else { return Vec::new() };
+    dir.flatten()
+        .filter_map(|e| {
+            let ct = e.file_name().to_str()?.parse().ok()?;
+            let name: String = std::fs::read_to_string(e.path()).ok()?.trim().chars().take(64).collect();
+            Some((ct, name))
+        })
+        .take(50)
+        .collect()
+}
+
+/// A host token from the hub (randomToken(32): 43 base64url characters), checked before it
+/// reaches the root helper, which checks it again.
+pub fn valid_token(t: &str) -> bool {
+    t.len() == 43 && t.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,6 +129,13 @@ mod tests {
         assert_eq!(guest_port("vethabc123"), None); // Docker
         assert_eq!(guest_port("veth105i"), None);
         assert_eq!(guest_port("enp3s0"), None);
+    }
+
+    #[test]
+    fn checks_container_tokens() {
+        assert!(valid_token("abcdefghijklmnopqrstuvwxyzABCDEFGHIJ0123-_6"));
+        assert!(!valid_token("enr_abcdefghijklmnopqrstuvwxyzABCDEFGHIJ01"));
+        assert!(!valid_token("abcdefghijklmnopqrstuvwxyzABCDEFGHIJ0123\n6"));
     }
 
     #[test]

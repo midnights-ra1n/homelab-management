@@ -6,6 +6,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Network,
+  Package,
   Plug,
   Rocket,
   Server,
@@ -30,6 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/proxmox", label: "Proxmox", short: "Proxmox", icon: Server, description: "Nœuds, invités et migrations" },
   { href: "/webmin", label: "Webmin", short: "Webmin", icon: SquareTerminal, description: "Instances et état système via SSH" },
   { href: "/monitoring", label: "Monitoring", short: "Monitoring", icon: Activity },
+  { href: "/nodejs", label: "Node.js", short: "Node.js", icon: Package, description: "Applications node-app des machines suivies" },
   { href: "/energie", label: "Énergie", short: "Énergie", icon: Plug, description: "Consommation des prises Meross, via le monitoring" },
   { href: "/journaux", label: "Journaux", short: "Journaux", icon: ScrollText, description: "Tout ce qui a été fait, sur 90 jours" },
 ];
@@ -42,7 +44,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { accent: "lavande", items: ["/", "/applications", "/monitoring", "/energie"].map(byHref) },
   { label: "Infrastructure", accent: "ciel", items: ["/inventaire", "/stock", "/reseau", "/carte"].map(byHref) },
   { label: "Suivi", accent: "rose", items: ["/deploiements", "/taches", "/journaux"].map(byHref) },
-  { label: "Serveurs", accent: "mauve", items: ["/proxmox", "/webmin"].map(byHref) },
+  { label: "Serveurs", accent: "mauve", items: ["/proxmox", "/webmin", "/nodejs"].map(byHref) },
 ];
 
 /** Onglets principaux de la barre mobile (le reste est dans « Plus »). */

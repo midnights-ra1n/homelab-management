@@ -201,7 +201,7 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // The first check waits a minute so the agent itself starts instantly and cheaply.
     let mut upd = tokio::time::interval_at(tokio::time::Instant::now() + Duration::from_secs(60), Duration::from_secs(6 * 3600));
     // Dashboard action still running in a root helper: (action, requested at, helper output).
-    let mut apt_pending: Option<(String, u64, (&str, &str))> = actions::lxc_running().then(|| ("enable_lxc".to_string(), actions::now(), actions::APT_OUTPUT));
+    let mut apt_pending: Option<(String, u64, (&str, &str))> = actions::install_running().map(|a| (a.to_string(), actions::now(), actions::APT_OUTPUT));
     let mut apt_poll = tokio::time::interval(Duration::from_secs(5));
     // Docker: the root helper refreshes the snapshot every minute; image updates are checked
     // against the registries two minutes after start, then every 6 hours.
@@ -228,6 +228,8 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // Proxmox node: its guests, sent when they change (checked every minute).
     let mut pve_tick = tokio::time::interval(Duration::from_secs(60));
     let mut pve_sent: Option<pve::Report> = None;
+    // New LXC containers: token asked at most every 10 minutes each (the root helper may be using one).
+    let mut lxc_asked: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
     live_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         tokio::select! {
@@ -257,6 +259,18 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         return Failure::Retry(e.to_string());
                     }
                     pve_sent = Some(rep);
+                }
+                let now = actions::now();
+                lxc_asked.retain(|_, t| now < *t + 600);
+                for (ct, name) in pve::wants() {
+                    if lxc_asked.contains_key(&ct) {
+                        continue;
+                    }
+                    lxc_asked.insert(ct, now);
+                    let m = serde_json::json!({"type": "lxc_token", "ct": ct, "name": name});
+                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
+                        return Failure::Retry(e.to_string());
+                    }
                 }
             }
             _ = upd.tick() => {
@@ -379,6 +393,18 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         }
                         continue;
                     }
+                    if m["type"] == "lxc_token" {
+                        let tok = m["token"].as_str().unwrap_or("");
+                        match m["ct"].as_u64() {
+                            Some(ct) if pve::valid_token(tok) => {
+                                if let Err(e) = actions::drop_request(&format!("lxc-token-{ct}"), tok) {
+                                    eprintln!("hlm-agent: lxc token: {e}");
+                                }
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
                     if m["type"] != "action" { continue; }
                     let action = m["action"].as_str().unwrap_or("").to_string();
                     let (state, message) = match action.as_str() {
@@ -389,7 +415,11 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                                 Err(e) => ("failed", e),
                             }
                         }
-                        "enable_lxc" => match actions::request_lxc(m["target"].as_str().unwrap_or("")) {
+                        "enable_lxc" => match actions::request_lxc() {
+                            Ok(()) => { apt_pending = Some((action.clone(), actions::now(), actions::APT_OUTPUT)); ("running", String::new()) }
+                            Err(e) => ("failed", e),
+                        },
+                        "reconfigure_agent" => match actions::request_reinstall(m["target"].as_str().unwrap_or("")) {
                             Ok(()) => { apt_pending = Some((action.clone(), actions::now(), actions::APT_OUTPUT)); ("running", String::new()) }
                             Err(e) => ("failed", e),
                         },

@@ -143,6 +143,9 @@ type agentMsg struct {
 	Action  string `json:"action,omitempty"`
 	State   string `json:"state,omitempty"`
 	Message string `json:"message,omitempty"`
+	// lxc_token: a Proxmox node asks for the token of one of its new containers (guests.go)
+	CT   int    `json:"ct,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 type agentConn struct {
@@ -816,6 +819,12 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 			}
 			s.pruneCTs(id, hostName, m.Pve.CTs)
 			events.publish("hosts")
+		case m.Type == "lxc_token" && m.CT > 0:
+			if tok, err := s.lxcToken(id, hostName, m.CT, m.Name); err != nil {
+				slog.Warn("lxc token refused", "host_id", id, "ct", m.CT, "err", err)
+			} else if err := s.agentSend(id, map[string]any{"type": "lxc_token", "ct": m.CT, "token": tok}); err != nil {
+				slog.Error("send lxc token", "err", err)
+			}
 		case m.Type == "action_result" && hostActions[m.Action] && (m.State == "running" || m.State == "done" || m.State == "failed"):
 			s.setHostAction(id, m.Action, m.State, m.Message)
 			events.publish("hosts")

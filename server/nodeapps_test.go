@@ -76,6 +76,11 @@ func TestNodeCreateAndHostType(t *testing.T) {
 			t.Fatalf("%+v: got %s", c, got)
 		}
 	}
+	if !reconfigureRe.MatchString("HOST_TYPE=vm SMART=false AUTO_UPDATE=true LXC=keep") ||
+		reconfigureRe.MatchString("HOST_TYPE=vm SMART=false AUTO_UPDATE=true LXC=keep TOKEN=enr_x") ||
+		reconfigureRe.MatchString("HOST_TYPE=vm REPO=x SMART=false AUTO_UPDATE=true LXC=keep") {
+		t.Fatal("reconfigure options")
+	}
 	if assetKind("vps", "kvm") != "vm" || assetKind("proxmox", "") != "physical" || assetKind("", "lxc") != "lxc" {
 		t.Fatal("inventory kind")
 	}

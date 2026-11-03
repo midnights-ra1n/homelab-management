@@ -207,7 +207,55 @@ func (s *Server) mgProxmox(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
-	writeJSON(w, 200, collect(ctx, list, s.proxmoxOverview))
+	writeJSON(w, 200, dedupeProxmox(collect(ctx, list, s.proxmoxOverview)))
+}
+
+// dedupeProxmox: each node of a cluster answers for the whole cluster (/cluster/resources), so
+// one integration per node shows every node and guest once per integration. A node (and its
+// guests and storages) is kept in the first integration that sees it. A node is told apart by
+// its name and size, so two standalone servers both named "pve" stay two.
+func dedupeProxmox(list []source[map[string]any]) []source[map[string]any] {
+	key := func(n pveResource) string {
+		name, _ := n["node"].(string)
+		return fmt.Sprintf("%s|%v|%v", strings.ToLower(name), n["maxcpu"], n["maxmem"])
+	}
+	seen := map[string]bool{}
+	for i := range list {
+		d := list[i].Data
+		nodes, _ := d["nodes"].([]pveResource)
+		if len(nodes) == 0 {
+			continue
+		}
+		var keep []pveResource
+		dup := map[string]bool{} // node names shown by an earlier integration
+		for _, n := range nodes {
+			if seen[key(n)] {
+				name, _ := n["node"].(string)
+				dup[name] = true
+			} else {
+				keep = append(keep, n)
+			}
+		}
+		for _, n := range keep {
+			seen[key(n)] = true
+		}
+		if len(dup) == 0 {
+			continue
+		}
+		onKept := func(rs []pveResource) []pveResource {
+			out := []pveResource{}
+			for _, r := range rs {
+				if name, _ := r["node"].(string); !dup[name] {
+					out = append(out, r)
+				}
+			}
+			return out
+		}
+		guests, _ := d["guests"].([]pveResource)
+		storages, _ := d["storages"].([]pveResource)
+		d["nodes"], d["guests"], d["storages"] = nonNil(keep), onKept(guests), onKept(storages)
+	}
+	return list
 }
 
 // pveTarget resolves the integration and validates every name that ends up in the API path.

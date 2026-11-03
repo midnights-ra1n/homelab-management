@@ -19,6 +19,7 @@ export interface HostInfo {
   virtualization?: string; manufacturer?: string; model?: string; ips?: { iface: string; address: string; prefix: number }[];
   pve_node?: string; pve_ctid?: number; // Proxmox LXC container: node hostname and CT ID
   host_type?: HostType; // declared at install (Ansible hlm_host_type)
+  install?: "deb" | "script";
 }
 /** Deployment type, see hostTypes in server/hosts.go. */
 export type HostType = "proxmox" | "physical" | "vm" | "lxc" | "vps";
@@ -69,7 +70,7 @@ export interface NodeApp {
 export interface NodeKey { id: string; name: string; kind: "shared" | "app" | string; type: string; comment: string; fingerprint: string; created: number }
 export interface NodeSnapshot { apps: NodeApp[]; ssh_keys: NodeKey[]; ui_port: number; actions: boolean; error?: string; collected_at: number; online: number; failing: number }
 export type NodeAction = "node_deploy" | "node_pull" | "node_update" | "node_restart" | "node_stop" | "node_remove" | "node_purge";
-export type HostActionName = "check_updates" | "apply_updates" | "update_agent" | "update_container" | "enable_lxc" | NodeAction;
+export type HostActionName = "check_updates" | "apply_updates" | "update_agent" | "update_container" | "enable_lxc" | "reconfigure_agent" | NodeAction;
 export interface HostAction { action: HostActionName; target?: string; state: "pending" | "running" | "done" | "failed"; message: string; at: number }
 export const actionBusy = (h: Host) => !!h.action && (h.action.state === "pending" || h.action.state === "running") && Date.now() / 1000 - h.action.at < 7200;
 export interface Install { hub_url: string; key: string; token: string; command: string }

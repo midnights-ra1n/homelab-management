@@ -363,6 +363,7 @@ func (s *Server) testIntegration(ctx context.Context, i *integration) (string, e
 type integrationError struct {
 	msg    string
 	status int
+	body   []byte // start of the error answer, relayed as is by mgNodeProxy
 }
 
 func (e *integrationError) Error() string { return e.msg }
@@ -411,7 +412,8 @@ func httpJSON(ctx context.Context, method, u string, headers map[string]string, 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		text, _ := io.ReadAll(io.LimitReader(resp.Body, 160))
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		text := body[:min(len(body), 160)]
 		hint := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		switch resp.StatusCode {
 		case 401:
@@ -422,7 +424,7 @@ func httpJSON(ctx context.Context, method, u string, headers map[string]string, 
 		if t := strings.TrimSpace(string(text)); t != "" {
 			hint += " — " + t
 		}
-		return &integrationError{msg: hint, status: resp.StatusCode}
+		return &integrationError{msg: hint, status: resp.StatusCode, body: body}
 	}
 	if out == nil || resp.StatusCode == 204 {
 		return nil

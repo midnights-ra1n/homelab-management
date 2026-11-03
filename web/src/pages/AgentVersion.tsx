@@ -3,18 +3,19 @@ import { RefreshCw } from "../shared/icons";
 import { api, actionBusy, type Host, type HostActionName } from "../api";
 import { Badge, Button, useToast } from "../ui";
 
-/** Sends an action to a host's agent; returns the updated host. */
-export function useHostAction(onDone?: (h: Host) => void) {
+/** Sends an action to a host's agent; returns the updated host. base: the management's relay. */
+export function useHostAction(onDone?: (h: Host) => void, base?: string) {
   const toast = useToast();
   const [busy, setBusy] = useState<string>();
   const run = async (h: Host, action: HostActionName, target?: string) => {
     setBusy(`${h.id}:${action}${target ? ":" + target : ""}`);
     try {
-      const updated = await api.post<Host>(`/api/hosts/${h.id}/action`, { action, target });
+      const updated = await api.post<Host>(`${base ?? `/api/hosts/${h.id}`}/action`, { action, target });
       onDone?.(updated);
       toast(action === "update_agent" ? `Mise à jour de l'agent demandée sur ${h.name}`
         : action === "apply_updates" ? `Installation des mises à jour lancée sur ${h.name}`
         : action === "enable_lxc" ? `Installation dans les conteneurs LXC lancée sur ${h.name}`
+        : action === "reconfigure_agent" ? `Réinstallation de l'agent lancée sur ${h.name}`
         : action === "update_container" ? `Mise à jour de ${target} lancée sur ${h.name}`
         : action.startsWith("node_") ? `${target} : demande envoyée à ${h.name}`
         : `Vérification lancée sur ${h.name}`);

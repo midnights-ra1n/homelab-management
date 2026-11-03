@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense, use } from "react";
+import { Suspense, use, useEffect } from "react";
 import { AssetHardware } from "@/features/hardware/hardware-views";
 import { Copy, ExternalLink, Pencil, Plus, SquareTerminal, Star } from "../../../../shared/icons";
 import { ancestorsOf, assetDetail, assetMonitoring, assetOptions, childrenOf, getAsset, type Asset } from "@/lib/data/assets";
@@ -37,6 +37,9 @@ import { IpDialog } from "@/features/network/dialogs";
 import { resourceSummary } from "@/features/inventory/summary";
 import { cn, formatDate, formatDateTime, formatGb, formatUptime, timeAgo } from "@/lib/utils";
 import { getT } from "@/i18n/server";
+import { invalidate } from "@/lib/resource";
+import { actionBusy, type Host } from "../../../../api";
+import { NodeAppsPanel } from "../../../../pages/NodeApps";
 
 export default function AssetPage({ params }: PageProps<"/[lang]/inventaire/[id]">) {
   return (
@@ -231,6 +234,11 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
               </CardBody>
             </Card>
           )}
+
+          {/* Applications Node.js du monitoring */}
+          <Suspense fallback={null}>
+            <NodeApps asset={asset} />
+          </Suspense>
 
           {/* Hébergés */}
           {(canHost || children.length > 0) && (
@@ -511,6 +519,31 @@ function LiveMonitoring({ asset }: { asset: Asset }) {
         )}
       </CardBody>
     </Card>
+  );
+}
+
+/** Node.js apps of the linked monitoring host, managed here through the relay (mg_nodeapps.go). */
+function NodeApps({ asset }: { asset: Asset }) {
+  const tr = use(getT());
+  const linked = use(assetMonitoring(asset.id));
+  const h = linked.host as unknown as Host | undefined;
+  const busy = !!h && actionBusy(h);
+  // While an action runs, follow it as the monitoring's host page does.
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(invalidate, 5000);
+    return () => clearInterval(t);
+  }, [busy]);
+  const shown = !!h?.node_apps;
+  useEffect(() => {
+    if (shown && location.hash === "#node") document.getElementById("node")?.scrollIntoView({ block: "start" });
+  }, [shown]);
+  if (!shown) return null;
+  return (
+    <section id="node" aria-labelledby="node-title" className="grid gap-3">
+      <h2 id="node-title" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Applications Node.js")}</h2>
+      <NodeAppsPanel h={h} base={`/api/mg/assets/${asset.id}/node`} onChanged={invalidate} />
+    </section>
   );
 }
 

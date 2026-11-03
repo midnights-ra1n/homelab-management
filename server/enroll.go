@@ -39,18 +39,8 @@ func (s *Server) enrollHost(tok, hostname string) (id int64, name, hostToken str
 	if err != nil || (exp.Valid && time.Now().Unix() >= exp.Int64) {
 		return 0, "", "", false, err
 	}
-	name = cleanHostname(hostname)
-	// Keep names unique so enrolled machines stay distinguishable: pve, pve-2, pve-3...
-	base := name
-	for i := 2; ; i++ {
-		var n int
-		if err = s.db.QueryRow(`SELECT COUNT(*) FROM hosts WHERE name=?`, name).Scan(&n); err != nil {
-			return
-		}
-		if n == 0 {
-			break
-		}
-		name = base + "-" + strconv.Itoa(i)
+	if name, err = s.uniqueHostName(cleanHostname(hostname)); err != nil {
+		return
 	}
 	hostToken = randomToken(32)
 	tx, err := s.db.Begin()
@@ -67,6 +57,18 @@ func (s *Server) enrollHost(tok, hostname string) (id int64, name, hostToken str
 		return
 	}
 	return id, name, hostToken, true, tx.Commit()
+}
+
+// uniqueHostName keeps names unique so enrolled machines stay distinguishable: pve, pve-2, pve-3...
+func (s *Server) uniqueHostName(base string) (string, error) {
+	name := base
+	for i := 2; ; i++ {
+		var n int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM hosts WHERE name=?`, name).Scan(&n); err != nil || n == 0 {
+			return name, err
+		}
+		name = base + "-" + strconv.Itoa(i)
+	}
 }
 
 // cleanHostname keeps a readable, bounded name from the agent-supplied hostname.

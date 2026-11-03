@@ -47,7 +47,7 @@ Mise à jour : le bouton *Mettre à jour l'agent* passe par l'assistant root `ap
 
 ## Plusieurs machines : le jeton commun
 
-*Hôtes → Déploiement en masse* crée un jeton commun (`enr_…`), valable 24 heures, 7 jours, 30 jours ou sans limite. On y choisit ensuite le **type de machine**, comme dans l'assistant : il règle SMART (`hlm_smart` pour Ansible) et, pour un *Serveur Proxmox*, propose d'installer aussi l'agent dans les conteneurs LXC (méthode Commande ; prévoir un jeton sans expiration pour les conteneurs créés plus tard).
+*Hôtes → Déploiement en masse* crée un jeton commun (`enr_…`), valable 24 heures, 7 jours, 30 jours ou sans limite. On y choisit ensuite le **type de machine**, comme dans l'assistant : il règle SMART (`hlm_smart` pour Ansible) et, pour un *Serveur Proxmox*, propose d'installer aussi l'agent dans les conteneurs LXC (méthode Commande). Les conteneurs n'utilisent pas ce jeton : chacun reçoit le sien.
 
 - **La même commande et la même clé** sur toutes les machines.
 - À sa première connexion, chaque agent s'inscrit sous **son nom de machine** (`pve-01`, `nas`…). En cas de doublon, un suffixe est ajouté (`pve-01-2`).
@@ -57,12 +57,12 @@ Mise à jour : le bouton *Mettre à jour l'agent* passe par l'assistant root `ap
 
 ## Proxmox et conteneurs LXC
 
-Dans l'assistant, le type *Serveur Proxmox* propose **Installer aussi dans les conteneurs LXC Debian démarrés**, activé par défaut. La commande contient alors `LXC=all` et un jeton commun sans expiration (`LXC_TOKEN`), gardé sur le Proxmox dans `/etc/hlm-agent/lxc.env` (lisible par root seulement) pour équiper les futurs conteneurs. Le script :
+Dans l'assistant, le type *Serveur Proxmox* propose **Installer aussi dans les conteneurs LXC Debian démarrés**, activé par défaut. La commande contient alors `LXC=all`. **Aucun jeton commun** : chaque conteneur reçoit du hub **son propre jeton**. Le script root `lxc-sync.sh` dépose une demande (`/var/lib/hlm-agent/lxc/want/<CT>`) ; l'agent du Proxmox la transmet au hub, qui crée l'hôte du conteneur sous le Proxmox (ou reprend le sien) et répond avec son jeton ; le passage suivant installe l'agent avec ce jeton. Le hub n'en donne que pour un conteneur présent dans le dernier relevé du Proxmox, et jamais pour un conteneur dont l'agent est connecté. Supprimer un jeton commun n'a donc aucun effet sur les conteneurs. Le script :
 
 1. installe l'agent sur le Proxmox lui-même ;
 2. pour chaque conteneur démarré (`pct list`), vérifie qu'il s'agit d'une Debian avec systemd. Les autres conteneurs sont ignorés ;
 3. copie le binaire, déjà vérifié, et les fichiers d'installation dans le conteneur avec `pct push`. **Aucun accès Internet n'est nécessaire dans les conteneurs**, seulement l'accès au hub ;
-4. lance l'installation dans le conteneur, sans SMART. Chaque conteneur s'inscrit sous son nom avec le jeton commun.
+4. lance l'installation dans le conteneur, sans SMART, avec son jeton. Un conteneur sans agent attend son jeton : il est équipé au passage suivant du timer (2 à 4 minutes).
 5. écrit dans la configuration du conteneur son ID (`PVE_CTID`) et le nom du Proxmox (`PVE_NODE`). Dans **Hôtes**, le Proxmox se déplie alors sur ses conteneurs, triés par ID ; sur la **Carte**, ils sont placés sous lui. Pour les conteneurs déjà équipés, relancez la même ligne sur le Proxmox : ils ne sont pas réinscrits, seule leur configuration est complétée.
 
 Il affiche ensuite un bilan (`CT 101 (nextcloud): installed`…), puis active `hlm-agent-lxc.timer`. Toutes les 2 minutes, ce timer (script root `lxc-sync.sh`) :
@@ -70,9 +70,9 @@ Il affiche ensuite un bilan (`CT 101 (nextcloud): installed`…), puis active `h
 - installe l'agent dans chaque **nouveau** conteneur Debian démarré qui ne l'a pas encore (un échec est retenté au bout d'une heure). Un conteneur avec l'étiquette Proxmox `no-hlm` est laissé de côté ;
 - liste tous les conteneurs du cluster. Quand un conteneur est **supprimé** de Proxmox, le hub supprime son hôte (et l'inscrit au journal). Un conteneur arrêté ou migré vers un autre nœud n'est pas concerné.
 
-**Hôte déjà installé** (comme machine virtuelle, avec Ansible, ou avant ce timer) : sur sa fiche, **Passer en serveur Proxmox**, sans rien relancer à la main. Le hub crée un jeton commun sans expiration (« LXC de <hôte> ») et l'envoie à l'agent, qui le dépose pour l'assistant root `apt-action.sh` (action `lxc`). Celui-ci relance `install.sh` avec `LXC=all` : l'agent du Proxmox redémarre quelques secondes en gardant sa configuration et ses options (Docker, Node.js, mise à jour automatique), SMART est activé, puis l'agent s'installe dans les conteneurs Debian démarrés, sans les arrêter. Il faut `REMOTE_UPDATES` activé (par défaut). Le bouton devient **Rééquiper les conteneurs** une fois le timer actif (utile si le jeton a été révoqué). Le bilan s'affiche sous le bouton.
+**Hôte déjà installé** (comme machine virtuelle, avec Ansible, ou avant ce timer) : sur sa fiche, **Passer en serveur Proxmox**, sans rien relancer à la main. L'agent demande à l'assistant root `apt-action.sh` (action `lxc`) de relancer `install.sh` avec `LXC=all` : l'agent du Proxmox redémarre quelques secondes en gardant sa configuration et ses options (Docker, Node.js, mise à jour automatique), SMART est activé, puis l'agent s'installe dans les conteneurs Debian démarrés, sans les arrêter. Il faut `REMOTE_UPDATES` activé (par défaut). Le bouton devient **Rééquiper les conteneurs** une fois le timer actif. Le bilan s'affiche sous le bouton.
 
-À la main : relancez une fois la ligne avec `LXC=all` et un jeton `LXC_TOKEN=enr_…` valide (*Hôtes → Déploiement en masse*). `LXC=none` arrête le timer ; une relance sans `LXC` garde le choix précédent. Les machines virtuelles (QEMU) ne sont pas concernées ; installez l'agent dans une VM comme sur n'importe quelle machine.
+À la main : relancez une fois la ligne avec `LXC=all`, sans jeton. Une ancienne valeur `LXC_TOKEN` est ignorée ; les jetons communs « LXC de … » peuvent être supprimés. `LXC=none` arrête le timer ; une relance sans `LXC` garde le choix précédent. Les machines virtuelles (QEMU) ne sont pas concernées ; installez l'agent dans une VM comme sur n'importe quelle machine.
 
 ### Hiérarchie Proxmox → VM et conteneurs
 
@@ -107,6 +107,13 @@ Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gèr
 - **Variables, nouvelle app et deploy keys**, comme dans `node-app-ui` : onglet *Variables* de l'app (lu à la demande, enregistré avec redémarrage), bouton *Nouvelle app* (dépôt git uniquement : un chemin sur le serveur est refusé ; la deploy key s'affiche pour un dépôt SSH privé, ou une clé existante s'importe), *Nouvelle clé* et *Importer une clé*. Ces secrets transitent par la connexion chiffrée de l'agent et sont remis à l'utilisateur qui les demande : le hub ne les enregistre pas. Le helper root vérifie à nouveau chaque demande, et les refuse sur un hôte en lecture seule (`NODE_APPS_ACTIONS=0`).
 - Le bouton **Ouvrir Node.js UI** ouvre l'interface `node-app-ui` de l'hôte (tableau de bord système, même historique).
 
+## Type de déploiement
+
+Sur la fiche de l'hôte, ligne *Type de déploiement*, bouton *Changer* : Proxmox, serveur physique, machine virtuelle, conteneur LXC ou VPS. Chaque type propose ses options par défaut, comme l'assistant *Ajouter un hôte* : SMART pour un Proxmox ou un serveur physique, conteneurs LXC pour un Proxmox, mise à jour automatique de l'agent. Le type choisi est enregistré dans le hub (il l'emporte sur celui de l'installation) et repris par l'inventaire à la création de l'élément.
+
+- *Appliquer sur l'hôte* : l'agent fait relancer `install.sh` par son helper root (`apt-action.sh reinstall`) avec ces options. Docker et les applications Node.js sont détectés à nouveau, et le hub, le jeton et la clé de `agent.env` sont conservés. Les options passent par une liste fermée, vérifiée par le hub, par l'agent et par le helper.
+- La même chose se fait à la main, avec la commande affichée dans la fenêtre : `install.sh` relancé sans `TOKEN`. C'est nécessaire une fois sur un agent installé avant cette version, dont le helper ne connaît pas encore cette action.
+
 ## Options de install.sh
 
 `install.sh` est idempotent et non interactif. Relancé sans `TOKEN`, il met seulement à jour le binaire et les unités, sans toucher à la configuration.
@@ -119,13 +126,12 @@ Sur un hôte déployé avec le playbook `base-node`, la commande `node-app` gèr
 | `ALLOW_INSECURE` | `false` | Accepter un hub en HTTP (liaison non chiffrée) |
 | `AUTO_UPDATE` | `true` | Mise à jour quotidienne depuis les releases GitHub |
 | `SMART` | `true` | Installer smartmontools et la collecte SMART horaire |
-| `REMOTE_UPDATES` | `true` | Autoriser les boutons *Vérifier* et *Mettre à jour* (paquets apt et conteneurs Docker) |
+| `REMOTE_UPDATES` | `true` | Autoriser les boutons *Vérifier* et *Mettre à jour* (paquets apt et conteneurs Docker), et *Appliquer sur l'hôte* du type de déploiement |
 | `DOCKER` | `auto` | Suivi Docker : activé si `docker` est installé |
 | `NODE_APPS` | `auto` | Applications Node.js : activé si `/usr/local/bin/node-app` existe (playbook base-node) |
 | `NODE_APPS_ACTIONS` | `1` | `0` : applications Node.js en lecture seule (ni déploiement, ni redémarrage, ni variables, ni création, ni deploy keys) |
-| `HOST_TYPE` | détecté | Type de déploiement affiché par le hub : `proxmox`, `physical`, `vm`, `lxc` ou `vps` (modifiable ensuite dans le hub) |
-| `LXC` | — | `all` sur un Proxmox : installer aussi dans chaque conteneur LXC Debian démarré, puis dans les nouveaux (timer) ; `none` : arrêter le timer |
-| `LXC_TOKEN` | `TOKEN` | Jeton commun `enr_…` utilisé par les conteneurs LXC |
+| `HOST_TYPE` | détecté | Type de déploiement affiché par le hub : `proxmox`, `physical`, `vm`, `lxc` ou `vps` (`auto` : détecté). Appliqué aussi sans `TOKEN`, comme `AUTO_UPDATE` |
+| `LXC` | — | `all` sur un Proxmox : installer aussi dans chaque conteneur LXC Debian démarré, puis dans les nouveaux (timer), chacun avec son propre jeton ; `none` : arrêter le timer |
 | `VERSION` | dernière | Installer une release précise (`v0.1.4`) |
 | `REPO` | `midnights-ra1n/homelab-management` | Dépôt hébergeant les releases (fork) |
 

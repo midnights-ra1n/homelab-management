@@ -38,16 +38,15 @@ pub fn request_apt(kind: &str) -> Result<(), String> {
 }
 
 /// Proxmox: asks the root helper to install the agent in the LXC containers, now and in the new
-/// ones (install.sh LXC=all), with the shared enrollment token the hub sent for them.
-pub fn request_lxc(token: &str) -> Result<(), String> {
-    let ok = token.len() <= 100 && token.strip_prefix("enr_").is_some_and(|t| t.len() >= 20 && t.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'));
-    if !ok {
-        return Err("Jeton des conteneurs invalide".into());
-    }
+/// ones (install.sh LXC=all). Each container gets its own token from the hub (pve::wants).
+pub fn request_lxc() -> Result<(), String> {
     if !std::path::Path::new("/etc/pve").is_dir() {
         return Err("Cette machine n'est pas un serveur Proxmox (/etc/pve absent)".into());
     }
-    drop_request("lxc-token", token)?;
+    // Older helpers still wait for a shared token, which the hub no longer sends.
+    if std::fs::read_to_string(APT_HELPER).is_ok_and(|h| h.contains("LXC_TOKEN")) {
+        return Err("Helper de l'hôte trop ancien : lancez une fois la commande de « Type de déploiement » sur la machine".into());
+    }
     request_apt("lxc")
 }
 
@@ -70,11 +69,62 @@ pub fn request_smart() -> Result<(), String> {
     drop_request("smart-request", "1")
 }
 
-/// The LXC install restarts the agent (install.sh) while the root helper goes on: after a
-/// restart, keep waiting for its result.
-pub fn lxc_running() -> bool {
-    std::fs::read(APT_OUTPUT.0).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok())
-        .is_some_and(|st| st["action"] == "lxc" && st["state"] == "running")
+/// Re-runs install.sh as root with the deployment type and options chosen in the dashboard
+/// ("HOST_TYPE=vm SMART=false AUTO_UPDATE=true LXC=keep").
+pub fn request_reinstall(target: &str) -> Result<(), String> {
+    let helper = std::fs::read_to_string(APT_HELPER).map_err(|_| {
+        "Réinstallation à distance non installée sur cette machine (relancez install.sh, sans REMOTE_UPDATES=false)".to_string()
+    })?;
+    if !helper.contains("reinstall") {
+        return Err("Helper de l'hôte trop ancien : lancez une fois la commande affichée sur la machine, l'action fonctionnera ensuite".into());
+    }
+    let opts = parse_reinstall(target)?;
+    drop_request("reinstall-opts", &opts)?;
+    request_apt("reinstall")
+}
+
+/// Checks the options word by word (the root helper checks them again).
+fn parse_reinstall(target: &str) -> Result<String, String> {
+    const ALLOWED: &[&str] = &[
+        "HOST_TYPE=auto", "HOST_TYPE=proxmox", "HOST_TYPE=physical", "HOST_TYPE=vm", "HOST_TYPE=lxc", "HOST_TYPE=vps",
+        "SMART=true", "SMART=false", "AUTO_UPDATE=true", "AUTO_UPDATE=false", "LXC=keep", "LXC=all", "LXC=none",
+    ];
+    let words: Vec<&str> = target.split_whitespace().collect();
+    if let Some(w) = words.iter().find(|w| !ALLOWED.contains(w)) {
+        return Err(format!("Option refusée : {}", w.split('=').next().unwrap_or("")));
+    }
+    if words.is_empty() {
+        return Err("Options de réinstallation invalides".into());
+    }
+    Ok(words.join(" "))
+}
+
+/// install.sh restarts the agent (LXC install, reinstall) while the root helper goes on: after a
+/// restart, keep waiting for its result. Returns the dashboard action that is still running.
+pub fn install_running() -> Option<&'static str> {
+    let st = std::fs::read(APT_OUTPUT.0).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok())?;
+    if st["state"] != "running" {
+        return None;
+    }
+    match st["action"].as_str()? {
+        "lxc" => Some("enable_lxc"),
+        "reinstall" => Some("reconfigure_agent"),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_reinstall;
+
+    #[test]
+    fn reinstall_options_are_a_closed_list() {
+        assert_eq!(parse_reinstall("HOST_TYPE=vm SMART=false AUTO_UPDATE=true LXC=keep").unwrap(), "HOST_TYPE=vm SMART=false AUTO_UPDATE=true LXC=keep");
+        assert_eq!(parse_reinstall("HOST_TYPE=proxmox LXC=all").unwrap(), "HOST_TYPE=proxmox LXC=all");
+        for bad in ["HOST_TYPE=vm REPO=evil/x", "HOST_TYPE=vm;reboot", "", "HOST_TYPE=proxmox LXC=all TOKEN=enr_abcdefghijklmnopqrstuvwxyz"] {
+            assert!(parse_reinstall(bad).is_err(), "{bad}");
+        }
+    }
 }
 
 /// Result of a root helper's last action, once finished after `since`: (ok, message).

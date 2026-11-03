@@ -8,10 +8,12 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
+	"time"
 )
 
 // Wire format shared with agent/src/pve.rs. Keep both in sync.
@@ -141,7 +143,8 @@ func (s *Server) pruneCTs(node int64, nodeName string, cts []int) {
 		return
 	}
 	for _, h := range hosts {
-		if h.parent.Int64 != node || h.vmid <= 0 || h.info.Virtualization != "lxc" || slices.Contains(cts, h.vmid) {
+		// Hosts made by lxcToken that never connected have no info yet.
+		if h.parent.Int64 != node || h.vmid <= 0 || (h.info.Virtualization != "lxc" && h.info.Hostname != "") || slices.Contains(cts, h.vmid) {
 			continue
 		}
 		s.agentsMu.Lock()
@@ -161,6 +164,56 @@ func (s *Server) pruneCTs(node int64, nodeName string, cts []int) {
 		s.logEvent("Proxmox "+nodeName, "host", h.id, "delete", fmt.Sprintf("Hôte « %s » supprimé : CT %d supprimé de Proxmox", name, h.vmid))
 		slog.Info("container removed from Proxmox, host deleted", "host_id", h.id, "name", name, "ctid", h.vmid)
 	}
+}
+
+// lxcToken gives a new container of a Proxmox node its own agent token, instead of a shared
+// enrollment token: the node's root helper (lxc-sync.sh) asks through the node's agent, and
+// installs the agent in the container with it. The container must be in the node's latest
+// report; its host is reused (token replaced) unless its agent is connected.
+func (s *Server) lxcToken(node int64, nodeName string, ct int, ctName string) (string, error) {
+	var raw string
+	var rep pveReport
+	if err := s.db.QueryRow(`SELECT pve FROM hosts WHERE id=?`, node).Scan(&raw); err != nil {
+		return "", err
+	}
+	json.Unmarshal([]byte(raw), &rep)
+	if !slices.Contains(rep.CTs, ct) {
+		return "", fmt.Errorf("CT %d absent du dernier rapport Proxmox", ct)
+	}
+	tok := randomToken(32)
+	var id int64
+	err := s.db.QueryRow(`SELECT id FROM hosts WHERE parent_id=? AND vmid=?`, node, ct).Scan(&id)
+	switch {
+	case err == nil:
+		s.agentsMu.Lock()
+		_, connected := s.agents[id]
+		s.agentsMu.Unlock()
+		if connected {
+			return "", fmt.Errorf("l'agent du CT %d est déjà connecté", ct)
+		}
+		if _, err := s.db.Exec(`UPDATE hosts SET token_hash=? WHERE id=?`, hashToken(tok), id); err != nil {
+			return "", err
+		}
+		s.logEvent("Proxmox "+nodeName, "host", id, "update", fmt.Sprintf("Nouveau jeton pour l'installation de l'agent dans le CT %d", ct))
+	case errors.Is(err, sql.ErrNoRows):
+		if ctName == "" {
+			ctName = fmt.Sprintf("ct-%d", ct)
+		}
+		name, err := s.uniqueHostName(cleanHostname(ctName))
+		if err != nil {
+			return "", err
+		}
+		res, err := s.db.Exec(`INSERT INTO hosts(name,token_hash,created_at,parent_id,vmid) VALUES(?,?,?,?,?)`, name, hashToken(tok), time.Now().Unix(), node, ct)
+		if err != nil {
+			return "", err
+		}
+		id, _ = res.LastInsertId()
+		s.logEvent("Proxmox "+nodeName, "host", id, "create", fmt.Sprintf("Hôte « %s » créé pour le CT %d, avec son propre jeton", name, ct))
+		events.publish("hosts")
+	default:
+		return "", err
+	}
+	return tok, nil
 }
 
 // parentFromRequest checks a parent chosen in the dashboard: -1 automatic (Proxmox), 0 none,

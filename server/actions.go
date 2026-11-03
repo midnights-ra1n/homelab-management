@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,9 +20,14 @@ import (
 	"github.com/coder/websocket/wsjson"
 )
 
+// Options of reconfigure_agent, in this order; the agent and its root helper check them again.
+var reconfigureRe = regexp.MustCompile(`^HOST_TYPE=(auto|proxmox|physical|vm|lxc|vps) SMART=(true|false) AUTO_UPDATE=(true|false) LXC=(keep|all|none)$`)
+
 var hostActions = map[string]bool{"check_updates": true, "apply_updates": true, "update_agent": true, "update_container": true,
-	// Proxmox: install the agent in the LXC containers, now and in the new ones (target: a new enrollment token).
+	// Proxmox: install the agent in the LXC containers, now and in the new ones (each gets its own token, see lxcToken).
 	"enable_lxc": true,
+	// Re-run install.sh with the deployment type and its options (target: reconfigureRe).
+	"reconfigure_agent": true,
 	// node-app (base-node playbook), on one app; see nodeapps.go.
 	"node_deploy": true, "node_pull": true, "node_update": true, "node_restart": true, "node_stop": true, "node_remove": true, "node_purge": true}
 
@@ -60,7 +66,7 @@ func (s *Server) handleHostAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !hostActions[req.Action] {
-		writeErr(w, 400, "Action inconnue : check_updates, apply_updates, update_agent, update_container, enable_lxc ou node_*")
+		writeErr(w, 400, "Action inconnue : check_updates, apply_updates, update_agent, update_container, enable_lxc, reconfigure_agent ou node_*")
 		return
 	}
 	if strings.HasPrefix(req.Action, "node_") && !nodeAppName.MatchString(req.Target) {
@@ -70,24 +76,9 @@ func (s *Server) handleHostAction(w http.ResponseWriter, r *http.Request) {
 	if req.Target != "" {
 		logName(r, req.Target+" ("+req.Action+")")
 	}
-	if req.Action == "enable_lxc" {
-		// The containers enroll with their own shared token, never stored in the host's action.
-		s.agentsMu.Lock()
-		_, ok := s.agents[id]
-		s.agentsMu.Unlock()
-		if !ok {
-			writeErr(w, 409, "L'agent n'est pas connecté")
-			return
-		}
-		var name string
-		s.db.QueryRow(`SELECT name FROM hosts WHERE id=?`, id).Scan(&name)
-		req.Target = enrollPrefix + randomToken(32)
-		if _, err := s.db.Exec(`INSERT INTO enroll_tokens(name,token_hash,prefix,created_at) VALUES(?,?,?,?)`,
-			clip("LXC de "+name, 100), hashToken(req.Target), req.Target[:len(enrollPrefix)+6], time.Now().Unix()); err != nil {
-			serverErr(w, err)
-			return
-		}
-		logName(r, name+" → conteneurs LXC")
+	if req.Action == "reconfigure_agent" && !reconfigureRe.MatchString(req.Target) {
+		writeErr(w, 400, "Options de réinstallation invalides")
+		return
 	}
 	if req.Action == "update_container" && (req.Target == "" || len(req.Target) > 200 || strings.Trim(req.Target, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-") != "") {
 		writeErr(w, 400, "Nom de conteneur invalide")
@@ -171,9 +162,6 @@ func (s *Server) sendHostAction(w http.ResponseWriter, r *http.Request, id int64
 	if err := wsjson.Write(ctx, conn.conn, map[string]string{"type": "action", "action": action, "target": target}); err != nil {
 		writeErr(w, 502, "Impossible de joindre l'agent : "+err.Error())
 		return
-	}
-	if action == "enable_lxc" {
-		target = ""
 	}
 	s.setHostActionTarget(id, action, target, "pending", "")
 	s.handleGetHost(w, r)

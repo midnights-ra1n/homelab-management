@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
 import { Check, Cpu, HardDrive, Laptop, LoaderCircle, Server } from "../shared/icons";
-import { api, fmtBytes, fmtPct, type Host, type Install } from "../api";
+import { api, fmtBytes, fmtPct, type Host, type HostType, type Install } from "../api";
 import { Alert, Button, CodeBlock, Dialog, Field, Segmented, Switch, cn, inputClass, navigate, useToast } from "../ui";
 
 export type Kind = "vm" | "proxmox" | "physical" | "client";
-export const KINDS: { id: Kind; label: string; hint: string; icon: typeof Server; smart: boolean }[] = [
+// hostType: HOST_TYPE given to install.sh (a VM or LXC container is told apart by detection).
+export const KINDS: { id: Kind; label: string; hint: string; icon: typeof Server; smart: boolean; hostType?: HostType }[] = [
   { id: "vm", label: "Machine virtuelle", hint: "VM ou conteneur LXC, sans SMART", icon: Cpu, smart: false },
-  { id: "proxmox", label: "Serveur Proxmox", hint: "Hyperviseur avec ses disques", icon: Server, smart: true },
-  { id: "physical", label: "Serveur physique", hint: "NAS, serveur dédié", icon: HardDrive, smart: true },
-  { id: "client", label: "Poste client", hint: "Ordinateur sous Debian", icon: Laptop, smart: true },
+  { id: "proxmox", label: "Serveur Proxmox", hint: "Hyperviseur avec ses disques", icon: Server, smart: true, hostType: "proxmox" },
+  { id: "physical", label: "Serveur physique", hint: "NAS, serveur dédié", icon: HardDrive, smart: true, hostType: "physical" },
+  { id: "client", label: "Poste client", hint: "Ordinateur sous Debian", icon: Laptop, smart: true, hostType: "physical" },
 ];
 
-export interface InstallOptions { smart: boolean; autoUpdate: boolean; lxcToken?: string }
+export interface InstallOptions { smart: boolean; autoUpdate: boolean; lxc?: boolean; hostType?: HostType }
 
-const REPO = "midnights-ra1n/homelab-management";
+export const REPO = "midnights-ra1n/homelab-management";
 
 export const UNINSTALL_COMMAND = `curl -fsSL https://raw.githubusercontent.com/${REPO}/stable/agent/uninstall.sh | sudo sh`;
 
@@ -45,7 +46,8 @@ export function installCommand(i: Install, o: InstallOptions) {
   if (i.hub_url.startsWith("http://")) env.push("ALLOW_INSECURE=true");
   if (!o.smart) env.push("SMART=false");
   if (!o.autoUpdate) env.push("AUTO_UPDATE=false");
-  if (o.lxcToken) env.push("LXC=all", `LXC_TOKEN='${o.lxcToken}'`);
+  if (o.lxc) env.push("LXC=all");
+  if (o.hostType) env.push(`HOST_TYPE=${o.hostType}`);
   return `curl -fsSL https://raw.githubusercontent.com/${REPO}/stable/agent/install.sh | sudo ${env.join(" ")} sh`;
 }
 
@@ -57,12 +59,14 @@ function ansibleVars(name: string, i: Install, o: InstallOptions) {
     `hlm_key: "${i.key}"`,
     `hlm_smart: ${o.smart}`,
     `hlm_auto_update: ${o.autoUpdate}`,
+    ...(o.hostType ? [`hlm_host_type: ${o.hostType}`] : []),
   ].join("\n");
 }
 
 function envFile(i: Install, o: InstallOptions) {
   return [`HUB_URL=${i.hub_url}`, `TOKEN=${i.token}`, `KEY=${i.key}`,
-    ...(i.hub_url.startsWith("http://") ? ["ALLOW_INSECURE=true"] : []), ...(o.autoUpdate ? [] : ["AUTO_UPDATE=false"])].join("\n");
+    ...(i.hub_url.startsWith("http://") ? ["ALLOW_INSECURE=true"] : []), ...(o.autoUpdate ? [] : ["AUTO_UPDATE=false"]),
+    ...(o.hostType ? [`HOST_TYPE=${o.hostType}`] : [])].join("\n");
 }
 
 /** Install instructions with one tab per method; also used after a token rotation. */
@@ -81,8 +85,8 @@ export function InstallInstructions({ install: initial, name, options = { smart:
       {method === "curl" && (
         <>
           <p className="text-sm text-body">Collez cette ligne dans un terminal de la machine (Debian, avec sudo). Le script télécharge le binaire, vérifie son empreinte SHA-256, crée l'utilisateur hlm-agent et démarre le service.</p>
-          {options.lxcToken && (
-            <Alert kind="info" title="Conteneurs LXC inclus">Après le Proxmox, le script installe l'agent dans chaque conteneur Debian démarré (copie par pct push, sans accès Internet nécessaire dans les conteneurs). Chacun apparaît sous son nom. Relancez la même ligne pour équiper les conteneurs créés plus tard ; le jeton commun est valable 7 jours.</Alert>
+          {options.lxc && (
+            <Alert kind="info" title="Conteneurs LXC inclus">Après le Proxmox, le script installe l'agent dans chaque conteneur Debian démarré (copie par pct push, sans accès Internet nécessaire dans les conteneurs). Chacun reçoit son propre jeton du hub et apparaît sous son nom. Les conteneurs créés plus tard sont équipés automatiquement en quelques minutes.</Alert>
           )}
           <CodeBlock text={installCommand(install, options)} />
         </>
@@ -202,14 +206,8 @@ export function AddHostWizard({ open, onClose, hosts = [] }: { open: boolean; on
     setError(undefined);
     try {
       const r = await api.post<{ id: number; install: Install }>("/api/hosts", { name, parent });
-      if (kind === "proxmox" && lxc) {
-        // LXC containers enroll themselves with a shared token, one host each. No expiry:
-        // the Proxmox host keeps it (root only) to equip the containers created later.
-        const e = await api.post<{ install: Install }>("/api/enroll-tokens", { name: `LXC de ${name}` });
-        setOpts((o) => ({ ...o, lxcToken: e.install.token }));
-      } else {
-        setOpts((o) => ({ ...o, lxcToken: undefined }));
-      }
+      // Each LXC container gets its own token, asked to the hub by the Proxmox agent.
+      setOpts((o) => ({ ...o, lxc: kind === "proxmox" && lxc }));
       setCreated(r);
       setStep(1);
     } catch (err) { setError((err as Error).message); }
@@ -241,7 +239,7 @@ export function AddHostWizard({ open, onClose, hosts = [] }: { open: boolean; on
           <Field label="Nom" htmlFor="wiz-name" error={error} hint="Tel qu'il apparaîtra dans le tableau de bord, par exemple pve-01">
             <input id="wiz-name" className={inputClass} value={name} disabled={!!created} onChange={(e) => setName(e.target.value)} autoFocus aria-invalid={!!error} />
           </Field>
-          <KindPicker value={kind} onChange={(k) => { setKind(k.id); setOpts((o) => ({ ...o, smart: k.smart })); }} />
+          <KindPicker value={kind} onChange={(k) => { setKind(k.id); setOpts((o) => ({ ...o, smart: k.smart, hostType: k.hostType })); }} />
           <Switch label="Surveiller les disques (SMART, installe smartmontools)" checked={opts.smart} onChange={(v) => setOpts({ ...opts, smart: v })} />
           <Switch label="Mise à jour automatique quotidienne de l'agent" checked={opts.autoUpdate} onChange={(v) => setOpts({ ...opts, autoUpdate: v })} />
           {kind === "proxmox" && (
