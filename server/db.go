@@ -149,6 +149,18 @@ var migrations = []string{
 	ALTER TABLE hosts DROP COLUMN latest;
 	ALTER TABLE hosts DROP COLUMN last_seen;
 	ALTER TABLE hosts DROP COLUMN docker;`,
+	// Alerts waiting for their digest (digest.go).
+	`CREATE TABLE notify_queue(
+		id INTEGER PRIMARY KEY,
+		freq TEXT NOT NULL,
+		kind TEXT NOT NULL,
+		name TEXT NOT NULL,
+		from_s TEXT NOT NULL DEFAULT '',
+		to_s TEXT NOT NULL DEFAULT '',
+		message TEXT NOT NULL DEFAULT '',
+		at INTEGER NOT NULL,
+		from_text TEXT NOT NULL DEFAULT '',
+		to_text TEXT NOT NULL DEFAULT '');`,
 }
 
 // activityTable is the journal shared by both roles (same shape as homelab-management's

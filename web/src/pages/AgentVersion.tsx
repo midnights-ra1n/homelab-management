@@ -14,6 +14,7 @@ export function useHostAction(onDone?: (h: Host) => void) {
       onDone?.(updated);
       toast(action === "update_agent" ? `Mise à jour de l'agent demandée sur ${h.name}`
         : action === "apply_updates" ? `Installation des mises à jour lancée sur ${h.name}`
+        : action === "enable_lxc" ? `Installation dans les conteneurs LXC lancée sur ${h.name}`
         : action === "update_container" ? `Mise à jour de ${target} lancée sur ${h.name}`
         : action.startsWith("node_") ? `${target} : demande envoyée à ${h.name}`
         : `Vérification lancée sur ${h.name}`);

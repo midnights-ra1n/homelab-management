@@ -12,6 +12,10 @@ import { DatabaseSection, McpSection, PasskeysSection, UpdateSection } from "../
 type S = Record<string, string>;
 interface SettingsResp { settings: S; db_size: number; version: string }
 
+const FREQ_CATS: [string, string][] = [["status", "Pannes et rétablissements"], ["cert", "Certificats SSL"], ["disk", "Disques (SMART, espace)"], ["updates", "Mises à jour et redémarrages"],
+  ["docker", "Images Docker"], ["nodeapps", "Applications Node.js"], ["reminders", "Rappels de mise à jour"]];
+const FREQS: [string, string][] = [["instant", "Immédiat"], ["hourly", "Résumé toutes les heures"], ["daily", "Résumé quotidien"], ["weekly", "Résumé hebdomadaire"], ["monthly", "Résumé mensuel"]];
+
 export function SettingsPage({ version }: { version: string }) {
   const [data, setData] = useState<SettingsResp>();
   const [draft, setDraft] = useState<S>({});
@@ -114,7 +118,8 @@ export function SettingsPage({ version }: { version: string }) {
               try { await api.post("/api/settings/test-email"); toast("E-mail de test envoyé"); } catch (e) { setError((e as Error).message); }
               setBusy(undefined);
             }}>Envoyer un e-mail de test</Button>
-            <Button loading={busy === "smtp"} onClick={() => save("smtp", ["smtp_enabled", "smtp_host", "smtp_port", "smtp_tls", "smtp_user", "smtp_pass", "smtp_from", "smtp_to", "notify_window_s", "status_title", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_node_apps", "notify_smart_level", "notify_disk_pct"])}>Enregistrer les notifications</Button>
+            <Button loading={busy === "smtp"} onClick={() => save("smtp", ["smtp_enabled", "smtp_host", "smtp_port", "smtp_tls", "smtp_user", "smtp_pass", "smtp_from", "smtp_to", "notify_window_s", "status_title", "notify_security_updates", "notify_reboot", "notify_docker_updates", "notify_node_apps", "notify_smart_level", "notify_disk_pct",
+              ...FREQ_CATS.map(([k]) => `notify_freq_${k}`), "notify_digest_time", "notify_digest_weekday", "notify_digest_monthday", "notify_max_per_hour", "notify_cooldown_min", "updates_check_time"])}>Enregistrer les notifications</Button>
           </>}>
           <Switch label="Activer les notifications" checked={bool("smtp_enabled")} onChange={(c) => setDraft({ ...draft, smtp_enabled: String(c) })} />
           <div className="grid gap-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
@@ -154,6 +159,38 @@ export function SettingsPage({ version }: { version: string }) {
               </select>
             </Field>
             {input("notify_disk_pct", "Espace disque : seuil d'alerte (%)", { type: "number", min: 0, max: 99 }, "Alerte quand une partition dépasse ce taux d'occupation ; 0 : jamais")}
+          </fieldset>
+          <fieldset className="grid gap-5 border-t border-line-subtle pt-5">
+            <legend className="mm-label-caps float-left mb-3 w-full">Fréquence d'envoi (e-mail et Matrix)</legend>
+            <p className="text-sm text-body">Chaque type d'alerte part tout de suite ou dans un résumé. Les notifications push restent immédiates. Un résumé des mises à jour liste ce qui reste à installer sur chaque hôte au moment de l'envoi, une seule fois par période.</p>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {FREQ_CATS.map(([k, label]) => (
+                <Field key={k} label={label} htmlFor={`s-freq-${k}`}>
+                  <select id={`s-freq-${k}`} className={inputClass} value={v(`notify_freq_${k}`)} onChange={set(`notify_freq_${k}`)}>
+                    {FREQS.map(([f, l]) => <option key={f} value={f}>{l}</option>)}
+                  </select>
+                </Field>
+              ))}
+            </div>
+            <div className="grid gap-5 sm:grid-cols-3">
+              {input("notify_digest_time", "Heure des résumés", { type: "time" }, "Quotidien, hebdomadaire et mensuel")}
+              <Field label="Jour du résumé hebdomadaire" htmlFor="s-digest-wd">
+                <select id="s-digest-wd" className={inputClass} value={v("notify_digest_weekday")} onChange={set("notify_digest_weekday")}>
+                  {["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"].map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
+                </select>
+              </Field>
+              {input("notify_digest_monthday", "Jour du résumé mensuel", { type: "number", min: 1, max: 28 }, "Du 1er au 28")}
+            </div>
+            <div className={FIELD_ROW}>
+              {input("notify_max_per_hour", "Messages immédiats par heure, au plus", { type: "number", min: 0 }, "Au-delà, les alertes partent dans le résumé de l'heure suivante ; 0 : sans limite")}
+              {input("notify_cooldown_min", "Délai avant de réalerter pour le même élément (min)", { type: "number", min: 0 }, "Un service qui tombe et revient en boucle n'envoie qu'un message, la suite part dans le résumé horaire ; 0 : désactivé")}
+            </div>
+          </fieldset>
+          <fieldset className="grid gap-3 border-t border-line-subtle pt-5">
+            <legend className="mm-label-caps float-left mb-3 w-full">Vérification des mises à jour</legend>
+            <Switch label="Vérifier chaque jour sur tous les hôtes (apt-get update puis analyse)" checked={!!v("updates_check_time")}
+              onChange={(c) => setDraft({ ...draft, updates_check_time: c ? "06:00" : "" })} />
+            {!!v("updates_check_time") && <div className="sm:max-w-xs">{input("updates_check_time", "Heure de la vérification", { type: "time" }, "Sans réglage, l'agent relève les paquets toutes les 6 heures depuis les listes rafraîchies par apt-daily")}</div>}
           </fieldset>
         </SettingsSection>
 

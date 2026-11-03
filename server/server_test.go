@@ -425,8 +425,9 @@ func TestTimezoneSetting(t *testing.T) {
 	// 11:46 UTC on 14 Oct 2026 is 13:46 in Paris (CEST).
 	at := time.Date(2026, 10, 14, 11, 46, 0, 0, time.UTC)
 	d := buildEmailData("T", "", []Event{{Kind: "Sonde", Name: "x", From: StatusOperational, To: StatusMajor, At: at}})
-	if d.Events[0].Time != "13:46:00" {
-		t.Fatalf("event time %s, want 13:46:00", d.Events[0].Time)
+	// Another day than today: the date is shown too (digests).
+	if d.Events[0].Time != "14/10 13:46" {
+		t.Fatalf("event time %s, want 14/10 13:46", d.Events[0].Time)
 	}
 	tzLoc.Store(time.UTC) // other tests expect the default
 }

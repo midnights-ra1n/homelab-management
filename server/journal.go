@@ -167,6 +167,7 @@ var journalLabels = map[string]journalLabel{
 	"POST /api/status/wall-key":             jl("settings", "update", "Lien de l'écran de supervision créé"),
 	"DELETE /api/status/wall-key":           jl("settings", "update", "Lien de l'écran de supervision révoqué"),
 	"POST /api/hosts/update-agents":         jl("host", "action", "Mise à jour de tous les agents demandée"),
+	"POST /api/hosts/apply-updates":         jl("host", "action", "Mise à jour de tous les hôtes lancée, un par un"),
 	"POST /api/monitors":                    jl("monitor", "create", "Sonde ajoutée"),
 	"PUT /api/monitors/{id}":                jl("monitor", "update", "Sonde modifiée"),
 	"DELETE /api/monitors/{id}":             jl("monitor", "delete", "Sonde supprimée"),

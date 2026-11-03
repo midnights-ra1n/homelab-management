@@ -154,6 +154,7 @@ func run(cfg Config) error {
 		go s.watchHosts(ctx)
 		go s.runReports(ctx)
 		go s.runReminders(ctx)
+		go s.runSchedules(ctx)
 	}
 	go s.runRetention(ctx)
 	go s.runReleaseCheck(ctx)

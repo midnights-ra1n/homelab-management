@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
@@ -148,7 +149,7 @@ func pushPayload(evs []Event) []byte {
 		if l, ok := warningLabels[e.Kind]; ok && e.To == "" {
 			return l[0]
 		}
-		return statusLabels[e.To]
+		return cmp.Or(e.ToText, statusLabels[e.To])
 	}
 	var title string
 	var lines []string

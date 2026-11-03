@@ -201,7 +201,7 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     // The first check waits a minute so the agent itself starts instantly and cheaply.
     let mut upd = tokio::time::interval_at(tokio::time::Instant::now() + Duration::from_secs(60), Duration::from_secs(6 * 3600));
     // Dashboard action still running in a root helper: (action, requested at, helper output).
-    let mut apt_pending: Option<(String, u64, (&str, &str))> = None;
+    let mut apt_pending: Option<(String, u64, (&str, &str))> = actions::lxc_running().then(|| ("enable_lxc".to_string(), actions::now(), actions::APT_OUTPUT));
     let mut apt_poll = tokio::time::interval(Duration::from_secs(5));
     // Docker: the root helper refreshes the snapshot every minute; image updates are checked
     // against the registries two minutes after start, then every 6 hours.
@@ -384,6 +384,10 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                                 Err(e) => ("failed", e),
                             }
                         }
+                        "enable_lxc" => match actions::request_lxc(m["target"].as_str().unwrap_or("")) {
+                            Ok(()) => { apt_pending = Some((action.clone(), actions::now(), actions::APT_OUTPUT)); ("running", String::new()) }
+                            Err(e) => ("failed", e),
+                        },
                         "update_container" => match actions::request_container_update(m["target"].as_str().unwrap_or("")) {
                             Ok(()) => { apt_pending = Some((action.clone(), actions::now(), actions::DOCKER_OUTPUT)); ("running", String::new()) }
                             Err(e) => ("failed", e),

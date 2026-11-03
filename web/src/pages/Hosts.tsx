@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Cpu, HardDrive, KeyRound, Pencil, MemoryStick, Plus, RefreshCw, Server, Thermometer, Trash2, Users } from "../shared/icons";
-import { api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostLatest, type HostSeries, type Install } from "../api";
+import { ChevronDown, ChevronRight, Cpu, Download, HardDrive, KeyRound, Pencil, MemoryStick, Plus, RefreshCw, Server, Thermometer, Trash2, Users } from "../shared/icons";
+import { actionBusy, api, fmtAgo, hostStatusLabel, fmtBytes, fmtDate, fmtPct, pct, type Host, type HostLatest, type HostSeries, type Install } from "../api";
 import {
   Alert, Badge, Button, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, EmptyState, Field, Link, inputClass, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented,
   Skeleton, Stat, StatusBadge, StatusIcon, Switch, Tag, cn, navigate, statusKind, usePoll, useTitle, useToast,
@@ -10,6 +10,7 @@ import { AddHostWizard, InstallInstructions, ParentSelect, UNINSTALL_COMMAND } f
 import { MassDeployDialog } from "./MassDeploy";
 import { AgentVersion, useHostAction } from "./AgentVersion";
 import { ContainersTable } from "./Containers";
+import { ActionStatus, UpgradeDialog } from "./Updates";
 import { NodeAppsPanel } from "./NodeApps";
 
 /** Proxmox ID of a VM or LXC container (from its node, else from install.sh LXC=all). */
@@ -170,6 +171,8 @@ export function HostDetailPage({ id }: { id: number }) {
   const myDisks = disks.data?.find((d) => d.host_id === id);
   const [install, setInstall] = useState<Install>();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [upgrade, setUpgrade] = useState<Host>();
+  const [lxc, setLxc] = useState(false);
   const [edit, setEdit] = useState<{ name: string; parent: number; was: number }>();
   const all = usePoll(() => api.get<Host[]>("/api/hosts"), 60000, [], ["hosts"]);
   const toast = useToast();
@@ -269,6 +272,25 @@ export function HostDetailPage({ id }: { id: number }) {
                   <dd><AgentVersion h={h} onUpdate={() => agentAction.run(h, "update_agent")} updating={agentAction.busy === `${h.id}:update_agent`} />
                     {h.action?.action === "update_agent" && h.action.state === "failed" && <p className="mt-1 text-xs text-red">{h.action.message}</p>}</dd>
                 </div>
+                <div className="col-span-2 min-w-0">
+                  <dt className="mb-1 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">Mises à jour système</dt>
+                  <dd className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-h2">{!h.updates ? "—" : h.updates.pending ? `${h.updates.pending} en attente${h.updates.security ? `, dont ${h.updates.security} de sécurité` : ""}` : "À jour"}</span>
+                    <Button size="sm" variant="secondary" icon={<Download size={14} />} disabled={!h.connected || actionBusy(h) || !h.updates?.pending}
+                      loading={agentAction.busy === `${h.id}:apply_updates`} onClick={() => setUpgrade(h)}>Mettre à jour l'hôte</Button>
+                  </dd>
+                  <ActionStatus h={h} />
+                </div>
+                {h.proxmox && (
+                  <div className="col-span-2 min-w-0">
+                    <dt className="mb-1 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">Conteneurs LXC</dt>
+                    <dd className="flex flex-wrap items-center gap-2">
+                      <span className="text-h2">{h.lxc_sync ? "Agent installé automatiquement" : "Non équipés"}</span>
+                      <Button size="sm" variant="secondary" icon={<Server size={14} />} disabled={!h.connected || actionBusy(h)}
+                        loading={agentAction.busy === `${h.id}:enable_lxc`} onClick={() => setLxc(true)}>{h.lxc_sync ? "Rééquiper les conteneurs" : "Passer en serveur Proxmox"}</Button>
+                    </dd>
+                  </div>
+                )}
               </dl>
             </CardBody>
           </Card>
@@ -351,6 +373,16 @@ export function HostDetailPage({ id }: { id: number }) {
             </Field>
           </form>
         )}
+      </Dialog>
+      <UpgradeDialog host={upgrade} onClose={() => setUpgrade(undefined)} onConfirm={(x) => agentAction.run(x, "apply_updates")} />
+      <Dialog open={lxc} onClose={() => setLxc(false)} size="sm" title={h.lxc_sync ? "Rééquiper les conteneurs LXC" : "Passer en serveur Proxmox"}
+        footer={<><Button variant="secondary" onClick={() => setLxc(false)}>Annuler</Button>
+          <Button icon={<Server size={16} />} onClick={() => { setLxc(false); agentAction.run(h, "enable_lxc"); }}>Installer dans les conteneurs</Button></>}>
+        <p className="text-sm leading-relaxed text-body">
+          Sans rien réinstaller à la main : l'assistant root de l'agent relance <code className="font-mono text-xs text-h2">install.sh</code> avec <code className="font-mono text-xs text-h2">LXC=all</code>.
+          L'agent du Proxmox redémarre quelques secondes, garde sa configuration et active SMART ; il s'installe ensuite dans chaque conteneur Debian démarré, sans les arrêter, puis dans les nouveaux toutes les 2 minutes.
+          Un jeton commun sans expiration est créé pour eux (« LXC de {h.name} », révocable dans Déploiement en masse). Les conteneurs étiquetés <code className="font-mono text-xs text-h2">no-hlm</code> sont ignorés.
+        </p>
       </Dialog>
       <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} size="sm" title={`Supprimer ${h.name}`}
         footer={<><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Annuler</Button>

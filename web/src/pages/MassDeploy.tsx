@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "../shared/icons";
 import { api, fmtAgo, fmtDate, type Install } from "../api";
 import { Alert, Badge, Button, Card, CodeBlock, Dialog, Field, IconButton, Segmented, Switch, inputClass } from "../ui";
-import { HubUrlField, UNINSTALL_COMMAND, installCommand } from "./AddHostWizard";
+import { HubUrlField, KINDS, KindPicker, UNINSTALL_COMMAND, installCommand, type Kind } from "./AddHostWizard";
 
 interface EnrollToken { id: number; name: string; prefix: string; expires_at: number | null; created_at: number; last_used_at: number; uses: number }
 
@@ -19,7 +19,9 @@ export function MassDeployDialog({ open, onClose }: { open: boolean; onClose: ()
   const [created, setCreated] = useState<Install>();
   const [hub, setHub] = useState("");
   const [method, setMethod] = useState<"curl" | "ansible">("ansible");
-  const [withLxc, setWithLxc] = useState(false);
+  const [kind, setKind] = useState<Kind>("vm");
+  const [withLxc, setWithLxc] = useState(true);
+  const smart = KINDS.find((k) => k.id === kind)!.smart;
   const [error, setError] = useState<string>();
   const load = () => api.get<EnrollToken[]>("/api/enroll-tokens").then(setTokens, () => {});
   useEffect(() => { if (open) load(); }, [open]);
@@ -60,6 +62,7 @@ export function MassDeployDialog({ open, onClose }: { open: boolean; onClose: ()
           <>
             <Alert kind="warning" title="Le jeton ne sera plus affiché">Copie-le maintenant (dans un vault Ansible, par exemple).</Alert>
             <HubUrlField value={hub} onChange={setHub} />
+            <KindPicker value={kind} onChange={(k) => setKind(k.id)} />
             <Segmented className="w-fit" label="Méthode" value={method} onChange={setMethod} options={[["ansible", "Ansible"], ["curl", "Commande"]]} />
             {method === "ansible" ? (
               <>
@@ -68,15 +71,18 @@ export function MassDeployDialog({ open, onClose }: { open: boolean; onClose: ()
                   `hlm_hub_url: ${install.hub_url}`,
                   `hlm_key: "${install.key}"`,
                   `hlm_agent_token: "{{ vault_hlm_agent_token }}"`,
+                  `hlm_smart: ${smart}`,
                 ].join("\n")} />
+                {kind === "proxmox" && <p className="text-sm text-body">Le rôle Ansible n'installe pas l'agent dans les conteneurs LXC : une fois le Proxmox inscrit, utilisez <span className="text-h2">Passer en serveur Proxmox</span> sur sa fiche, ou la méthode Commande.</p>}
                 <p className="text-sm text-body">et dans le vault (<code className="font-mono text-xs text-h2">ansible-vault create group_vars/&lt;groupe&gt;/vault.yml</code>) :</p>
                 <CodeBlock text={`vault_hlm_agent_token: ${install.token}`} />
               </>
             ) : (
               <>
                 <p className="text-sm text-body">La même ligne fonctionne sur toutes les machines :</p>
-                <Switch label="Sur un Proxmox, installer aussi dans ses conteneurs LXC" checked={withLxc} onChange={setWithLxc} />
-                <CodeBlock text={installCommand(install, { smart: true, autoUpdate: true, lxcToken: withLxc ? install.token : undefined })} />
+                {kind === "proxmox" && <Switch label="Installer aussi dans les conteneurs LXC Debian démarrés, puis dans les nouveaux" checked={withLxc} onChange={setWithLxc} />}
+                {kind === "proxmox" && withLxc && expiry !== "never" && <Alert kind="info" title="Jeton à durée limitée">Les conteneurs créés après son expiration ne seront plus équipés. Pour eux, créez un jeton valable « Jamais », ou utilisez Passer en serveur Proxmox sur la fiche de l'hôte.</Alert>}
+                <CodeBlock text={installCommand(install, { smart, autoUpdate: true, lxcToken: kind === "proxmox" && withLxc ? install.token : undefined })} />
               </>
             )}
           </>

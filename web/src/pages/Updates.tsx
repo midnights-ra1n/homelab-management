@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import { ArrowUpRight, ChevronRight, Container, Download, LoaderCircle, PackageCheck, RefreshCw, RotateCcw, ShieldAlert } from "../shared/icons";
 import { actionBusy, api, fmtAgo, fmtDate, type Host } from "../api";
 import {
-  Alert, Badge, Button, Card, Dialog, EmptyState, IconButton, Link, PageHeader, SECTIONS, STAT_GRID, Skeleton, Stat, StatusIcon, Switch, cn, usePoll,
+  Alert, Badge, Button, Card, Dialog, EmptyState, IconButton, Link, PageHeader, SECTIONS, STAT_GRID, Skeleton, Stat, StatusIcon, Switch, cn, usePoll, useToast,
 } from "../ui";
 import { useHostAction } from "./AgentVersion";
 
@@ -32,10 +32,10 @@ export function UpdateKpis({ hosts }: { hosts: Host[] }) {
 
 const logClass = "mt-2 max-h-56 overflow-auto rounded-xl border border-line bg-field p-3 font-mono text-xs whitespace-pre-wrap text-h2";
 
-function ActionStatus({ h }: { h: Host }) {
+export function ActionStatus({ h }: { h: Host }) {
   const a = h.action;
   if (!a || a.action === "update_agent") return null;
-  const what = a.action === "apply_updates" ? "Installation des mises à jour" : "Vérification";
+  const what = a.action === "apply_updates" ? "Installation des mises à jour" : a.action === "enable_lxc" ? "Installation dans les conteneurs LXC" : "Vérification";
   if (actionBusy(h)) return <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-meta"><LoaderCircle size={12} className="animate-spin" aria-hidden />{what} en cours…</span>;
   if (a.state === "pending" || a.state === "running") return <span className="mt-1 block text-xs text-red">{what} sans réponse</span>;
   return (
@@ -55,11 +55,25 @@ export function UpdatesPage() {
   const hosts = data ?? [];
   const ready = (h: Host) => h.connected && !actionBusy(h);
   const images = updateTotals(hosts).images;
+  const toUpgrade = hosts.filter((h) => ready(h) && !!h.updates?.pending);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const toast = useToast();
+  const upgradeAll = async () => {
+    setConfirmAll(false);
+    try {
+      const r = await api.post<{ hosts: string[] }>("/api/hosts/apply-updates");
+      toast(`Mise à jour lancée, un hôte à la fois : ${r.hosts.join(", ")}`);
+      refresh();
+    } catch (e) { toast((e as Error).message, "error"); }
+  };
 
   return (
     <>
-      <PageHeader title="Mises à jour" description="Paquets en attente sur chaque hôte (apt), relevés toutes les 6 heures par l'agent, ou à la demande."
-        actions={<Button variant="secondary" icon={<RefreshCw size={16} />} disabled={!hosts.some(ready)} onClick={() => hosts.filter(ready).forEach((h) => run(h, "check_updates"))}>Tout vérifier</Button>} />
+      <PageHeader title="Mises à jour" description="Paquets en attente sur chaque hôte (apt), relevés toutes les 6 heures par l'agent, chaque jour à l'heure choisie dans la configuration, ou à la demande."
+        actions={<>
+          <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={!hosts.some(ready)} onClick={() => hosts.filter(ready).forEach((h) => run(h, "check_updates"))}>Tout vérifier</Button>
+          <Button icon={<Download size={16} />} disabled={!toUpgrade.length} onClick={() => setConfirmAll(true)}>Tout mettre à jour{toUpgrade.length ? ` (${toUpgrade.length})` : ""}</Button>
+        </>} />
       {error && <Alert kind="error" title="Impossible de charger les mises à jour" className="mb-6">{error}</Alert>}
       {!data && !error && <Skeleton className="h-64" />}
       {data && (
@@ -140,14 +154,29 @@ export function UpdatesPage() {
           )}
         </div>
       )}
-      <Dialog open={!!confirm} onClose={() => setConfirm(undefined)} size="sm" title={`Mettre à jour ${confirm?.name ?? ""}`}
-        footer={<><Button variant="secondary" onClick={() => setConfirm(undefined)}>Annuler</Button>
-          <Button icon={<Download size={16} />} onClick={() => { const h = confirm!; setConfirm(undefined); run(h, "apply_updates"); }}>Installer les mises à jour</Button></>}>
+      <UpgradeDialog host={confirm} onClose={() => setConfirm(undefined)} onConfirm={(h) => run(h, "apply_updates")} />
+      <Dialog open={confirmAll} onClose={() => setConfirmAll(false)} size="sm" title="Mettre à jour tous les hôtes"
+        footer={<><Button variant="secondary" onClick={() => setConfirmAll(false)}>Annuler</Button>
+          <Button icon={<Download size={16} />} onClick={upgradeAll}>Tout mettre à jour</Button></>}>
         <p className="text-sm leading-relaxed text-body">
-          {confirm?.updates?.pending ?? 0} paquet(s) seront installés (apt-get upgrade, configuration locale conservée, aucun paquet supprimé).
-          L'hôte n'est pas redémarré automatiquement{confirm?.updates?.reboot_required ? " ; un redémarrage est déjà requis" : ""}. Le journal apt s'affiche sous le nom de l'hôte une fois l'opération terminée.
+          {toUpgrade.length} hôte(s) seront mis à jour <strong className="text-h1">l'un après l'autre</strong> : chacun commence quand le précédent a fini. Les VM et conteneurs passent avant les serveurs Proxmox.
+          Même opération que le bouton de chaque hôte (apt-get upgrade, aucun paquet supprimé, pas de redémarrage). Vous pouvez fermer cette page, le serveur poursuit.
         </p>
       </Dialog>
     </>
+  );
+}
+
+/** Confirmation of "Mettre à jour" for one host (here and on the host page). */
+export function UpgradeDialog({ host, onClose, onConfirm }: { host?: Host; onClose: () => void; onConfirm: (h: Host) => void }) {
+  return (
+    <Dialog open={!!host} onClose={onClose} size="sm" title={`Mettre à jour ${host?.name ?? ""}`}
+      footer={<><Button variant="secondary" onClick={onClose}>Annuler</Button>
+        <Button icon={<Download size={16} />} onClick={() => { const h = host!; onClose(); onConfirm(h); }}>Installer les mises à jour</Button></>}>
+      <p className="text-sm leading-relaxed text-body">
+        {host?.updates?.pending ?? 0} paquet(s) seront installés (apt-get upgrade, configuration locale conservée, aucun paquet supprimé).
+        L'hôte n'est pas redémarré automatiquement{host?.updates?.reboot_required ? " ; un redémarrage est déjà requis" : ""}. Le journal apt s'affiche une fois l'opération terminée.
+      </p>
+    </Dialog>
   );
 }

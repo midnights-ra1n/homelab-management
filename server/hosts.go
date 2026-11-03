@@ -176,6 +176,8 @@ type Host struct {
 	ParentID     *int64 `json:"parent_id"`
 	ParentManual bool   `json:"parent_manual"` // chosen in the dashboard, never changed automatically
 	VMID         int    `json:"vmid,omitempty"`
+	Proxmox      bool   `json:"proxmox"`  // the agent runs on a Proxmox node (/etc/pve)
+	LxcSync      bool   `json:"lxc_sync"` // and installs itself in the LXC containers (hlm-agent-lxc)
 }
 
 type hostAction struct {
@@ -332,7 +334,7 @@ func (s *Server) pingDownHosts(ctx context.Context, hosts []Host) {
 }
 
 func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
-	rows, err := s.db.Query(`SELECT id,name,COALESCE(l.last_seen,0),maintenance,public,info,COALESCE(l.latest,'{}'),updates,action,COALESCE(l.docker,'{}'),node_apps,created_at,parent_id,parent_manual,vmid FROM hosts LEFT JOIN host_live l ON l.host_id=id `+where+` ORDER BY name COLLATE NOCASE`, args...)
+	rows, err := s.db.Query(`SELECT id,name,COALESCE(l.last_seen,0),maintenance,public,info,COALESCE(l.latest,'{}'),updates,action,COALESCE(l.docker,'{}'),node_apps,created_at,parent_id,parent_manual,vmid,pve FROM hosts LEFT JOIN host_live l ON l.host_id=id `+where+` ORDER BY name COLLATE NOCASE`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -340,9 +342,13 @@ func (s *Server) loadHosts(where string, args ...any) ([]Host, error) {
 	hosts := []Host{}
 	for rows.Next() {
 		var h Host
-		var info, latest, updates, action, docker, nodeApps string
-		if err := rows.Scan(&h.ID, &h.Name, &h.LastSeen, &h.Maintenance, &h.Public, &info, &latest, &updates, &action, &docker, &nodeApps, &h.CreatedAt, &h.ParentID, &h.ParentManual, &h.VMID); err != nil {
+		var info, latest, updates, action, docker, nodeApps, pve string
+		if err := rows.Scan(&h.ID, &h.Name, &h.LastSeen, &h.Maintenance, &h.Public, &info, &latest, &updates, &action, &docker, &nodeApps, &h.CreatedAt, &h.ParentID, &h.ParentManual, &h.VMID, &pve); err != nil {
 			return nil, err
+		}
+		var p pveReport
+		if pve != "{}" && json.Unmarshal([]byte(pve), &p) == nil {
+			h.Proxmox, h.LxcSync = true, p.CTs != nil
 		}
 		h.Info, h.Latest = json.RawMessage(info), json.RawMessage(latest)
 		var u agentUpdates

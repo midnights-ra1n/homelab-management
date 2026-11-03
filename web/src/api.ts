@@ -38,6 +38,8 @@ export interface Host {
   node_apps: NodeSnapshot | null;
   /** Proxmox node or physical host above this one: detected (MAC on its bridges) or chosen by hand. */
   parent_id: number | null; parent_manual: boolean; vmid?: number;
+  /** Proxmox node; lxc_sync: its agent also equips the LXC containers (install.sh LXC=all). */
+  proxmox: boolean; lxc_sync: boolean;
 }
 
 /** Host status wording: tells a stopped agent apart from a machine that is down. */
@@ -60,7 +62,7 @@ export interface NodeApp {
 export interface NodeKey { id: string; name: string; kind: "shared" | "app" | string; type: string; comment: string; fingerprint: string; created: number }
 export interface NodeSnapshot { apps: NodeApp[]; ssh_keys: NodeKey[]; ui_port: number; actions: boolean; error?: string; collected_at: number; online: number; failing: number }
 export type NodeAction = "node_deploy" | "node_pull" | "node_update" | "node_restart" | "node_stop" | "node_remove" | "node_purge";
-export type HostActionName = "check_updates" | "apply_updates" | "update_agent" | "update_container" | NodeAction;
+export type HostActionName = "check_updates" | "apply_updates" | "update_agent" | "update_container" | "enable_lxc" | NodeAction;
 export interface HostAction { action: HostActionName; target?: string; state: "pending" | "running" | "done" | "failed"; message: string; at: number }
 export const actionBusy = (h: Host) => !!h.action && (h.action.state === "pending" || h.action.state === "running") && Date.now() / 1000 - h.action.at < 7200;
 export interface Install { hub_url: string; key: string; token: string; command: string }

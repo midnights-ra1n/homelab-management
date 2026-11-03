@@ -1,8 +1,8 @@
 //! Actions requested from the dashboard.
 //!
 //! The agent is unprivileged, so apt actions go through a root-owned helper: the agent writes
-//! "refresh" or "upgrade" to APT_REQUEST, hlm-agent-apt.path starts apt-action.sh as root, which
-//! only accepts those two words, runs apt and reports in APT_STATUS. The agent never runs
+//! "refresh", "upgrade", "agentdeb" or "lxc" to APT_REQUEST, hlm-agent-apt.path starts apt-action.sh as root, which
+//! only accepts those words, runs apt (or install.sh) and reports in APT_STATUS. The agent never runs
 //! anything as root itself.
 
 use serde_json::Value;
@@ -37,6 +37,20 @@ pub fn request_apt(kind: &str) -> Result<(), String> {
     drop_request("apt-request", kind)
 }
 
+/// Proxmox: asks the root helper to install the agent in the LXC containers, now and in the new
+/// ones (install.sh LXC=all), with the shared enrollment token the hub sent for them.
+pub fn request_lxc(token: &str) -> Result<(), String> {
+    let ok = token.len() <= 100 && token.strip_prefix("enr_").is_some_and(|t| t.len() >= 20 && t.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'));
+    if !ok {
+        return Err("Jeton des conteneurs invalide".into());
+    }
+    if !std::path::Path::new("/etc/pve").is_dir() {
+        return Err("Cette machine n'est pas un serveur Proxmox (/etc/pve absent)".into());
+    }
+    drop_request("lxc-token", token)?;
+    request_apt("lxc")
+}
+
 /// Asks the root helper to pull and recreate one Docker Compose container.
 pub fn request_container_update(name: &str) -> Result<(), String> {
     if !std::path::Path::new(DOCKER_HELPER).exists() {
@@ -54,6 +68,13 @@ pub fn request_smart() -> Result<(), String> {
         return Err("Relevé SMART à la demande non installé sur cette machine (relancez install.sh)".into());
     }
     drop_request("smart-request", "1")
+}
+
+/// The LXC install restarts the agent (install.sh) while the root helper goes on: after a
+/// restart, keep waiting for its result.
+pub fn lxc_running() -> bool {
+    std::fs::read(APT_OUTPUT.0).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+        .is_some_and(|st| st["action"] == "lxc" && st["state"] == "running")
 }
 
 /// Result of a root helper's last action, once finished after `since`: (ok, message).

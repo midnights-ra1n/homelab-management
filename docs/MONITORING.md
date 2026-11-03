@@ -73,7 +73,10 @@ L'intervalle des agents (30 s par défaut) se règle dans *Paramètres → Colle
 
 - **Conteneurs** : les conteneurs Docker de chaque hôte (état, image, ressources), avec les **nouvelles images** disponibles. Le bouton de mise à jour demande à l'agent de tirer l'image et de recréer le conteneur.
 - **Disques** : santé SMART de chaque disque, avec un verdict calculé par le hub (*bon état*, *à surveiller*, *à remplacer*, *défaillant*) et les raisons (secteurs réalloués, usure, température…). L'espace occupé de chaque partition est suivi à part.
-- **Mises à jour** : paquets en attente par hôte, mises à jour de sécurité, redémarrage requis. *Vérifier* et *Appliquer* passent par l'agent puis par le script root `apt-action.sh` lancé par systemd : ni le hub ni l'agent ne tournent en root.
+- **Mises à jour** : paquets en attente par hôte, mises à jour de sécurité, redémarrage requis. *Vérifier* et *Mettre à jour* passent par l'agent puis par le script root `apt-action.sh` lancé par systemd : ni le hub ni l'agent ne tournent en root.
+  - **Tout mettre à jour** installe les mises à jour des hôtes connectés **l'un après l'autre** : chacun commence quand le précédent a fini (2 heures au plus par hôte). VM et conteneurs d'abord, serveurs Proxmox en dernier. Le serveur poursuit même si la page est fermée.
+  - La fiche d'un hôte a aussi son bouton **Mettre à jour l'hôte**.
+  - **Vérification quotidienne** (*Paramètres → Notifications*, à l'heure choisie) : `apt-get update` puis analyse sur tous les hôtes connectés. Sans elle, l'agent relève les paquets toutes les 6 heures depuis les listes rafraîchies par `apt-daily`.
 
 ## Sondes
 
@@ -119,6 +122,8 @@ La page *Énergie* montre la puissance instantanée, la consommation par jour, s
 - serveur SMTP (STARTTLS, TLS implicite ou aucun), expéditeur, destinataires ;
 - **fenêtre de regroupement** (60 s par défaut) : tous les changements d'une fenêtre partent dans un seul message ; 0 envoie chaque changement aussitôt ;
 - alertes supplémentaires : nouvelles mises à jour de sécurité, redémarrage requis, nouvelles images Docker, santé SMART (à partir de *à surveiller*, *à remplacer* ou *défaillant*), espace disque au-delà d'un seuil (90 % par défaut). Chacune n'est signalée qu'une fois ;
+- **fréquence d'envoi** par type d'alerte (pannes, certificats, disques, mises à jour, images Docker, applications Node.js, rappels) : *immédiat*, ou résumé *toutes les heures*, *quotidien*, *hebdomadaire* ou *mensuel*, à l'heure, au jour de la semaine et au jour du mois choisis. Les alertes en attente d'un résumé sont gardées en base (rien n'est perdu au redémarrage). Le résumé des mises à jour ne cumule pas les relevés : il liste ce qui reste à installer sur chaque hôte au moment de l'envoi. Exemple : vérification chaque jour, mises à jour en résumé mensuel = un seul e-mail par mois ;
+- **anti-spam** : nombre maximal de messages immédiats par heure (au-delà, les alertes partent dans le résumé de l'heure suivante) et délai avant de réalerter pour le même élément (un service qui tombe et revient en boucle n'envoie qu'un message). Ces réglages valent pour l'e-mail et Matrix ; les notifications push restent immédiates ;
 - **modèle d'e-mail** composé par blocs, ou en HTML avancé, avec aperçu.
 
 **Matrix** (*Paramètres → Notifications Matrix*) : mêmes alertes, même regroupement, envoyées dans un salon, sur matrix.org ou sur votre propre serveur (Synapse, Conduit, Dendrite…). Le titre reprend l'objet du modèle d'e-mail. Mise en place :

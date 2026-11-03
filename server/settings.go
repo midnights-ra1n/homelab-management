@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -52,11 +53,25 @@ var settingDefs = map[string]string{
 	"notify_disk_pct":         "90",
 	"notify_docker_updates":   "false",
 	"notify_node_apps":        "true",
-	"report_monthly_enabled":  "false",
-	"report_weekly_enabled":   "false",
-	"report_energy":           "off",
-	"meross_key":              "",
-	"db_max_mb":               "0",
+	// Pacing (digest.go): instant or digest per category, cap per hour, cooldown per object.
+	"notify_freq_status":     "instant",
+	"notify_freq_cert":       "instant",
+	"notify_freq_disk":       "instant",
+	"notify_freq_updates":    "instant",
+	"notify_freq_docker":     "instant",
+	"notify_freq_nodeapps":   "instant",
+	"notify_freq_reminders":  "instant",
+	"notify_digest_time":     "08:00",
+	"notify_digest_weekday":  "1",
+	"notify_digest_monthday": "1",
+	"notify_max_per_hour":    "0",
+	"notify_cooldown_min":    "0",
+	"updates_check_time":     "",
+	"report_monthly_enabled": "false",
+	"report_weekly_enabled":  "false",
+	"report_energy":          "off",
+	"meross_key":             "",
+	"db_max_mb":              "0",
 }
 
 var secretSettings = []string{"smtp_pass", "matrix_token", "meross_key"}
@@ -67,6 +82,8 @@ func dropSecrets(m map[string]string) {
 	}
 }
 
+var hhmmRe = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+
 var intSettings = map[string][2]int{
 	"agent_interval_s":       {5, 3600},
 	"retention_metrics_days": {1, 3650},
@@ -76,6 +93,10 @@ var intSettings = map[string][2]int{
 	"smtp_port":              {1, 65535},
 	"db_max_mb":              {0, 1 << 20},
 	"notify_disk_pct":        {0, 99},
+	"notify_digest_weekday":  {1, 7},
+	"notify_digest_monthday": {1, 28},
+	"notify_max_per_hour":    {0, 1000},
+	"notify_cooldown_min":    {0, 10080},
 }
 
 // defs returns the settings of this server's role.
@@ -171,6 +192,16 @@ func validateSettings(defs, in map[string]string) string {
 	}
 	if v, ok := in["report_energy"]; ok && v != "off" && v != "daily" && v != "weekly" && v != "monthly" {
 		return "La fréquence du rapport de consommation doit être off, daily, weekly ou monthly"
+	}
+	for k, v := range in {
+		if strings.HasPrefix(k, "notify_freq_") && !slices.Contains(notifyFreqs, v) {
+			return "La fréquence d'envoi doit être instant, hourly, daily, weekly ou monthly"
+		}
+	}
+	for _, k := range []string{"notify_digest_time", "updates_check_time"} {
+		if v, ok := in[k]; ok && !(v == "" && k == "updates_check_time") && !hhmmRe.MatchString(v) {
+			return "L'heure doit être au format HH:MM (par exemple 08:00)"
+		}
 	}
 	if v, ok := in["notify_smart_level"]; ok && v != DiskWatch && v != DiskReplace && v != DiskFailing && v != "off" {
 		return "Le seuil d'alerte SMART doit être watch, replace, failing ou off"

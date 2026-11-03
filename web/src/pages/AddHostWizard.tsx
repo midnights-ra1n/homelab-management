@@ -3,8 +3,8 @@ import { Check, Cpu, HardDrive, Laptop, LoaderCircle, Server } from "../shared/i
 import { api, fmtBytes, fmtPct, type Host, type Install } from "../api";
 import { Alert, Button, CodeBlock, Dialog, Field, Segmented, Switch, cn, inputClass, navigate, useToast } from "../ui";
 
-type Kind = "vm" | "proxmox" | "physical" | "client";
-const KINDS: { id: Kind; label: string; hint: string; icon: typeof Server; smart: boolean }[] = [
+export type Kind = "vm" | "proxmox" | "physical" | "client";
+export const KINDS: { id: Kind; label: string; hint: string; icon: typeof Server; smart: boolean }[] = [
   { id: "vm", label: "Machine virtuelle", hint: "VM ou conteneur LXC, sans SMART", icon: Cpu, smart: false },
   { id: "proxmox", label: "Serveur Proxmox", hint: "Hyperviseur avec ses disques", icon: Server, smart: true },
   { id: "physical", label: "Serveur physique", hint: "NAS, serveur dédié", icon: HardDrive, smart: true },
@@ -128,6 +128,26 @@ function Stepper({ step }: { step: number }) {
   );
 }
 
+/** Machine type: sets the default options (SMART, LXC containers of a Proxmox host). */
+export function KindPicker({ value, onChange }: { value: Kind; onChange: (k: (typeof KINDS)[number]) => void }) {
+  return (
+    <fieldset className="mm-field">
+      <legend className="mm-field__label mb-1.5">Type de machine</legend>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
+        {KINDS.map((k) => (
+          <button key={k.id} type="button" role="radio" aria-checked={value === k.id}
+            className="flex flex-col items-start gap-1 rounded-xl border border-line-subtle bg-box p-3 text-left transition-colors hover:border-line-strong aria-checked:border-accent aria-checked:bg-accent-soft"
+            onClick={() => onChange(k)}>
+            <span className="mb-1 flex size-8 items-center justify-center rounded-full bg-accent-soft text-accent-text"><k.icon size={16} aria-hidden /></span>
+            <span className="text-sm font-medium text-h1">{k.label}</span>
+            <span className="text-xs text-meta">{k.hint}</span>
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 /** Parent of a host: -1 automatic (the Proxmox node that runs it), 0 none, else a host id.
     The host itself and the hosts under it are left out. */
 export function ParentSelect({ id, hosts, self, value, onChange, disabled }: {
@@ -221,20 +241,7 @@ export function AddHostWizard({ open, onClose, hosts = [] }: { open: boolean; on
           <Field label="Nom" htmlFor="wiz-name" error={error} hint="Tel qu'il apparaîtra dans le tableau de bord, par exemple pve-01">
             <input id="wiz-name" className={inputClass} value={name} disabled={!!created} onChange={(e) => setName(e.target.value)} autoFocus aria-invalid={!!error} />
           </Field>
-          <fieldset className="mm-field">
-            <legend className="mm-field__label mb-1.5">Type de machine</legend>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
-              {KINDS.map((k) => (
-                <button key={k.id} type="button" role="radio" aria-checked={kind === k.id}
-                  className="flex flex-col items-start gap-1 rounded-xl border border-line-subtle bg-box p-3 text-left transition-colors hover:border-line-strong aria-checked:border-accent aria-checked:bg-accent-soft"
-                  onClick={() => { setKind(k.id); setOpts((o) => ({ ...o, smart: k.smart })); }}>
-                  <span className="mb-1 flex size-8 items-center justify-center rounded-full bg-accent-soft text-accent-text"><k.icon size={16} aria-hidden /></span>
-                  <span className="text-sm font-medium text-h1">{k.label}</span>
-                  <span className="text-xs text-meta">{k.hint}</span>
-                </button>
-              ))}
-            </div>
-          </fieldset>
+          <KindPicker value={kind} onChange={(k) => { setKind(k.id); setOpts((o) => ({ ...o, smart: k.smart })); }} />
           <Switch label="Surveiller les disques (SMART, installe smartmontools)" checked={opts.smart} onChange={(v) => setOpts({ ...opts, smart: v })} />
           <Switch label="Mise à jour automatique quotidienne de l'agent" checked={opts.autoUpdate} onChange={(v) => setOpts({ ...opts, autoUpdate: v })} />
           {kind === "proxmox" && (

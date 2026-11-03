@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -43,6 +44,7 @@ var warningLabels = map[string][2]string{
 	KindSpace:    {"Espace disque faible", statusColors[StatusMinor]},
 	KindNodeApp:  {"Application en échec", statusColors[StatusMinor]},
 	KindReminder: {"Rappel de mise à jour", statusColors[StatusMaintenance]},
+	KindPending:  {"Mises à jour en attente", statusColors[StatusMaintenance]},
 }
 
 type Event struct {
@@ -52,6 +54,8 @@ type Event struct {
 	To      string
 	Message string
 	At      time.Time
+	// Wording instead of the status label, e.g. "Consommation électrique élevée" for a plug over its threshold.
+	FromText, ToText string
 }
 
 // Notifier groups every status change that happens within the grouping window into a
@@ -61,9 +65,11 @@ type Notifier struct {
 	mu      sync.Mutex
 	pending []Event
 	timer   *time.Timer
+	sent    []time.Time          // instant messages of the last hour (notify_max_per_hour)
+	last    map[string]time.Time // last instant message per object (notify_cooldown_min)
 }
 
-func newNotifier(s *Server) *Notifier { return &Notifier{s: s} }
+func newNotifier(s *Server) *Notifier { return &Notifier{s: s, last: map[string]time.Time{}} }
 
 func (n *Notifier) add(e Event) {
 	slog.Info("status change", "kind", e.Kind, "name", e.Name, "from", e.From, "to", e.To)
@@ -88,15 +94,25 @@ func (n *Notifier) flush() {
 		return
 	}
 	n.s.push(evs)
-	if n.s.getSetting("matrix_enabled", "false") == "true" {
-		if err := n.s.sendMatrixAlert(evs, ""); err != nil {
+	if n.s.getSetting("matrix_enabled", "false") != "true" && n.s.getSetting("smtp_enabled", "false") != "true" {
+		return
+	}
+	if evs = n.pace(evs, time.Now()); len(evs) > 0 {
+		n.s.sendMessages(evs)
+	}
+}
+
+// sendMessages sends alerts (instant or digest) to Matrix and by e-mail.
+func (s *Server) sendMessages(evs []Event) {
+	if s.getSetting("matrix_enabled", "false") == "true" {
+		if err := s.sendMatrixAlert(evs, ""); err != nil {
 			slog.Error("send alert to Matrix", "err", err, "events", len(evs))
 		}
 	}
-	if n.s.getSetting("smtp_enabled", "false") != "true" {
+	if s.getSetting("smtp_enabled", "false") != "true" {
 		return
 	}
-	if err := n.s.sendAlert(evs); err != nil {
+	if err := s.sendAlert(evs); err != nil {
 		slog.Error("send alert e-mail", "err", err, "events", len(evs))
 	}
 }
@@ -157,16 +173,27 @@ func (s *Server) emailData(evs []Event) emailData {
 func buildEmailData(title, url string, evs []Event) emailData {
 	d := emailData{Title: title, Date: time.Now().In(localTZ()).Format("02/01/2006 15:04"), URL: url}
 	for _, e := range evs {
-		ee := emailEvent{Event: e, FromLabel: statusLabels[e.From], ToLabel: statusLabels[e.To], Color: statusColors[e.To], Time: e.At.In(localTZ()).Format("15:04:05")}
+		ee := emailEvent{Event: e, FromLabel: cmp.Or(e.FromText, statusLabels[e.From]), ToLabel: cmp.Or(e.ToText, statusLabels[e.To]), Color: statusColors[e.To], Time: eventTime(e.At)}
 		if w, ok := warningLabels[e.Kind]; ok {
 			d.Warnings++
 			ee.FromLabel, ee.ToLabel, ee.Color = "", w[0], w[1]
 		} else if statusRank(e.To) >= statusRank(StatusMinor) {
 			d.Down++
+		} else if e.ToText != "" {
+			d.Warnings++ // e.g. high power: not a recovery, whatever its status rank
 		}
 		d.Events = append(d.Events, ee)
 	}
 	return d
+}
+
+// eventTime shows the date too for an event of another day (digests).
+func eventTime(t time.Time) string {
+	t, now := t.In(localTZ()), time.Now().In(localTZ())
+	if t.YearDay() != now.YearDay() || t.Year() != now.Year() {
+		return t.Format("02/01 15:04")
+	}
+	return t.Format("15:04:05")
 }
 
 // sampleEvents feeds template validation and the test e-mail.

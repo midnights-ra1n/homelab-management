@@ -736,7 +736,17 @@ func (s *Server) recordResult(m *Monitor, res checkResult, eff string) error {
 	}
 	if eff != m.Status && m.Status != StatusUnknown && eff != StatusUnknown &&
 		eff != StatusMaintenance && m.Status != StatusMaintenance {
-		s.notifier.add(Event{Kind: "Sonde", Name: m.Name, From: m.Status, To: eff, Message: res.message, At: now})
+		ev := Event{Kind: "Sonde", Name: m.Name, From: m.Status, To: eff, Message: res.message, At: now}
+		// A plug over its power threshold is "degraded": say what it means.
+		if m.Type == "meross" {
+			if eff == StatusDegraded && strings.Contains(res.message, "au-dessus du seuil") {
+				ev.ToText = highPower
+			}
+			if m.Status == StatusDegraded && strings.Contains(m.Message, "au-dessus du seuil") {
+				ev.FromText = highPower
+			}
+		}
+		s.notifier.add(ev)
 	}
 	return nil
 }

@@ -47,7 +47,7 @@ Mise à jour : le bouton *Mettre à jour l'agent* passe par l'assistant root `ap
 
 ## Plusieurs machines : le jeton commun
 
-*Hôtes → Déploiement en masse* crée un jeton commun (`enr_…`), valable 24 heures, 7 jours, 30 jours ou sans limite.
+*Hôtes → Déploiement en masse* crée un jeton commun (`enr_…`), valable 24 heures, 7 jours, 30 jours ou sans limite. On y choisit ensuite le **type de machine**, comme dans l'assistant : il règle SMART (`hlm_smart` pour Ansible) et, pour un *Serveur Proxmox*, propose d'installer aussi l'agent dans les conteneurs LXC (méthode Commande ; prévoir un jeton sans expiration pour les conteneurs créés plus tard).
 
 - **La même commande et la même clé** sur toutes les machines.
 - À sa première connexion, chaque agent s'inscrit sous **son nom de machine** (`pve-01`, `nas`…). En cas de doublon, un suffixe est ajouté (`pve-01-2`).
@@ -70,7 +70,9 @@ Il affiche ensuite un bilan (`CT 101 (nextcloud): installed`…), puis active `h
 - installe l'agent dans chaque **nouveau** conteneur Debian démarré qui ne l'a pas encore (un échec est retenté au bout d'une heure). Un conteneur avec l'étiquette Proxmox `no-hlm` est laissé de côté ;
 - liste tous les conteneurs du cluster. Quand un conteneur est **supprimé** de Proxmox, le hub supprime son hôte (et l'inscrit au journal). Un conteneur arrêté ou migré vers un autre nœud n'est pas concerné.
 
-Une installation faite avant ce timer ne l'a pas : relancez une fois la ligne avec `LXC=all` et un jeton `LXC_TOKEN=enr_…` valide (*Hôtes → Déploiement en masse*). `LXC=none` arrête le timer ; une relance sans `LXC` garde le choix précédent. Les machines virtuelles (QEMU) ne sont pas concernées ; installez l'agent dans une VM comme sur n'importe quelle machine.
+**Hôte déjà installé** (comme machine virtuelle, avec Ansible, ou avant ce timer) : sur sa fiche, **Passer en serveur Proxmox**, sans rien relancer à la main. Le hub crée un jeton commun sans expiration (« LXC de <hôte> ») et l'envoie à l'agent, qui le dépose pour l'assistant root `apt-action.sh` (action `lxc`). Celui-ci relance `install.sh` avec `LXC=all` : l'agent du Proxmox redémarre quelques secondes en gardant sa configuration et ses options (Docker, Node.js, mise à jour automatique), SMART est activé, puis l'agent s'installe dans les conteneurs Debian démarrés, sans les arrêter. Il faut `REMOTE_UPDATES` activé (par défaut). Le bouton devient **Rééquiper les conteneurs** une fois le timer actif (utile si le jeton a été révoqué). Le bilan s'affiche sous le bouton.
+
+À la main : relancez une fois la ligne avec `LXC=all` et un jeton `LXC_TOKEN=enr_…` valide (*Hôtes → Déploiement en masse*). `LXC=none` arrête le timer ; une relance sans `LXC` garde le choix précédent. Les machines virtuelles (QEMU) ne sont pas concernées ; installez l'agent dans une VM comme sur n'importe quelle machine.
 
 ### Hiérarchie Proxmox → VM et conteneurs
 

@@ -38,6 +38,8 @@ func randHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
+const highPower = "Consommation électrique élevée"
+
 // checkMeross reads the instant power of a plug through its local HTTP API.
 func checkMeross(ctx context.Context, m *Monitor, key string) checkResult {
 	if key == "" {
