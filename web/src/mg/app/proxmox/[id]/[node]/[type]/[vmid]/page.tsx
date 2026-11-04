@@ -137,7 +137,7 @@ function Summary({ ctx, tf, base }: { ctx: Ctx; tf: Timeframe; base: string }) {
   const running = s.status === "running";
   const tags = String(c.tags ?? "").split(/[;,\s]+/).filter(Boolean);
   return (
-    <div className="grid gap-10">
+    <div className="grid gap-8">
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="grid content-start gap-4 p-5">
           <Meter label="CPU" value={running ? (s.cpu ?? 0) * 100 : 0} detail={running ? `${((s.cpu ?? 0) * 100).toFixed(1)} % · ${s.cpus} vCPU` : `${s.cpus} vCPU`} />
@@ -148,7 +148,7 @@ function Summary({ ctx, tf, base }: { ctx: Ctx; tf: Timeframe; base: string }) {
           ) : (
             <p className="flex justify-between text-xs text-body">
               <span>{tr("Disque de démarrage")}</span>
-              <span className="font-mono text-meta">{formatBytes(s.maxdisk, tr.locale)}</span>
+              <span className="tabular-nums text-meta">{formatBytes(s.maxdisk, tr.locale)}</span>
             </p>
           )}
         </Card>
@@ -156,7 +156,7 @@ function Summary({ ctx, tf, base }: { ctx: Ctx; tf: Timeframe; base: string }) {
           <InfoList
             items={[
               [tr("État"), s.qmpstatus ?? s.status],
-              [tr("Uptime"), running ? <span key="u" className="font-mono">{formatUptime(s.uptime, tr.locale)}</span> : "—"],
+              [tr("Uptime"), running ? <span key="u" className="tabular-nums">{formatUptime(s.uptime, tr.locale)}</span> : "—"],
               [tr("Démarrage auto"), c.onboot ? tr("Oui") : tr("Non")],
               [tr("Ordre de démarrage"), c.startup ? <span key="st" className="font-mono">{String(c.startup)}</span> : "—"],
               [tr("Système"), String(c.ostype ?? "—")],
@@ -167,8 +167,8 @@ function Summary({ ctx, tf, base }: { ctx: Ctx; tf: Timeframe; base: string }) {
                     [tr("Machine"), <span key="m" className="font-mono">{s["running-machine"] ?? String(c.machine ?? "—")}</span>],
                   ] as [string, React.ReactNode][])
                 : []),
-              [tr("Lecture / écriture disque"), <span key="io" className="font-mono">{`${formatBytes(s.diskread, tr.locale)} / ${formatBytes(s.diskwrite, tr.locale)}`}</span>],
-              [tr("Réseau entrant / sortant"), <span key="n" className="font-mono">{`${formatBytes(s.netin, tr.locale)} / ${formatBytes(s.netout, tr.locale)}`}</span>],
+              [tr("Lecture / écriture disque"), <span key="io" className="tabular-nums">{`${formatBytes(s.diskread, tr.locale)} / ${formatBytes(s.diskwrite, tr.locale)}`}</span>],
+              [tr("Réseau entrant / sortant"), <span key="n" className="tabular-nums">{`${formatBytes(s.netin, tr.locale)} / ${formatBytes(s.netout, tr.locale)}`}</span>],
               [tr("Tags"), tags.length ? <span key="t" className="inline-flex flex-wrap justify-end gap-1">{tags.map((t) => <Tag key={t}>{t}</Tag>)}</span> : "—"],
             ]}
           />

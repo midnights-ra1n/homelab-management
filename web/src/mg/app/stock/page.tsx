@@ -1,7 +1,9 @@
 import { Suspense, use } from "react";
-import { AlertTriangle, CheckCircle2, Package, Warehouse } from "../../../shared/icons";
+import { Package, Warehouse } from "../../../shared/icons";
+import { Card } from "../../../ui";
+import { Spec } from "../../../pages/NodeApps";
 import { listHardware } from "@/lib/data/hardware";
-import { assetOptions } from "@/lib/data/assets";
+import { assetOptions, hardwareTotals, storageTotalGb } from "@/lib/data/assets";
 import {
   HARDWARE_CATEGORIES,
   HARDWARE_CATEGORY_META,
@@ -27,7 +29,7 @@ export default function StockPage({ searchParams }: PageProps<"/[lang]/stock">) 
     <>
       <PageHeader
         title={tr("Stock matériel")}
-        description={tr("Serveurs, PC, matériel réseau et composants : ce qui est installé où, ce qui attend en stock et ce qui est en panne.")}
+        description={tr("Ce qui est installé où, ce qui attend en stock et ce qui est en panne.")}
       />
       <Suspense fallback={<Skeleton className="h-[28rem] rounded-3xl" />}>
         <Stock searchParams={searchParams} />
@@ -42,6 +44,8 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
   const pick = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : "");
   const [q, category, status, condition] = [pick("q").toLowerCase(), pick("category"), pick("status"), pick("condition")];
   const all = use(listHardware());
+  const hw = use(hardwareTotals());
+  const storage = use(storageTotalGb());
   const options = {
     machines: all.filter((h) => HARDWARE_MACHINES.includes(h.category)).map((h) => ({ id: h.id, name: h.name })),
     assets: use(assetOptions(["physical", "network"])).map((a) => ({ id: a.id, display_name: a.display_name })),
@@ -86,24 +90,34 @@ function Stock({ searchParams }: { searchParams: PageProps<"/[lang]/stock">["sea
         <Stat
           label={tr("Matériel")}
           value={pieces(all)}
-          icon={<Package size={16} />}
           detail={value > 0 ? tr("{v} € d'achats", { v: value.toLocaleString(tr.locale, { maximumFractionDigits: 0 }) }) : tr("{n} équipement(s)", { n: options.machines.length })}
         />
-        <Stat label={tr("En service")} value={count("in_use")} icon={<CheckCircle2 size={16} />} tone="green" detail={tr("{n} équipement(s)", { n: options.machines.length })} />
+        <Stat label={tr("En service")} value={count("in_use")} tone="green" detail={tr("{n} équipement(s)", { n: options.machines.length })} />
         <Stat
           label={tr("En stock")}
           value={count("stock")}
-          icon={<Warehouse size={16} />}
           detail={[stockGb("ram") && `RAM ${formatGb(stockGb("ram"))}`, stockGb("disk") && `${tr("disques")} ${formatGb(stockGb("disk"))}`].filter(Boolean).join(" · ") || tr("{n} commandé(s)", { n: count("ordered") })}
         />
         <Stat
           label={tr("À surveiller")}
           value={broken + watch + warrantySoon}
-          icon={<AlertTriangle size={16} />}
           tone={broken ? "red" : watch || warrantySoon ? "yellow" : undefined}
           detail={tr("{b} en panne ou en réparation · {a} à surveiller · {w} garantie(s) sous 30 j", { b: broken, a: watch, w: warrantySoon })}
         />
       </div>
+
+      {hw.servers > 0 && (
+        <Card title={tr("Capacité")} sub={tr("{n} serveur(s) physique(s)", { n: hw.servers })}>
+          <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[
+              { label: tr("Cœurs / threads"), value: `${hw.cores} / ${hw.threads}` },
+              { label: tr("Mémoire"), value: formatGb(hw.ram_gb, tr.locale) },
+              { label: tr("Stockage brut"), value: formatGb(storage, tr.locale) },
+              { label: tr("Consommation"), value: hw.watts ? `${hw.watts} W` : "—" },
+            ].map((k) => <Spec key={k.label} label={k.label}>{k.value}</Spec>)}
+          </dl>
+        </Card>
+      )}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
         <FilterBar

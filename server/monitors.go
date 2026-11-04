@@ -731,8 +731,8 @@ func (s *Server) recordResult(m *Monitor, res checkResult, eff string) error {
 		events.publish("metrics")
 	}
 	if warnCert {
-		s.notifier.add(Event{Kind: KindCert, Name: m.Name, Message: fmt.Sprintf("Le certificat expire dans %d jour(s), le %s",
-			daysLeft(*res.certExpiry), res.certExpiry.In(localTZ()).Format("02/01/2006 à 15:04")), At: now})
+		s.notifier.add(Event{Kind: KindCert, Name: m.Name, Message: plural(fmt.Sprintf("Le certificat expire dans %d jour(s), le %s",
+			daysLeft(*res.certExpiry), res.certExpiry.In(localTZ()).Format("02/01/2006 à 15:04"))), At: now})
 	}
 	if eff != m.Status && m.Status != StatusUnknown && eff != StatusUnknown &&
 		eff != StatusMaintenance && m.Status != StatusMaintenance {

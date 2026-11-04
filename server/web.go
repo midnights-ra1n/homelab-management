@@ -61,7 +61,7 @@ func (s *Server) staticHandler() http.Handler {
 var managementShell = strings.NewReplacer(
 	"Midnights Monitoring", "Midnights Management",
 	"Supervision du homelab : hôtes, sondes et page de statut.", "Gestion du homelab : inventaire, réseau, déploiements, Proxmox.",
-	`"/icon`, `"/mg/icon`, `"/apple-touch-icon.png"`, `"/mg/apple-touch-icon.png"`,
+	`"/icon`, `"/mg/icon`, `"/apple-touch-icon.png"`, `"/mg/apple-touch-icon.png"`, `"/favicon.ico"`, `"/mg/favicon.ico"`,
 )
 
 func (s *Server) serveManagementShell(w http.ResponseWriter, dist fs.FS, p string) {

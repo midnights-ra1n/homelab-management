@@ -20,7 +20,7 @@ function Step({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-const Path = ({ children }: { children: ReactNode }) => <span className="font-mono text-xs text-h2">{children}</span>;
+const Path = ({ children }: { children: ReactNode }) => <span className="font-medium text-h2">{children}</span>;
 
 /** Guide repliable : mettre en place Nextcloud et Rappels, et ce qu'il faut attendre des délais. */
 export function TaskSyncGuide({ open }: { open: boolean }) {
@@ -32,7 +32,7 @@ export function TaskSyncGuide({ open }: { open: boolean }) {
         <ChevronDown size={16} className="ml-auto shrink-0 text-meta transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
       <div className="mm-card__body grid gap-8 lg:grid-cols-2">
-        <ol className="grid list-decimal content-start gap-5 pl-5 marker:font-mono marker:text-meta">
+        <ol className="grid list-decimal content-start gap-5 pl-5 marker:text-meta">
           <Step title={tr("Nextcloud : les listes")}>
             <p>{tr("Dans Nextcloud Tâches, crée une liste par usage (Perso, Pro…).")}</p>
             <p>

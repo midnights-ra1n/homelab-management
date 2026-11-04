@@ -271,15 +271,45 @@ func loadOrCreateKey(dir string) (ed25519.PrivateKey, error) {
 	return pk, nil
 }
 
+// getSetting reads from memory: the table is read on every status computed and written only
+// from the settings forms. A failed load is not kept, so the next call tries again.
 func (s *Server) getSetting(k, def string) string {
-	var v string
-	if err := s.db.QueryRow(`SELECT value FROM settings WHERE key=?`, k).Scan(&v); err != nil {
-		return def
+	s.settingsMu.Lock()
+	defer s.settingsMu.Unlock()
+	if s.settings == nil {
+		rows, err := s.db.Query(`SELECT key,value FROM settings`)
+		if err != nil {
+			return def
+		}
+		defer rows.Close()
+		all := map[string]string{}
+		for rows.Next() {
+			var key, v string
+			if err := rows.Scan(&key, &v); err != nil {
+				return def
+			}
+			all[key] = v
+		}
+		if rows.Err() != nil {
+			return def
+		}
+		s.settings = all
 	}
-	return v
+	if v, ok := s.settings[k]; ok {
+		return v
+	}
+	return def
+}
+
+// forgetSettings must follow every write to the table.
+func (s *Server) forgetSettings() {
+	s.settingsMu.Lock()
+	s.settings = nil
+	s.settingsMu.Unlock()
 }
 
 func (s *Server) setSetting(k, v string) error {
 	_, err := s.db.Exec(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, k, v)
+	s.forgetSettings()
 	return err
 }

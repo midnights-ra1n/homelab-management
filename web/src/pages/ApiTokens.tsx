@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BookOpen, KeyRound, Plus, Trash2 } from "../shared/icons";
 import { api, fmtAgo, fmtDate } from "../api";
+import { plural } from "../shared/plural";
 import {
   Alert, Badge, Button, ButtonAnchor, Card, CardBody, Checkbox, CodeBlock, Dialog, FIELD_ROW, FORM_ACTIONS, Field, IconButton, SectionTitle, Switch, Tag,
   inputClass, useToast,
@@ -49,7 +50,7 @@ export function ApiSection({ draft, setDraft, save, busy }: {
             <div className={FORM_ACTIONS}><Button loading={busy === "api"} onClick={() => save("api", ["api_enabled", "api_cors_origins"])}>Enregistrer l'API</Button></div>
           </CardBody>
         </Card>
-        <Card flush title="Jetons" sub={`${tokens.length} jeton(s)`} actions={<Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={() => setCreating(true)}>Créer un jeton</Button>}>
+        <Card flush title="Jetons" sub={plural(`${tokens.length} jeton(s)`)} actions={<Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={() => setCreating(true)}>Créer un jeton</Button>}>
           {tokens.length === 0 ? <p className="px-5 py-8 text-center text-sm text-meta">Aucun jeton. Crée-en un par application qui interroge l'API.</p> : (
             <div className="mm-table-wrap">
               <table className="mm-table min-w-[48rem]">
@@ -65,7 +66,7 @@ export function ApiSection({ draft, setDraft, save, busy }: {
                           {t.user && <span className="block text-xs font-normal text-meta">Connexion de {t.user}</span>}
                         </td>
                         <td className="whitespace-normal"><div className="flex max-w-[18rem] flex-wrap gap-1">{t.scopes.map((s) => <Tag key={s}>{s}</Tag>)}</div></td>
-                        <td>{t.expires_at == null ? <span className="text-meta">Jamais</span> : expired ? <Badge tone="red" dot>Expiré</Badge> : <span className="font-mono text-xs">{fmtDate(t.expires_at)}</span>}</td>
+                        <td>{t.expires_at == null ? <span className="text-meta">Jamais</span> : expired ? <Badge tone="red" dot>Expiré</Badge> : <span className="tabular-nums text-xs">{fmtDate(t.expires_at)}</span>}</td>
                         <td className="mm-col-muted">{t.last_used_at ? fmtAgo(t.last_used_at) : "Jamais"}</td>
                         <td className="w-px"><IconButton label={`Révoquer ${t.name}`} icon={<Trash2 size={15} />} onClick={() => setRevoking(t)} /></td>
                       </tr>
@@ -76,11 +77,11 @@ export function ApiSection({ draft, setDraft, save, busy }: {
             </div>
           )}
         </Card>
-        <Card flush title="Appareils (notifications push)" sub={devices?.push_enabled ? `${devices.devices.length} appareil(s)` : "APNs non configuré"}
+        <Card flush title="Appareils (notifications push)" sub={devices?.push_enabled ? plural(`${devices.devices.length} appareil(s)`) : "APNs non configuré"}
           actions={devices?.push_enabled && devices.devices.length > 0 && <Button variant="secondary" size="sm" onClick={testPush}>Envoyer un test</Button>}>
           {!devices?.push_enabled && (
             <p className="px-5 pt-4 text-sm text-body">
-              Pour les notifications de l'app iOS et macOS, définissez <code>HLT_APNS_KEY</code> (clé .p8), <code>HLT_APNS_KEY_ID</code>, <code>HLT_APNS_TEAM_ID</code> et <code>HLT_APNS_TOPIC</code> (identifiant de l'app), puis redémarrez le serveur.
+              Pour les notifications de l'app iOS et macOS, définis <code>HLT_APNS_KEY</code> (clé .p8), <code>HLT_APNS_KEY_ID</code>, <code>HLT_APNS_TEAM_ID</code> et <code>HLT_APNS_TOPIC</code> (identifiant de l'app), puis redémarre le serveur.
             </p>
           )}
           {!devices?.devices.length ? <p className="px-5 py-8 text-center text-sm text-meta">Aucun appareil. L'app s'inscrit avec un jeton ayant le scope push:write (<a href="https://github.com/midnights-ra1n/homelab-management/blob/stable/docs/API-APPLE.md" target="_blank" rel="noopener">guide iOS / macOS</a>).</p> : (
@@ -130,7 +131,7 @@ function CreateTokenDialog({ scopes, onClose }: { scopes: Record<string, string>
     const days = EXPIRY.find((x) => x[0] === expiry)?.[2];
     if (days) expires_at = Math.floor(Date.now() / 1000) + days * 86400;
     if (expiry === "custom") {
-      if (!date) { setError("Choisissez une date d'expiration"); return; }
+      if (!date) { setError("Choisis une date d'expiration"); return; }
       expires_at = Math.floor(new Date(`${date}T23:59:59`).getTime() / 1000);
     }
     setBusy(true);
@@ -150,7 +151,7 @@ function CreateTokenDialog({ scopes, onClose }: { scopes: Record<string, string>
       )}>
       {token ? (
         <div className="grid gap-5">
-          <Alert kind="warning" title="Le jeton ne sera plus affiché">Copiez-le maintenant et stockez-le comme un mot de passe.</Alert>
+          <Alert kind="warning" title="Le jeton ne sera plus affiché">Copie-le maintenant et stocke-le comme un mot de passe.</Alert>
           <Field label="Jeton"><CodeBlock text={token} /></Field>
           <Field label="Exemple"><CodeBlock text={`curl -H "Authorization: Bearer ${token}" ${location.origin}/api/v1/status`} /></Field>
         </div>
@@ -168,7 +169,7 @@ function CreateTokenDialog({ scopes, onClose }: { scopes: Record<string, string>
               <Field label="Date" htmlFor="tok-date"><input id="tok-date" className={inputClass} type="date" min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
             )}
           </div>
-          {expiry === "never" && <Alert kind="info" title="Jeton sans expiration">À réserver à un service interne de confiance ; révoquez-le s'il fuite.</Alert>}
+          {expiry === "never" && <Alert kind="info" title="Jeton sans expiration">À réserver à un service interne de confiance ; révoque-le s'il fuite.</Alert>}
           <fieldset className="mm-field">
             <legend className="mm-field__label mb-1.5">Scopes</legend>
             <div className="grid gap-3 rounded-[18px] border border-line-strong bg-field px-4 py-3">

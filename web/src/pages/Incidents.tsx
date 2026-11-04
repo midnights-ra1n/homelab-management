@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { CircleAlert, CircleCheck, TriangleAlert, Wrench } from "../shared/icons";
+import { CircleCheck } from "../shared/icons";
 import { api, fmtAgo, statusLabel, type Overview, type Status } from "../api";
 import { Alert, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, Segmented, Card, Stat, StatusBadge, StatusIcon, navigate, usePoll } from "../ui";
+import { plural } from "../shared/plural";
 
 export interface Incident { key: string; kind: "Hôte" | "Sonde"; name: string; status: Status; detail: string; at: number; to: string }
 
@@ -33,19 +34,19 @@ export function IncidentsPage() {
 
   return (
     <>
-      <PageHeader title="Incidents en cours" description="Hôtes et sondes qui ne sont pas opérationnels, du plus grave au moins grave. Mis à jour en direct." />
+      <PageHeader title="Incidents en cours" description="Hôtes et sondes qui ne sont pas opérationnels, du plus grave au moins grave." />
       {error && <Alert kind="error" title="Impossible de charger les incidents" className="mb-6">{error}</Alert>}
       <div className={SECTIONS}>
         <div className={STAT_GRID}>
-          <Stat label="Pannes majeures" value={count("major_outage")} icon={<CircleAlert size={16} />} tone={count("major_outage") ? "red" : undefined} />
-          <Stat label="Pannes partielles" value={count("minor_outage")} icon={<CircleAlert size={16} />} tone={count("minor_outage") ? "red" : undefined} />
-          <Stat label="Performances dégradées" value={count("degraded")} icon={<TriangleAlert size={16} />} tone={count("degraded") ? "yellow" : undefined} />
-          <Stat label="En maintenance" value={count("maintenance")} icon={<Wrench size={16} />} />
+          <Stat label="Pannes majeures" value={count("major_outage")} tone={count("major_outage") ? "red" : undefined} />
+          <Stat label="Pannes partielles" value={count("minor_outage")} tone={count("minor_outage") ? "red" : undefined} />
+          <Stat label="Performances dégradées" value={count("degraded")} tone={count("degraded") ? "yellow" : undefined} />
+          <Stat label="En maintenance" value={count("maintenance")} />
         </div>
         {data && all.length === 0 ? (
           <EmptyState icon={<CircleCheck size={20} />} title="Aucun incident en cours">Tous les hôtes et toutes les sondes sont opérationnels.</EmptyState>
         ) : (
-          <Card flush title="Éléments concernés" sub={data ? `${list.length} incident(s)` : "Chargement…"}
+          <Card flush title="Éléments concernés" sub={data ? plural(`${list.length} incident(s)`) : "Chargement…"}
             actions={<Segmented size="sm" label="Type" value={filter} onChange={setFilter} options={[["all", "Tous"], ["Hôte", "Hôtes"], ["Sonde", "Sondes"]]} />}>
             {list.length === 0 ? <p className="px-5 py-8 text-center text-sm text-meta">Aucun incident pour ce type d'élément.</p> : (
               <>

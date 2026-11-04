@@ -569,7 +569,7 @@ func (s *Server) mgClearDoneTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if n, _ := res.RowsAffected(); n > 0 {
-		s.mgLog(r, "task", 0, "delete", fmt.Sprintf("%d tâche(s) terminée(s) archivée(s)", n))
+		s.mgLog(r, "task", 0, "delete", plural(fmt.Sprintf("%d tâche(s) terminée(s) archivée(s)", n)))
 	} else {
 		logSkip(r)
 	}

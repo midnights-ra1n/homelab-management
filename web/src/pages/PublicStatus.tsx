@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ExternalLink, Tv } from "../shared/icons";
+import { ExternalLink, Tv } from "../shared/icons";
 import { api, fmtDate, type Day, type Host, type Monitor, type Status } from "../api";
 import { BlockEditor, type BlockType } from "../blocks";
+import { plural } from "../shared/plural";
 import {
   Alert, Badge, Button, ButtonAnchor, Card, CardBody, CardHeader, Chart, CodeBlock, Dialog, FIELD_ROW, Field, Logo, PageHeader, SectionTitle, Skeleton, Stat, StatusBadge,
   StatusIcon, Switch, UptimeBars, fmtLatency, formatPct, inputClass, kindTone, statusKind, textareaClass, usePoll, useToast,
@@ -81,7 +82,7 @@ export function StatusView({ page }: { page: StatusPageData }) {
                       <div className="flex min-w-0 items-center gap-2.5">
                         <StatusIcon status={it.status} size={18} />
                         <p className="min-w-0 flex-1 truncate font-medium text-h1">{it.name}</p>
-                        {it.days && <span className="shrink-0 font-mono text-sm font-semibold text-h1">{formatPct(avgUptime(it.days))}</span>}
+                        {it.days && <span className="shrink-0 tabular-nums text-sm font-semibold text-h1">{formatPct(avgUptime(it.days))}</span>}
                         <StatusBadge status={it.status} />
                       </div>
                       {it.days && <UptimeBars days={it.days} height={24} />}
@@ -95,7 +96,7 @@ export function StatusView({ page }: { page: StatusPageData }) {
             const d = b.data as { uptime: number | null; count: number } | undefined;
             return (
               <Stat key={b.id} label={b.title || `Disponibilité sur ${b.days ?? 90} jours`} value={formatPct(d?.uptime == null ? null : d.uptime * 100)}
-                detail={`${d?.count ?? 0} service(s)`} icon={<Activity size={16} />} />
+                detail={plural(`${d?.count ?? 0} service(s)`)} />
             );
           }
           case "latency":
@@ -121,7 +122,7 @@ export function PublicStatusPage() {
       {error && <Alert kind="info" title="Page de statut indisponible">{error}</Alert>}
       {!data && !error && <Skeleton className="h-72" />}
       {data && <StatusView page={data} />}
-      <footer className="mt-12 flex items-center justify-center gap-2 font-mono text-xs text-meta">
+      <footer className="mt-12 flex items-center justify-center gap-2 text-xs text-meta">
         <span className="[&_svg]:h-4"><Logo compact /></span>Midnights Monitoring
       </footer>
     </div>
@@ -238,7 +239,7 @@ export function StatusEditorPage() {
           <Button loading={busy} onClick={save}>Enregistrer la page</Button>
         </>} />
       {error && <Alert kind="error" title="Disposition invalide" className="mb-6">{error}</Alert>}
-      <div className="grid items-start gap-8 xl:grid-cols-[minmax(20rem,26rem)_minmax(0,1fr)] xl:gap-10">
+      <div className="grid items-start gap-8 xl:grid-cols-[minmax(20rem,26rem)_minmax(0,1fr)]">
         <section aria-labelledby="blocks-title">
           <SectionTitle id="blocks-title">Blocs</SectionTitle>
           <BlockEditor blocks={blocks} onChange={setBlocks} types={TYPES}

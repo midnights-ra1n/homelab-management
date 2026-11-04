@@ -128,7 +128,7 @@ export function IconPicker({
                 )}
               >
                 <img src={ICON_PROVIDERS[type].url(r.name)} alt="" width={32} height={32} loading="lazy" className="h-8 w-8 object-contain" />
-                <span className="w-full truncate text-center text-[0.65rem] text-meta">{r.name}</span>
+                <span className="w-full truncate text-center text-xs text-meta">{r.name}</span>
               </button>
             ))}
             {!searching && results.length === 0 && (
@@ -160,7 +160,7 @@ export function IconPicker({
                   )}
                 >
                   <AppIcon type="upload" value={u.filename} name={u.label} size={32} />
-                  <span className="w-full truncate text-center text-[0.65rem] text-meta">{u.label}</span>
+                  <span className="w-full truncate text-center text-xs text-meta">{u.label}</span>
                 </button>
                 <button
                   type="button"

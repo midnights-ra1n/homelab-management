@@ -35,7 +35,7 @@ export function DeploymentTypeDialog({ h, open, onClose, onDone }: { h: Host; op
   const [o, setO] = useState<Reconfigure>({ type: initial.id, smart: initial.smart, autoUpdate: true, lxc: h.lxc_sync ? "keep" : "all" });
   const [busy, setBusy] = useState<"save" | "apply">();
   const pick = (t: (typeof TYPE_CHOICES)[number]) => setO({ ...o, type: t.id, smart: t.smart, lxc: t.id === "proxmox" ? (h.lxc_sync ? "keep" : "all") : h.lxc_sync ? "none" : "keep" });
-  const blocked = !h.connected ? "Agent hors ligne : utilisez la commande" : actionBusy(h) ? "Une action est déjà en cours sur cet hôte" : undefined;
+  const blocked = !h.connected ? "Agent hors ligne : utilise la commande" : actionBusy(h) ? "Une action est déjà en cours sur cet hôte" : undefined;
 
   const save = async (apply: boolean) => {
     setBusy(apply ? "apply" : "save");

@@ -52,8 +52,8 @@ export function IpGrid({
               title={`${c.address} — ${style.label}${c.label ? ` · ${c.label}` : ""}`}
               aria-label={`${c.address} : ${style.label}${c.label ? `, ${c.label}` : ""}`}
               className={cn(
-                "flex h-9 items-center justify-center rounded-md font-mono text-[0.65rem] tabular-nums transition-[transform,filter] duration-150",
-                clickable ? "cursor-pointer text-meta hover:scale-110 hover:brightness-125" : "cursor-default",
+                "flex h-9 items-center justify-center rounded-md font-mono text-xs tabular-nums transition-[transform,filter] duration-150",
+                clickable ? "cursor-pointer text-meta transition-opacity duration-300 hover:opacity-70" : "cursor-default",
               )}
               style={{ background: style.bg, color: style.text }}
             >

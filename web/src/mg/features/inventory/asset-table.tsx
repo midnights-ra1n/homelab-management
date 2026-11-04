@@ -218,7 +218,7 @@ export function AssetTable({ assets, hosts }: { assets: Asset[]; hosts: AssetOpt
                       )}
                     </td>
                   )}
-                  <td className="mm-col-num font-mono text-xs">{resourceSummary(a, tr) || <span className="text-meta">—</span>}</td>
+                  <td className="mm-col-num">{resourceSummary(a, tr) || <span className="text-meta">—</span>}</td>
                   <td>
                     <div className="flex max-w-[14rem] flex-wrap gap-1">
                       {a.tags.slice(0, 3).map((t) => (

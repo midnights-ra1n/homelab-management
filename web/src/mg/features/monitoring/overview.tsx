@@ -1,11 +1,11 @@
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Globe, PackageCheck, Radar, RotateCcw, Server, ShieldAlert } from "../../../shared/icons";
+import { Globe } from "../../../shared/icons";
+import { STAT_GRID, Segmented } from "../../../ui";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Meter } from "@/components/ui/meter";
-import { SectionTitle } from "@/components/ui/page-header";
 import { Stat } from "@/components/ui/stat";
 import { hlmKind, StatusIcon, statusTone, type StatusKind } from "@/components/status-icon";
 import { fetchHlm, fetchProxmox, machineKeys, summarize } from "@/lib/integrations";
@@ -49,6 +49,7 @@ export function StatusHero() {
     : m.configured
       ? tr("Ajoute des sondes ou installe l'agent sur tes hôtes dans Midnights Monitoring : leur état apparaîtra ici.")
       : tr("Aucune sonde ni aucun hôte n'est suivi : connecte Midnights Monitoring pour voir l'état de l'infrastructure.");
+  if (kind === "ok") return null;
   return (
     <div
       className="flex flex-col gap-5 rounded-xl border px-5 py-5 sm:px-6 md:flex-row md:items-center md:justify-between"
@@ -63,13 +64,13 @@ export function StatusHero() {
           <p className="text-lg font-semibold text-h1 sm:text-xl">{title}</p>
           {alerts.length > 0 ? (
             <ul className="mt-2 grid gap-1 text-sm text-body">
-              {alerts.slice(0, 4).map((a, i) => (
+              {alerts.slice(0, 3).map((a, i) => (
                 <li key={i} className="flex min-w-0 items-center gap-2">
                   <StatusIcon kind={a.tone === "red" ? "down" : "warn"} size={14} />
                   <span className="truncate">{a.text}</span>
                 </li>
               ))}
-              {alerts.length > 4 && <li className="text-xs text-meta">{tr("+ {n} autre(s)", { n: alerts.length - 4 })}</li>}
+              {alerts.length > 3 && <li className="text-xs text-meta">{tr("+ {n} autre(s)", { n: alerts.length - 3 })}</li>}
             </ul>
           ) : (
             <p className="text-sm text-body">{quiet}</p>
@@ -79,7 +80,7 @@ export function StatusHero() {
       {hlm.length > 0 && (
         <div className="flex shrink-0 flex-wrap gap-2">
           {hlm.map((s) => (
-            <ButtonLink key={s.id} href={`${s.url}/status`} target="_blank" rel="noreferrer" icon={<Globe size={15} />}>
+            <ButtonLink key={s.id} href={`${s.url}/status`} target="_blank" rel="noreferrer" variant="secondary" size="sm" icon={<Globe size={14} />}>
               {hlm.length > 1 ? tr("Statut · {name}", { name: s.name }) : tr("Page de statut")}
             </ButtonLink>
           ))}
@@ -88,6 +89,8 @@ export function StatusHero() {
     </div>
   );
 }
+
+type View = "hosts" | "probes" | "bandwidth" | "updates";
 
 /* Midnights Monitoring : résumé ---------------------------------------------- */
 
@@ -100,6 +103,7 @@ const certDaysLeft = (m: HlmMonitor) => (m.cert_expires_at ? daysUntil(new Date(
 
 /** Résumé du hub : chiffres clés, tuiles compactes des sondes et des hôtes ; le détail reste dans le hub. */
 export function HlmOverview() {
+  const [view, setView] = useState<View>("hosts");
   const tr = use(getT());
   const [sources, pve] = [use(fetchHlm()), use(fetchProxmox())];
   const hub = sources[0];
@@ -120,27 +124,12 @@ export function HlmOverview() {
   const bandwidth = summarize(sources).bandwidth;
 
   return (
-    <section aria-labelledby="hlm-title" className="grid gap-5">
-      <SectionTitle
-        id="hlm-title"
-        actions={
-          hub && (
-            <div className="flex flex-wrap justify-end gap-1">
-              <ButtonLink href={`${hub.url}/monitors`} target="_blank" rel="noreferrer" variant="ghost" size="sm" icon={<Radar size={13} />}>
-                {tr("Sondes")}
-              </ButtonLink>
-              <ButtonLink href={`${hub.url}/hosts`} target="_blank" rel="noreferrer" variant="ghost" size="sm" icon={<Server size={13} />}>
-                {tr("Hôtes")}
-              </ButtonLink>
-              <ButtonLink href={hub.url} target="_blank" rel="noreferrer" variant="ghost" size="sm" icon={<ExternalLink size={13} />}>
-                {tr("Ouvrir le hub")}
-              </ButtonLink>
-            </div>
-          )
-        }
-      >
-        Midnights Monitoring
-      </SectionTitle>
+    <section aria-label="Midnights Monitoring" className="grid gap-8">
+      <Segmented label={tr("Vue")} value={view} onChange={setView} options={[
+        ["hosts", tr("Hôtes")], ["probes", tr("Sondes")],
+        ...(bandwidth.length ? [["bandwidth", tr("Bande passante")] as [View, string]] : []),
+        ["updates", tr("Mises à jour")],
+      ]} />
       {sources
         .filter((s) => !s.ok)
         .map((s) => (
@@ -149,19 +138,17 @@ export function HlmOverview() {
           </Alert>
         ))}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
+      {view !== "updates" && <div className={STAT_GRID}>
         <Stat
           label={tr("Hôtes")}
           value={`${hosts.filter((h) => h.kind === "ok").length}/${hosts.length}`}
-          detail={tr("opérationnel(s)")}
-          icon={<Server size={16} />}
+          detail={hosts.some((h) => h.kind === "down") ? tr("{n} en panne", { n: hosts.filter((h) => h.kind === "down").length }) : tr("en service")}
           tone={hosts.some((h) => h.kind === "down") ? "red" : undefined}
         />
         <Stat
           label={tr("Sondes")}
           value={`${activeProbes.filter((m) => m.kind === "ok").length}/${activeProbes.length}`}
-          detail={tr("HTTP(S), TCP, DNS, SSL")}
-          icon={<Radar size={16} />}
+          detail={activeProbes.some((m) => m.kind === "down") ? tr("{n} en panne", { n: activeProbes.filter((m) => m.kind === "down").length }) : tr("en service")}
           tone={activeProbes.some((m) => m.kind === "down") ? "red" : undefined}
         />
         <Stat
@@ -171,14 +158,15 @@ export function HlmOverview() {
         />
         <Stat
           label={tr("Certificats")}
-          value={certs.length ? `${certs.length - expiring.length}/${certs.length}` : "—"}
-          detail={expiring.length ? tr("{n} expire(nt) sous {d} j", { n: expiring.length, d: SOON_DAYS }) : tr("valides")}
-          icon={<ShieldAlert size={16} />}
+          value={`${certs.length - expiring.length}/${certs.length}`}
+          detail={expiring.length ? tr("{n} à renouveler sous {d} j", { n: expiring.length, d: SOON_DAYS }) : certs.length ? tr("valides") : tr("aucun suivi")}
           tone={expiring.length ? "yellow" : undefined}
         />
-      </div>
+      </div>}
 
-      {probes.length > 0 && (
+      {view === "updates" && <UpdatesSummary />}
+
+      {view === "probes" && probes.length > 0 && (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {probes.slice(0, MAX_PROBES).map((m) => {
             const days = (m.days ?? []).slice(-30).map((d) => ({
@@ -207,11 +195,11 @@ export function HlmOverview() {
                   <p className="min-w-0 flex-1 truncate font-medium text-h1" title={m.target}>
                     {m.name}
                   </p>
-                  <span className="shrink-0 rounded-full border border-line-subtle px-1.5 font-mono text-[0.65rem] text-meta">{probeKind(m)}</span>
-                  <span className="shrink-0 font-mono text-sm font-semibold text-h1">{formatPct(uptime90(m), 1, tr.locale)}</span>
+                  <span className="shrink-0 rounded-full border border-line-subtle px-1.5 font-mono text-xs text-meta">{probeKind(m)}</span>
+                  <span className="shrink-0 tabular-nums text-sm font-semibold text-h1">{formatPct(uptime90(m), 1, tr.locale)}</span>
                 </div>
                 <UptimeBars days={days} height={16} />
-                <p className={cn("truncate font-mono text-xs", m.kind === "down" ? "text-red" : "text-meta")} title={note}>
+                <p className={cn("truncate text-xs", m.kind === "down" ? "text-red" : "text-meta")} title={note}>
                   {note || "—"}
                 </p>
               </li>
@@ -219,15 +207,14 @@ export function HlmOverview() {
           })}
         </ul>
       )}
-      {probes.length > MAX_PROBES && hub && (
+      {view === "probes" && probes.length > MAX_PROBES && hub && (
         <Link href={`${hub.url}/monitors`} target="_blank" rel="noreferrer" className="-mt-2 text-sm text-meta hover:text-accent-text">
           {tr("+ {n} autre(s) sonde(s) dans le hub →", { n: probes.length - MAX_PROBES })}
         </Link>
       )}
 
-      {bandwidth.length > 0 && (
+      {view === "bandwidth" && (
         <div className="grid gap-3">
-          <p className="mm-label-caps">{tr("Bande passante (24 h)")}</p>
           <ul className="grid gap-3 lg:grid-cols-2">
             {bandwidth.map((l) => (
               <li key={`${l.url}|${l.target}|${l.interface}`} className="grid gap-3 rounded-xl border border-line-subtle bg-box p-4">
@@ -246,7 +233,7 @@ export function HlmOverview() {
         </div>
       )}
 
-      {hosts.length > 0 && (
+      {view === "hosts" && hosts.length > 0 && (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {hosts.slice(0, MAX_HOSTS).map((h) => {
             const node = machineKeys(h.name, h.info?.hostname).map((k) => nodes.get(k)).find(Boolean);
@@ -263,7 +250,7 @@ export function HlmOverview() {
                       <Badge tone="orange">Proxmox</Badge>
                     </Link>
                   )}
-                  {h.latest?.temp != null && <span className={cn("shrink-0 font-mono text-xs", h.latest.temp > 80 ? "text-red" : "text-meta")}>{Math.round(h.latest.temp)} °C</span>}
+                  {h.latest?.temp != null && <span className={cn("shrink-0 text-xs tabular-nums", h.latest.temp > 80 ? "text-red" : "text-meta")}>{Math.round(h.latest.temp)} °C</span>}
                 </div>
                 {live ? (
                   <div className="grid grid-cols-3 gap-3">
@@ -281,12 +268,12 @@ export function HlmOverview() {
           })}
         </ul>
       )}
-      {hosts.length > MAX_HOSTS && hub && (
+      {view === "hosts" && hosts.length > MAX_HOSTS && hub && (
         <Link href={`${hub.url}/hosts`} target="_blank" rel="noreferrer" className="-mt-2 text-sm text-meta hover:text-accent-text">
           {tr("+ {n} autre(s) hôte(s) dans le hub →", { n: hosts.length - MAX_HOSTS })}
         </Link>
       )}
-      {hosts.length === 0 && probes.length === 0 && sources.every((s) => s.ok) && (
+      {view === "hosts" && hosts.length === 0 && probes.length === 0 && sources.every((s) => s.ok) && (
         <p className="text-sm text-meta">{tr("Aucun hôte équipé de l'agent.")}</p>
       )}
     </section>
@@ -296,7 +283,7 @@ export function HlmOverview() {
 /* Mises à jour : résumé ----------------------------------------------------- */
 
 /** Mises à jour relevées par les agents de Midnights Monitoring. */
-export function UpdatesSummary() {
+function UpdatesSummary() {
   const tr = use(getT());
   const hlm = use(fetchHlm());
   const items = hlm.flatMap((s) =>
@@ -311,28 +298,14 @@ export function UpdatesSummary() {
         reboot: h.updates!.reboot_required,
       })),
   );
-  if (items.length === 0 && hlm.every((s) => s.ok)) return null;
+  if (items.length === 0 && hlm.every((s) => s.ok)) return <p className="text-sm text-meta">{tr("Aucun relevé de mises à jour.")}</p>;
   const todo = items.filter((h) => h.pending > 0 || h.reboot).sort((a, b) => b.security - a.security || b.pending - a.pending);
   const pending = items.reduce((n, h) => n + h.pending, 0);
   const security = items.reduce((n, h) => n + h.security, 0);
   const reboot = items.filter((h) => h.reboot).length;
 
   return (
-    <section aria-labelledby="updates-title" className="grid gap-5">
-      <SectionTitle
-        id="updates-title"
-        actions={
-          <div className="flex flex-wrap justify-end gap-1">
-            {hlm.map((s) => (
-              <ButtonLink key={s.id} href={`${s.url}/updates`} target="_blank" rel="noreferrer" variant="ghost" size="sm" icon={<ExternalLink size={13} />}>
-                {hlm.length > 1 ? s.name : "Midnights Monitoring"}
-              </ButtonLink>
-            ))}
-          </div>
-        }
-      >
-        {tr("Mises à jour")}
-      </SectionTitle>
+    <section aria-label={tr("Mises à jour")} className="grid gap-5">
       {hlm
         .filter((s) => !s.ok)
         .map((s) => (
@@ -340,11 +313,11 @@ export function UpdatesSummary() {
             {s.error}
           </Alert>
         ))}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6">
-        <Stat label={tr("Hôtes à jour")} value={`${items.length - todo.length}/${items.length}`} icon={<PackageCheck size={16} />} tone={todo.length ? undefined : "green"} />
+      <div className={STAT_GRID}>
+        <Stat label={tr("Hôtes à jour")} value={`${items.length - todo.length}/${items.length}`} tone={todo.length ? undefined : "green"} />
         <Stat label={tr("Paquets en attente")} value={pending} detail={tr("tous hôtes confondus")} />
-        <Stat label={tr("Sécurité")} value={security} detail={tr("correctifs de sécurité")} icon={<ShieldAlert size={16} />} tone={security ? "red" : undefined} />
-        <Stat label={tr("Redémarrages")} value={reboot} detail={tr("hôte(s) à redémarrer")} icon={<RotateCcw size={16} />} tone={reboot ? "yellow" : undefined} />
+        <Stat label={tr("Sécurité")} value={security} detail={tr("correctifs de sécurité")} tone={security ? "red" : undefined} />
+        <Stat label={tr("Redémarrages")} value={reboot} detail={tr("en attente")} tone={reboot ? "yellow" : undefined} />
       </div>
       {todo.length > 0 ? (
         <ul className="divide-y divide-line-subtle overflow-hidden rounded-xl border border-line-subtle bg-box">
@@ -357,7 +330,7 @@ export function UpdatesSummary() {
               </span>
               {h.reboot && <Badge tone="yellow">{tr("Redémarrage")}</Badge>}
               {h.security > 0 && <Badge tone="red">{tr("{n} sécu.", { n: h.security })}</Badge>}
-              <span className="w-16 shrink-0 text-right font-mono text-sm text-h2">{h.pending}</span>
+              <span className="w-16 shrink-0 text-right tabular-nums text-sm text-h2">{h.pending}</span>
             </li>
           ))}
           {todo.length > MAX_UPDATES && (

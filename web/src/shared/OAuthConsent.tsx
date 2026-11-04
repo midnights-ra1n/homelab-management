@@ -36,9 +36,9 @@ export function OAuthConsent() {
             <p className="flex items-start gap-2"><Bot size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
               <span><strong className="text-h1">{info.client_name}</strong> demande à lire les données du {info.role === "management" ? "serveur de gestion" : "monitoring"} <strong className="text-h1">{info.server}</strong> avec les outils MCP.</span></p>
             <p className="flex items-start gap-2"><ShieldCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-              <span>Accès en lecture seule. La réponse sera renvoyée à <span className="font-mono text-h1">{info.redirect_host}</span>. Vous pourrez révoquer l'accès dans Paramètres → Serveur MCP.</span></p>
+              <span>Accès en lecture seule. La réponse sera renvoyée à <span className="font-mono text-h1">{info.redirect_host}</span>. Tu pourras révoquer l'accès dans Paramètres → Serveur MCP.</span></p>
             {info.redirect_host !== "claude.ai" && info.redirect_host !== "claude.com" && !info.redirect_host.startsWith("localhost") && !info.redirect_host.startsWith("127.0.0.1") && (
-              <Alert kind="warning" title="Ce client ne renvoie pas vers Claude">N'autorisez que si vous avez configuré vous-même ce client.</Alert>
+              <Alert kind="warning" title="Ce client ne renvoie pas vers Claude">N'autorise que si tu as configuré toi-même ce client.</Alert>
             )}
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="secondary" loading={busy === "no"} disabled={!!busy} onClick={() => answer(false)}>Refuser</Button>

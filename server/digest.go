@@ -184,7 +184,7 @@ func (s *Server) pendingUpdateEvents() []Event {
 		}
 		var parts []string
 		if sec && u.Pending > 0 {
-			parts = append(parts, fmt.Sprintf("%d paquet(s) à mettre à jour, dont %d de sécurité", u.Pending, u.Security))
+			parts = append(parts, plural(fmt.Sprintf("%d paquet(s) à mettre à jour, dont %d de sécurité", u.Pending, u.Security)))
 		}
 		if reboot && u.RebootRequired {
 			parts = append(parts, "redémarrage requis")
@@ -212,5 +212,5 @@ func (s *Server) checkAllUpdates() {
 		}
 	}
 	events.publish("hosts")
-	s.logEvent("planification", "host", 0, "action", fmt.Sprintf("Vérification planifiée des mises à jour sur %d hôte(s)", n))
+	s.logEvent("planification", "host", 0, "action", plural(fmt.Sprintf("Vérification planifiée des mises à jour sur %d hôte(s)", n)))
 }

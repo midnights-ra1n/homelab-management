@@ -75,7 +75,7 @@ func pveAuth(ctx context.Context, i *integration) (map[string]string, error) {
 	case err != nil:
 		return nil, err
 	case res.Data.NeedTFA != nil:
-		return nil, integrationErr("Ce compte Proxmox a la double authentification : utilisez un jeton API")
+		return nil, integrationErr("Ce compte Proxmox a la double authentification : utilise un jeton API")
 	case res.Data.Ticket == "":
 		return nil, integrationErr("Réponse inattendue de Proxmox à la connexion")
 	}
@@ -139,7 +139,7 @@ func (s *Server) testProxmox(ctx context.Context, i *integration) (string, error
 	for k, n := range nodes {
 		names[k] = n.Node
 	}
-	return fmt.Sprintf("Proxmox VE %s — %d nœud(s) : %s", v.Version, len(nodes), strings.Join(names, ", ")), nil
+	return plural(fmt.Sprintf("Proxmox VE %s — %d nœud(s) : %s", v.Version, len(nodes), strings.Join(names, ", "))), nil
 }
 
 type pveResource map[string]any

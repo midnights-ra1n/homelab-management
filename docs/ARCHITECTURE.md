@@ -106,6 +106,10 @@ Sujets : `hosts` (état et infos d'un hôte), `monitors` (état d'une sonde), `m
 | `uploads/` | gestion | icônes des raccourcis |
 
 - SQLite en WAL, une seule connexion, `synchronous=NORMAL` : peu d'écritures disque, peu de mémoire.
+- Les routes lues par toutes les pages ouvertes (`/api/overview`, `/api/hosts`, relais de la gestion) sont gardées quelques secondes (`cacheJSON`), compressées une fois, et oubliées dès qu'un état change.
+- Les réponses JSON de plus de 1 Ko sont compressées en gzip, jamais le flux `/api/events`.
+- Les réglages sont lus en mémoire : une écriture recharge la table.
+- Un relevé Docker ou Node.js identique n'est pas réécrit (Node.js : une fois toutes les 5 minutes au plus) et ne réveille pas les pages ouvertes.
 - Rétention réglable (mesures, résultats de sondes, cumuls journaliers) et taille maximale de la base ; le journal garde 90 jours.
 - **Sauvegardez `secret.key` avec la base** : sans elle, les secrets (intégrations, communautés SNMP, mots de passe) sont à ressaisir.
 - Les deux rôles ont un export / import JSON (*Paramètres*), sans les secrets.

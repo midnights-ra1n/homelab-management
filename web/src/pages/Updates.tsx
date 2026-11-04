@@ -1,10 +1,11 @@
 import { Fragment, useState } from "react";
-import { ArrowUpRight, ChevronRight, Container, Download, LoaderCircle, PackageCheck, RefreshCw, RotateCcw, ShieldAlert } from "../shared/icons";
+import { ArrowUpRight, ChevronRight, Container, Download, LoaderCircle, PackageCheck, RefreshCw } from "../shared/icons";
 import { actionBusy, api, fmtAgo, fmtDate, type Host } from "../api";
 import {
   Alert, Badge, Button, Card, Dialog, EmptyState, IconButton, Link, PageHeader, SECTIONS, STAT_GRID, Skeleton, Stat, StatusIcon, Switch, cn, usePoll, useToast,
 } from "../ui";
 import { useHostAction } from "./AgentVersion";
+import { plural } from "../shared/plural";
 
 export function updateTotals(hosts: Host[]) {
   const reporting = hosts.filter((h) => h.updates);
@@ -22,10 +23,10 @@ export function UpdateKpis({ hosts }: { hosts: Host[] }) {
   const t = updateTotals(hosts);
   return (
     <div className={STAT_GRID}>
-      <Stat label="Hôtes à jour" value={`${t.upToDate}/${t.reporting}`} icon={<PackageCheck size={16} />} tone={t.upToDate === t.reporting ? "green" : undefined} detail={`${t.reporting} hôte(s) analysé(s)`} />
+      <Stat label="Hôtes à jour" value={`${t.upToDate}/${t.reporting}`} tone={t.upToDate === t.reporting ? "green" : undefined} detail={plural(`${t.reporting} hôte(s) analysé(s)`)} />
       <Stat label="Paquets en attente" value={t.pending} detail="tous hôtes confondus" />
-      <Stat label="Sécurité" value={t.security} detail="correctifs de sécurité" icon={<ShieldAlert size={16} />} tone={t.security ? "red" : undefined} />
-      <Stat label="Redémarrages" value={t.reboot} detail="hôte(s) à redémarrer" icon={<RotateCcw size={16} />} tone={t.reboot ? "yellow" : undefined} />
+      <Stat label="Sécurité" value={t.security} detail="correctifs de sécurité" tone={t.security ? "red" : undefined} />
+      <Stat label="Redémarrages" value={t.reboot} detail="en attente" tone={t.reboot ? "yellow" : undefined} />
     </div>
   );
 }
@@ -69,7 +70,7 @@ export function UpdatesPage() {
 
   return (
     <>
-      <PageHeader title="Mises à jour" description="Paquets en attente sur chaque hôte (apt), relevés toutes les 6 heures par l'agent, chaque jour à l'heure choisie dans la configuration, ou à la demande."
+      <PageHeader title="Mises à jour" description="Paquets apt en attente sur chaque hôte, relevés par l'agent ou à la demande."
         actions={<>
           <Button variant="secondary" icon={<RefreshCw size={16} />} disabled={!hosts.some(ready)} onClick={() => hosts.filter(ready).forEach((h) => run(h, "check_updates"))}>Tout vérifier</Button>
           <Button icon={<Download size={16} />} disabled={!toUpgrade.length} onClick={() => setConfirmAll(true)}>Tout mettre à jour{toUpgrade.length ? ` (${toUpgrade.length})` : ""}</Button>
@@ -82,14 +83,14 @@ export function UpdatesPage() {
           {images > 0 && (
             <Link to="/containers?filtre=maj" className="-mt-6 flex items-center gap-2.5 rounded-xl border border-line-subtle bg-box px-4 py-3 text-sm no-underline hover:border-line-strong">
               <Container size={16} className="text-accent-text" aria-hidden />
-              <span className="flex-1 text-h2">{images} image(s) Docker à mettre à jour</span>
+              <span className="flex-1 text-h2">{plural(`${images} image(s) Docker à mettre à jour`)}</span>
               <ArrowUpRight size={14} className="text-meta" aria-hidden />
             </Link>
           )}
           {hosts.length === 0 ? (
             <EmptyState icon={<PackageCheck size={20} />} title="Aucun hôte">Installe l'agent depuis la page Hôtes.</EmptyState>
           ) : (
-            <Card flush title="Hôtes" sub={`${hosts.length} hôte(s)`} actions={<Switch label="Sécurité uniquement" checked={securityOnly} onChange={setSecurityOnly} />}>
+            <Card flush title="Hôtes" sub={plural(`${hosts.length} hôte(s)`)} actions={<Switch label="Sécurité uniquement" checked={securityOnly} onChange={setSecurityOnly} />}>
               <div className="mm-table-wrap">
                 <table className="mm-table min-w-[60rem]">
                   <thead><tr><th scope="col" className="mm-col-check"><span className="sr-only">Détail</span></th><th scope="col">Hôte</th><th scope="col" className="mm-col-num">En attente</th><th scope="col" className="mm-col-num">Sécurité</th><th scope="col">Redémarrage</th><th scope="col">Listes apt</th><th scope="col">Analyse</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
@@ -112,7 +113,7 @@ export function UpdatesPage() {
                               </Link>
                               <ActionStatus h={h} />
                             </td>
-                            <td className="mm-col-num font-mono">{u ? u.pending : "—"}</td>
+                            <td className="mm-col-num">{u ? u.pending : "—"}</td>
                             <td className="mm-col-num">{!u ? "—" : u.security > 0 ? <Badge tone="red">{u.security} sécu.</Badge> : <span className="font-mono">0</span>}</td>
                             <td>{!u ? "—" : u.reboot_required ? <Badge tone="yellow" dot>Requis</Badge> : <span className="text-meta">Non</span>}</td>
                             <td className="mm-col-muted" title={u?.lists_updated_at ? fmtDate(u.lists_updated_at) : undefined}>{u?.lists_updated_at ? fmtAgo(u.lists_updated_at) : "—"}</td>
@@ -159,8 +160,8 @@ export function UpdatesPage() {
         footer={<><Button variant="secondary" onClick={() => setConfirmAll(false)}>Annuler</Button>
           <Button icon={<Download size={16} />} onClick={upgradeAll}>Tout mettre à jour</Button></>}>
         <p className="text-sm leading-relaxed text-body">
-          {toUpgrade.length} hôte(s) seront mis à jour <strong className="text-h1">l'un après l'autre</strong> : chacun commence quand le précédent a fini. Les VM et conteneurs passent avant les serveurs Proxmox.
-          Même opération que le bouton de chaque hôte (apt-get upgrade, aucun paquet supprimé, pas de redémarrage). Vous pouvez fermer cette page, le serveur poursuit.
+          {plural(`Mise à jour de ${toUpgrade.length} hôte(s)`)} <strong className="text-h1">l'un après l'autre</strong> : chacun commence quand le précédent a fini. Les VM et conteneurs passent avant les serveurs Proxmox.
+          Même opération que le bouton de chaque hôte (apt-get upgrade, aucun paquet supprimé, pas de redémarrage). Tu peux fermer cette page, le serveur poursuit.
         </p>
       </Dialog>
     </>
@@ -174,7 +175,7 @@ export function UpgradeDialog({ host, onClose, onConfirm }: { host?: Host; onClo
       footer={<><Button variant="secondary" onClick={onClose}>Annuler</Button>
         <Button icon={<Download size={16} />} onClick={() => { const h = host!; onClose(); onConfirm(h); }}>Installer les mises à jour</Button></>}>
       <p className="text-sm leading-relaxed text-body">
-        {host?.updates?.pending ?? 0} paquet(s) seront installés (apt-get upgrade, configuration locale conservée, aucun paquet supprimé).
+        {plural(`Installation de ${host?.updates?.pending ?? 0} paquet(s)`)} (apt-get upgrade, configuration locale conservée, aucun paquet supprimé).
         L'hôte n'est pas redémarré automatiquement{host?.updates?.reboot_required ? " ; un redémarrage est déjà requis" : ""}. Le journal apt s'affiche une fois l'opération terminée.
       </p>
     </Dialog>

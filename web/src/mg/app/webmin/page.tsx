@@ -127,7 +127,7 @@ function Instances() {
               )}
 
               <div className="mt-auto flex items-center justify-between gap-3 pt-5">
-                <span className="font-mono text-xs text-meta">
+                <span className="tabular-nums text-xs text-meta">
                   {sys?.uptime ? `⏱ ${formatUptime(sys.uptime, tr.locale)}` : d?.web.up ? `${d.web.ms} ms` : ""}
                 </span>
                 <ButtonLink href={s.url} target="_blank" rel="noreferrer" variant="secondary" size="sm" icon={<ExternalLink size={14} />}>

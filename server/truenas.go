@@ -131,7 +131,7 @@ func truenasVerdict(pools []truenasPool, alerts []truenasAlert, limit float64) c
 			problems = append(problems, strings.TrimSpace(a.Formatted))
 		}
 	}
-	msg := fmt.Sprintf("%d pool(s) sain(s)", len(pools))
+	msg := plural(fmt.Sprintf("%d pool(s) sain(s)", len(pools)))
 	if len(usage) > 0 {
 		msg += " · " + strings.Join(usage, ", ")
 	}

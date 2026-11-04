@@ -4,7 +4,7 @@ import { listIntegrations } from "@/lib/data/integrations";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader, SectionTitle } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { HlmOverview, StatusHero, UpdatesSummary } from "@/features/monitoring/overview";
+import { HlmOverview, StatusHero } from "@/features/monitoring/overview";
 import { useSession } from "@/session";
 import { getT } from "@/i18n/server";
 
@@ -14,20 +14,13 @@ export default function MonitoringPage() {
   return (
     <>
       <PageHeader
-        title={tr("Supervision centralisée")}
-        description={tr("Résumé de Midnights Monitoring : hôtes équipés de l'agent, sondes et mises à jour. Le détail reste dans le tableau de bord du monitoring.")}
-        actions={
-          <>
-            {monitoringUrl && (
-              <ButtonLink href={monitoringUrl} target="_blank" rel="noopener" variant="secondary" icon={<ExternalLink size={16} />}>
-                {tr("Ouvrir le monitoring")}
-              </ButtonLink>
-            )}
-            <ButtonLink href="/parametres#integrations" variant="secondary" icon={<Settings size={16} />}>
-              {tr("Intégrations")}
-            </ButtonLink>
-          </>
-        }
+        title={tr("Monitoring")}
+        description={tr("Le résumé de Midnights Monitoring.")}
+        actions={monitoringUrl && (
+          <ButtonLink href={monitoringUrl} target="_blank" rel="noopener" variant="secondary" icon={<ExternalLink size={16} />}>
+            {tr("Ouvrir le monitoring")}
+          </ButtonLink>
+        )}
       />
       <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
         <Sections />
@@ -40,7 +33,7 @@ function Sections() {
   const tr = use(getT());
   const configured = use(listIntegrations("hlm", true)).length > 0;
   return (
-    <div className="grid grid-cols-1 gap-12 xl:gap-16">
+    <div className="grid grid-cols-1 gap-8">
       <Suspense fallback={<Skeleton className="h-28 rounded-xl" />}>
         <StatusHero />
       </Suspense>
@@ -60,9 +53,6 @@ function Sections() {
         <>
           <Suspense fallback={<SectionSkeleton title="Midnights Monitoring" />}>
             <HlmOverview />
-          </Suspense>
-          <Suspense fallback={<SectionSkeleton title={tr("Mises à jour")} />}>
-            <UpdatesSummary />
           </Suspense>
         </>
       )}

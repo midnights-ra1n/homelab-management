@@ -156,9 +156,9 @@ export function IptablesPanel({ base }: { base: string }) {
         </Card>
       )}
       {adding && filter && <RuleDialog family={fam.family} chains={filter.chains.filter((c) => !managedBy(c.name)).map((c) => c.name)} onClose={() => setAdding(false)}
-        send={(c) => post(c, "Règle ajoutée. Pensez à enregistrer.")} />}
+        send={(c) => post(c, "Règle ajoutée. Pense à enregistrer.")} />}
       <Dialog open={!!confirm} onClose={() => setConfirm(undefined)} size="sm" title={confirm?.title}
-        footer={<Button loading={!!busy} onClick={async () => { await post({ ...confirm!.change, family: fam.family }, "Modification appliquée. Pensez à enregistrer."); setConfirm(undefined); }}>Confirmer</Button>}>
+        footer={<Button loading={!!busy} onClick={async () => { await post({ ...confirm!.change, family: fam.family }, "Modification appliquée. Pense à enregistrer."); setConfirm(undefined); }}>Confirmer</Button>}>
         <p className="text-sm break-all text-h2">{confirm?.text}</p>
       </Dialog>
     </div>

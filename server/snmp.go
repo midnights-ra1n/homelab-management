@@ -32,7 +32,7 @@ func validateSNMP(m *Monitor) string {
 	case "in", "out", "ifstatus":
 		c.Interface = strings.TrimSpace(c.Interface)
 		if c.Interface == "" || len(c.Interface) > 64 {
-			return "Indiquez le nom de l'interface (64 caractères au plus) ou son numéro ifIndex"
+			return "Indique le nom de l'interface (64 caractères au plus) ou son numéro ifIndex"
 		}
 		if p := c.MaxPercent; p != nil && (*p <= 0 || *p > 100 || c.SNMPMode == "ifstatus") {
 			return "Le seuil d'utilisation du lien doit être entre 0 et 100 %, pour un débit"

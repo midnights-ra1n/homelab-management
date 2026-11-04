@@ -14,6 +14,7 @@ import { api, fmtBytes, fmtMbps, fmtMs, fmtPct, hostStatusLabel, pct, savePrefs,
 import { containerKind } from "./Containers";
 import { guestCount, guestId, proxmoxTree } from "./Hosts";
 import { Alert, Badge, ButtonLink, EmptyState, IconButton, Link, Logo, Meter, PageHeader, Skeleton, StatusIcon, cn, inputClass, kindTone, statusKind, usePoll, type StatusKind, type Tone } from "../ui";
+import { plural } from "../shared/plural";
 
 type Variant = "hub" | "host" | "device" | "group" | "container" | "monitor";
 type MapData = {
@@ -117,7 +118,7 @@ function buildGraph(o: Overview, show: { containers: boolean; monitors: boolean 
     }));
     devices.set(target, {
       head: node(`d:${target}`, {
-        variant: "device", kind: worst(rows.map((r) => r.kind)), title: links[0].target, sub: `${links.length} interface(s) SNMP`,
+        variant: "device", kind: worst(rows.map((r) => r.kind)), title: links[0].target, sub: plural(`${links.length} interface(s) SNMP`),
         icon: <Router size={17} />, href: "/bandwidth", rows: rows.slice(0, 5),
         info: rows.length > 5 ? [["Autres interfaces", String(rows.length - 5)]] : undefined,
       }),
@@ -191,13 +192,13 @@ function buildGraph(o: Overview, show: { containers: boolean; monitors: boolean 
   }
   for (const g of groups.values()) {
     g.head.data.kind = worst(g.kids.map((k) => k.data.kind));
-    g.head.data.sub = `${g.kids.length} sonde(s)`;
+    g.head.data.sub = plural(`${g.kids.length} sonde(s)`);
   }
 
   const columns = [...devices.values(), ...hosts.values(), ...[...groups.values()].sort((a, b) => a.head.data.title.localeCompare(b.head.data.title))];
   const all = columns.flatMap((c) => [c.head, ...c.kids]);
   const hub = node("hub", {
-    variant: "hub", kind: statusKind(o.status), title: "Monitoring", sub: `${o.hosts.length} hôte(s) · ${o.monitors.length} sonde(s)`, icon: null,
+    variant: "hub", kind: statusKind(o.status), title: "Monitoring", sub: plural(`${o.hosts.length} hôte(s) · ${o.monitors.length} sonde(s)`), icon: null,
     info: [["En panne", String(all.filter((n) => n.data.kind === "down").length)], ["Dégradés", String(all.filter((n) => n.data.kind === "warn").length)]],
   });
   return { hub, columns, tunnels: wireguardTunnels(o.hosts) };
@@ -234,7 +235,7 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
         "relative flex flex-col gap-2 border bg-box transition-[opacity,box-shadow,border-color] duration-200",
         small ? "w-[220px] rounded-xl px-2.5 py-1.5" : "w-[244px] rounded-2xl px-3 py-2.5",
         data.variant === "hub" && "w-[244px] border-line-accent",
-        selected ? "border-accent shadow-[0_0_24px_4px_var(--mm-accent-soft)]" : "border-line",
+        selected ? "border-accent ring-1 ring-accent" : "border-line",
         data.dim && "opacity-25",
       )}
       style={alarm && !selected ? { borderColor: `color-mix(in srgb, ${tone} 60%, var(--mm-border))`, boxShadow: `0 0 18px -4px ${tone}` } : undefined}
@@ -246,21 +247,21 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
           {data.variant === "hub" ? <span className="flex size-6 [&_svg]:h-6"><Logo compact /></span> : data.icon}
         </span>
         <span className="min-w-0 flex-1">
-          {data.tag && <span className="block text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-meta">{data.tag}</span>}
+          {data.tag && <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-meta">{data.tag}</span>}
           <span className="flex items-center gap-1.5">
-            <span className={cn("size-2 shrink-0 rounded-full", data.kind === "down" && "animate-pulse")} style={{ background: tone }} title={KIND_LABEL[data.kind]} />
+            <span className="size-2 shrink-0 rounded-full" style={{ background: tone }} title={KIND_LABEL[data.kind]} />
             <span className={cn("truncate font-medium text-h1", small ? "text-[13px]" : "text-sm")}>{data.title}</span>
           </span>
-          {data.sub && <span className="block truncate font-mono text-[0.68rem] text-meta">{data.sub}</span>}
+          {data.sub && <span className="block truncate font-mono text-xs text-meta">{data.sub}</span>}
         </span>
       </div>
       {data.meters && (
         <div className="grid gap-1.5">
           {data.meters.map((m) => (
-            <div key={m.label} className="grid grid-cols-[3.2rem_1fr_2.6rem] items-center gap-2 text-[0.68rem]">
+            <div key={m.label} className="grid grid-cols-[3.2rem_1fr_2.6rem] items-center gap-2 text-xs">
               <span className="text-meta">{m.label}</span>
               <Meter value={m.value} size="sm" />
-              <span className="text-right font-mono text-body tabular-nums">{m.value == null ? "—" : `${Math.round(m.value)} %`}</span>
+              <span className="text-right text-body tabular-nums">{m.value == null ? "—" : `${Math.round(m.value)} %`}</span>
             </div>
           ))}
         </div>
@@ -268,7 +269,7 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
       {data.rows && (
         <ul className="grid gap-1">
           {data.rows.map((r) => (
-            <li key={r.label} className="flex items-center gap-1.5 text-[0.68rem]">
+            <li key={r.label} className="flex items-center gap-1.5 text-xs">
               <span className="size-1.5 shrink-0 rounded-full" style={{ background: kindTone(r.kind) }} />
               <span className="min-w-0 flex-1 truncate text-body">{r.label}</span>
               <span className="shrink-0 font-mono text-meta tabular-nums">{r.value}</span>
@@ -297,9 +298,9 @@ function TunnelEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: Edg
     <>
       <BaseEdge id={id} path={path} style={style} />
       <EdgeLabelRenderer>
-        <div className="nodrag nopan pointer-events-none absolute rounded-full border px-2 py-0.5 text-center font-mono text-[0.62rem] leading-tight backdrop-blur"
+        <div className="nodrag nopan pointer-events-none absolute rounded-full border px-2 py-0.5 text-center font-mono text-xs leading-tight"
           style={{ transform: `translate(-50%,-50%) translate(${x}px,${y}px)`, opacity: style?.opacity, color: style?.stroke,
-            borderColor: `color-mix(in srgb, ${style?.stroke} 45%, transparent)`, background: "color-mix(in srgb, var(--mm-overlay) 88%, transparent)" }}>
+            borderColor: `color-mix(in srgb, ${style?.stroke} 45%, transparent)`, background: "var(--mm-overlay)" }}>
           <span className="flex items-center gap-1"><Waypoints size={10} aria-hidden="true" />{data?.label}</span>
           {data?.rate && <span className="block text-meta">{data.rate}</span>}
         </div>
@@ -320,14 +321,14 @@ export default function MapPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="Carte" description="Vue d'ensemble de l'infrastructure surveillée, en direct. Glissez un hôte pour le déplacer avec ses conteneurs et ses sondes." />
+      <PageHeader title="Carte" description="L'infrastructure surveillée en direct : glisse un hôte pour le déplacer avec ses conteneurs et ses sondes." />
       {error && !data && <Alert kind="error" title="Impossible de charger la carte">{error}</Alert>}
       {(!data || !saved) && !error && <Skeleton className="h-[calc(100dvh-14rem)] min-h-[32rem] rounded-3xl" />}
       {data && saved && (data.hosts.length || data.monitors.length ? (
         <ReactFlowProvider><Flow o={data} saved={saved} /></ReactFlowProvider>
       ) : (
         <EmptyState icon={<Server size={20} />} title="Rien à afficher" action={<ButtonLink to="/hosts">Ajouter un hôte</ButtonLink>}>
-          Ajoutez un hôte ou une sonde pour les voir apparaître sur la carte.
+          Ajoute un hôte ou une sonde pour les voir apparaître sur la carte.
         </EmptyState>
       ))}
     </div>
@@ -420,9 +421,9 @@ function Flow({ o, saved: initial }: { o: Overview; saved: Pos }) {
             <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-meta" aria-hidden="true" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher…" aria-label="Rechercher sur la carte"
               onKeyDown={(e) => e.key === "Enter" && fit(nodes.filter((n) => !n.data.dim).map((n) => n.id))}
-              className={cn(inputClass, "w-44 bg-page/90 pl-8 backdrop-blur")} />
+              className={cn(inputClass, "w-44 bg-page pl-8")} />
           </label>
-          <div className="flex items-center gap-1 rounded-full border border-line bg-page/90 p-1 backdrop-blur">
+          <div className="flex items-center gap-1 rounded-full border border-line bg-page p-1">
             {([["containers", "Conteneurs", Container], ["monitors", "Sondes", Radar], ["tunnels", "WireGuard", Waypoints], ["problems", "Problèmes", Activity]] as const).map(([k, label, Icon]) => (
               <button key={k} type="button" aria-pressed={show[k]} onClick={() => setShow((s) => ({ ...s, [k]: !s[k] }))}
                 className={cn("flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs transition-colors",
@@ -431,7 +432,7 @@ function Flow({ o, saved: initial }: { o: Overview; saved: Pos }) {
               </button>
             ))}
           </div>
-          <div className="hidden items-center gap-3 rounded-full border border-line bg-page/90 px-3 py-1.5 text-xs backdrop-blur lg:flex" aria-label="Répartition des états">
+          <div className="hidden items-center gap-3 rounded-full border border-line bg-page px-3 py-1.5 text-xs lg:flex" aria-label="Répartition des états">
             {counts.map(([k, n]) => (
               <span key={k} className="flex items-center gap-1.5 text-body" title={KIND_LABEL[k]}>
                 <span className="size-2 rounded-full" style={{ background: kindTone(k) }} />{n} <span className="text-meta">{KIND_LABEL[k].toLowerCase()}</span>
@@ -441,8 +442,8 @@ function Flow({ o, saved: initial }: { o: Overview; saved: Pos }) {
         </Panel>
 
         <Panel position="top-right" className="!m-3 flex items-center gap-2">
-          <IconButton label="Ajuster à l'écran" variant="secondary" size="icon" className="bg-page/90 backdrop-blur" icon={<Maximize size={15} />} onClick={() => fit()} />
-          <IconButton label="Disposition automatique" variant="secondary" size="icon" className="bg-page/90 backdrop-blur" icon={<LayoutTemplate size={15} />}
+          <IconButton label="Ajuster à l'écran" variant="secondary" size="icon" className="bg-page" icon={<Maximize size={15} />} onClick={() => fit()} />
+          <IconButton label="Disposition automatique" variant="secondary" size="icon" className="bg-page" icon={<LayoutTemplate size={15} />}
             onClick={() => {
               for (const k of Object.keys(saved)) delete saved[k];
               savePrefs({ map_positions: null });

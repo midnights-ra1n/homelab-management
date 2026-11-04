@@ -166,7 +166,7 @@ export function GuestTable({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[64rem] text-left text-sm">
             <thead>
-              <tr className="border-b border-line-subtle font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
+              <tr className="border-b border-line-subtle mm-label-caps text-meta">
                 <th className="px-5 py-3 font-medium">{tr("Invité")}</th>
                 <th className="px-3 py-3 font-medium">{tr("Nœud")}</th>
                 <th className="w-32 px-3 py-3 font-medium">{tr("CPU")}</th>
@@ -192,7 +192,7 @@ export function GuestTable({
                           <Link href={guestHref(g)} className="block truncate font-medium text-h1 hover:text-accent-text">{g.name}</Link>
                           <p className="flex items-center gap-2 font-mono text-xs text-meta">
                             <span>{g.vmid}</span>
-                            <Badge tone={g.type === "qemu" ? "blue" : "purple"} className="px-1.5 py-0 text-[0.65rem]">
+                            <Badge tone={g.type === "qemu" ? "blue" : "purple"} className="px-1.5 py-0 text-xs">
                               {g.type === "qemu" ? "VM" : "CT"}
                             </Badge>
                             {g.tags.slice(0, 2).map((t) => (
@@ -213,11 +213,11 @@ export function GuestTable({
                       {running ? (
                         <Meter size="sm" value={(g.mem / g.maxmem) * 100} label=" " detail={`${formatBytes(g.mem, tr.locale)} / ${formatBytes(g.maxmem, tr.locale)}`} />
                       ) : (
-                        <span className="font-mono text-xs text-meta">{formatBytes(g.maxmem, tr.locale)}</span>
+                        <span className="tabular-nums text-xs text-meta">{formatBytes(g.maxmem, tr.locale)}</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 font-mono text-xs text-body">{formatBytes(g.maxdisk, tr.locale)}</td>
-                    <td className="px-3 py-3 font-mono text-xs text-body">{running ? formatUptime(g.uptime, tr.locale) : "—"}</td>
+                    <td className="px-3 py-3 tabular-nums text-xs text-body">{formatBytes(g.maxdisk, tr.locale)}</td>
+                    <td className="px-3 py-3 tabular-nums text-xs text-body">{running ? formatUptime(g.uptime, tr.locale) : "—"}</td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-0.5">
                         {ACTIONS.filter((a) => a.when(g.status) && !(g.type === "lxc" && (a.action === "suspend" || a.action === "resume"))).map(

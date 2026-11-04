@@ -41,7 +41,7 @@ export default function NetworkPage({ searchParams }: PageProps<"/[lang]/reseau"
     <>
       <PageHeader
         title={tr("Réseau")}
-        description={tr("Adressage, trafic en temps réel, tunnels VPN, pare-feu, noms de domaine et simulation de flux avant la mise en prod.")}
+        description={tr("Adressage, trafic, VPN, pare-feu, domaines et simulation de flux.")}
       />
       <Suspense fallback={<Skeleton className="h-[32rem] rounded-2xl" />}>
         <Ipam searchParams={searchParams} />
@@ -122,14 +122,14 @@ function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau">["sea
   return (
     <div>
       {tabs}
-    <div className="grid grid-cols-1 gap-10 xl:gap-14">
+    <div className="grid grid-cols-1 gap-8">
       {errors > 0 && (
         <Alert kind="error" title={tr("{errors} problème(s) d'adressage", { errors: errors })}>
           <Link href="/reseau?onglet=diagnostic" className="underline underline-offset-2">
             {tr("Voir le diagnostic")}</Link>
         </Alert>
       )}
-      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:gap-8">
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
         <Stat label="VLAN" value={totals.vlans} />
         <Stat label={tr("Sous-réseaux")} value={totals.subnets} />
         <Stat label={tr("Adresses attribuées")} value={totals.used} detail={tr("sur {0} utilisables", { "0": totals.capacity.toLocaleString(tr.locale) })} />
@@ -141,7 +141,7 @@ function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau">["sea
         <SectionTitle id="vlans" actions={<VlanDialog />}>
           {tr("VLAN")}</SectionTitle>
         {vlans.length === 0 ? (
-          <EmptyState title={tr("Aucun VLAN")}>{tr("Déclare tes VLAN (802.1Q) pour segmenter ton réseau : serveurs, IoT, invités…")}</EmptyState>
+          <EmptyState icon={<Network size={22} />} title={tr("Aucun VLAN")}>{tr("Déclare tes VLAN (802.1Q) pour segmenter ton réseau : serveurs, IoT, invités…")}</EmptyState>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {vlans.map((v) => (
@@ -158,8 +158,8 @@ function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau">["sea
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-h1">{v.name}</p>
-                  <p className="mt-0.5 font-mono text-xs text-meta">
-                    {v.subnet_count} {tr("sous-réseau(x) · ")}{v.asset_count} {tr("élément(s)")}</p>
+                  <p className="mt-0.5 tabular-nums text-xs text-meta">
+                    {tr("{s} sous-réseau(x) · {a} élément(s)", { s: v.subnet_count, a: v.asset_count })}</p>
                   {v.description && <p className="mt-1 line-clamp-2 text-xs text-body">{v.description}</p>}
                 </div>
                 <div className="-mr-1 -mt-1 flex">
@@ -188,7 +188,7 @@ function Ipam({ searchParams }: { searchParams: PageProps<"/[lang]/reseau">["sea
         >
           {tr("Sous-réseaux")}</SectionTitle>
         {subnets.length === 0 ? (
-          <EmptyState icon={<Network size={22} />} title={tr("Aucun sous-réseau")} action={<SubnetDialog vlans={vlans} />}>
+          <EmptyState icon={<Network size={22} />} title={tr("Aucun sous-réseau")}>
             {tr("Ajoute un sous-réseau (ex. 192.168.10.0/24) pour visualiser son occupation et attribuer des adresses.")}</EmptyState>
         ) : (
           <div className="grid gap-8 lg:grid-cols-[22rem_1fr]">
@@ -303,7 +303,7 @@ function SubnetDetail({
               [tr("Libres"), `${subnet.capacity - subnet.used - subnet.reserved - subnet.dhcp}`],
             ].map(([k, v]) => (
               <div key={k}>
-                <dt className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{k}</dt>
+                <dt className="mm-label-caps text-meta">{k}</dt>
                 <dd className="mt-1 truncate font-mono text-sm text-h1">{v}</dd>
               </div>
             ))}
@@ -357,7 +357,7 @@ function IpTable({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[44rem] text-left text-sm">
           <thead>
-            <tr className="border-b border-line-subtle font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
+            <tr className="border-b border-line-subtle mm-label-caps text-meta">
               <th className="px-5 py-3 font-medium">{tr("Adresse")}</th>
               <th className="px-3 py-3 font-medium">{tr("État")}</th>
               <th className="px-3 py-3 font-medium">{tr("Attribuée à")}</th>

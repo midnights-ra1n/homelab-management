@@ -1,4 +1,4 @@
-import type { Accent } from "../../../ui";
+import type { NavTabs } from "../../../ui";
 import {
   Activity,
   AppWindow,
@@ -38,14 +38,22 @@ export const NAV_ITEMS: NavItem[] = [
 
 const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
 
-/** Sections de la barre latérale (label en capitales ; la première n'en a pas). */
-export type NavSection = { label?: string; accent: Accent; items: NavItem[] };
+/** Sections de la barre latérale (label en capitales ; la première n'en a pas) : 8 entrées, 3 groupes. */
+export type NavSection = { label?: string; items: NavItem[] };
 export const NAV_SECTIONS: NavSection[] = [
-  { accent: "lavande", items: ["/", "/applications", "/monitoring", "/energie"].map(byHref) },
-  { label: "Infrastructure", accent: "ciel", items: ["/inventaire", "/stock", "/reseau", "/carte"].map(byHref) },
-  { label: "Suivi", accent: "rose", items: ["/deploiements", "/taches", "/journaux"].map(byHref) },
-  { label: "Serveurs", accent: "mauve", items: ["/proxmox", "/webmin", "/nodejs"].map(byHref) },
+  { items: ["/", "/applications"].map(byHref) },
+  { label: "Infrastructure", items: [byHref("/inventaire"), byHref("/reseau"), { ...byHref("/proxmox"), label: "Serveurs" }, byHref("/monitoring")] },
+  { label: "Suivi", items: ["/deploiements", "/taches"].map(byHref) },
 ];
+
+/** Les pages sans entrée dans la barre latérale, en onglets de celle dont elles dépendent. */
+export const NAV_TABS: NavTabs = {
+  "/inventaire": ["/inventaire", "/stock"],
+  "/reseau": ["/reseau", "/carte"],
+  "/proxmox": ["/proxmox", "/webmin", "/nodejs"],
+  "/monitoring": ["/monitoring", "/energie"],
+  "/taches": ["/taches", "/journaux"],
+};
 
 /** Onglets principaux de la barre mobile (le reste est dans « Plus »). */
 export const MOBILE_TABS = ["/", "/applications", "/inventaire", "/deploiements"];

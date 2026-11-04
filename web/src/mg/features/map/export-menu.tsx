@@ -78,7 +78,7 @@ export function ExportMenu({ container }: { container: React.RefObject<HTMLDivEl
         ref={anchorRef}
         variant="secondary"
         size="icon"
-        className="bg-page/90 backdrop-blur"
+        className="bg-page"
         title={tr("Exporter la carte")}
         aria-label={tr("Exporter la carte")}
         aria-expanded={open}

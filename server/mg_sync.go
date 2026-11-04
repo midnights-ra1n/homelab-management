@@ -98,7 +98,7 @@ func (s *Server) hlmLogin(ctx context.Context, i *integration, refused string) (
 	case errors.As(err, &ie) && ie.status == 401:
 		return "", integrationErr("Identifiant ou mot de passe du monitoring incorrect")
 	case errors.As(err, &ie) && ie.status == 404:
-		return "", integrationErr("Ce monitoring ne gère pas encore la connexion par compte : mettez-le à jour")
+		return "", integrationErr("Ce monitoring ne gère pas encore la connexion par compte : mets-le à jour")
 	case err != nil:
 		return "", err
 	case res.Token == "":
@@ -124,21 +124,31 @@ func hlmLogout(i *integration, tok string) {
 
 func (s *Server) hlmData(ctx context.Context, i *integration) (hlmData, error) {
 	var d hlmData
+	// First read alone: it signs in if needed, and the two others reuse its token.
 	if err := s.hlmGet(ctx, i, "/hosts", &d.Hosts); err != nil {
 		return d, err
 	}
+	var monitorsErr, bandwidthErr error
+	var wg sync.WaitGroup
+	get := func(path string, out any, err *error) {
+		own := *i // a refused token is renewed in the integration passed
+		wg.Go(func() { *err = s.hlmGet(ctx, &own, path, out) })
+	}
+	get("/monitors", &d.Monitors, &monitorsErr)
+	get("/bandwidth", &d.Bandwidth, &bandwidthErr)
+	wg.Wait()
 	// monitors:read is optional: a token limited to hosts stays usable.
-	if err := s.hlmGet(ctx, i, "/monitors", &d.Monitors); err != nil {
+	if monitorsErr != nil {
 		var ie *integrationError
-		if !errors.As(err, &ie) || ie.status != 403 {
-			return d, err
+		if !errors.As(monitorsErr, &ie) || ie.status != 403 {
+			return d, monitorsErr
 		}
 	}
 	// Same view as the monitoring dashboards; a hub older than this route answers 404.
-	if err := s.hlmGet(ctx, i, "/bandwidth", &d.Bandwidth); err != nil {
+	if bandwidthErr != nil {
 		var ie *integrationError
-		if !errors.As(err, &ie) || (ie.status != 403 && ie.status != 404) {
-			return d, err
+		if !errors.As(bandwidthErr, &ie) || (ie.status != 403 && ie.status != 404) {
+			return d, bandwidthErr
 		}
 	}
 	d.Hosts, d.Monitors = nonNil(d.Hosts), nonNil(d.Monitors)
@@ -289,7 +299,7 @@ func (s *Server) mgSyncNow(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": false, "message": err.Error()})
 		return
 	}
-	writeJSON(w, 200, map[string]any{"ok": true, "message": fmt.Sprintf("Synchronisation terminée : %d élément(s) créé(s) ou mis à jour.", n)})
+	writeJSON(w, 200, map[string]any{"ok": true, "message": plural(fmt.Sprintf("Synchronisation terminée : %d élément(s) créé(s) ou mis à jour.", n))})
 }
 
 func machineKeys(values ...string) []string {

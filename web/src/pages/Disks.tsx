@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { CircleAlert, CircleCheck, HardDrive, RefreshCw, TriangleAlert } from "../shared/icons";
+import { HardDrive, RefreshCw } from "../shared/icons";
 import { api, fmtAgo, fmtBytes, fmtNum } from "../api";
 import { Alert, Badge, Button, Card, EmptyState, Link, Meter, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Skeleton, Stat, StatusIcon, TONE_VAR, type Tone, usePoll, useToast } from "../ui";
+import { plural } from "../shared/plural";
 
 export type DiskHealthLevel = "good" | "watch" | "replace" | "failing";
 export interface Disk {
@@ -49,7 +50,7 @@ export function DiskCard({ d }: { d: Disk }) {
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-text"><HardDrive size={16} aria-hidden /></span>
           <div className="min-w-0">
             <p className="truncate font-semibold text-h1">{d.model || "Disque"}</p>
-            <p className="truncate font-mono text-xs text-meta">{KIND[d.kind]} · {fmtBytes(d.capacity_bytes)} · {d.name}</p>
+            <p className="truncate tabular-nums text-xs text-meta">{KIND[d.kind]} · {fmtBytes(d.capacity_bytes)} · {d.name}</p>
           </div>
         </div>
         <Badge tone={tone} dot>{label}</Badge>
@@ -62,8 +63,8 @@ export function DiskCard({ d }: { d: Disk }) {
       <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
         {facts.map(([k, v]) => (
           <div key={k} className="min-w-0">
-            <dt className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{k}</dt>
-            <dd className="mt-0.5 truncate font-mono text-h2" title={v}>{v}</dd>
+            <dt className="mm-label-caps text-meta">{k}</dt>
+            <dd className="mt-0.5 truncate tabular-nums text-h2" title={v}>{v}</dd>
           </div>
         ))}
       </dl>
@@ -85,7 +86,7 @@ export function DisksPage() {
     setBusy(true);
     try {
       const r = await api.post<{ sent: number }>("/api/disks/refresh");
-      toast(r.sent ? `Relevé demandé à ${r.sent} hôte(s) : les données arrivent d'ici quelques minutes` : "Aucun agent connecté", r.sent ? "success" : "error");
+      toast(r.sent ? plural(`Relevé demandé à ${r.sent} hôte(s) : les données arrivent d'ici quelques minutes`) : "Aucun agent connecté", r.sent ? "success" : "error");
     } catch (e) { toast((e as Error).message, "error"); }
     setBusy(false);
   };
@@ -93,17 +94,17 @@ export function DisksPage() {
   const count = (l: DiskHealthLevel) => all.filter((d) => d.health === l).length;
   return (
     <>
-      <PageHeader title="Disques" description="Santé SMART des disques durs et SSD, relevée toutes les heures. Les durées restantes sont des estimations."
+      <PageHeader title="Disques" description="Santé SMART des disques durs et SSD, relevée toutes les heures, avec une durée de vie estimée."
         actions={<Button variant="secondary" icon={<RefreshCw size={16} />} loading={busy} onClick={refresh}>Relever maintenant</Button>} />
       {error && <Alert kind="error" title="Impossible de charger les disques" className="mb-6">{error}</Alert>}
       {!data && !error && <Skeleton className="h-64" />}
       {data && (
         <div className={SECTIONS}>
           <div className={STAT_GRID}>
-            <Stat label="Disques suivis" value={all.length} icon={<HardDrive size={16} />} />
-            <Stat label="Bon état" value={count("good")} icon={<CircleCheck size={16} />} tone="green" />
-            <Stat label="À surveiller" value={count("watch")} icon={<TriangleAlert size={16} />} tone={count("watch") ? "yellow" : undefined} />
-            <Stat label="À remplacer ou défaillants" value={count("replace") + count("failing")} icon={<CircleAlert size={16} />} tone={count("replace") + count("failing") ? "red" : undefined} />
+            <Stat label="Disques suivis" value={all.length} />
+            <Stat label="Bon état" value={count("good")} tone="green" />
+            <Stat label="À surveiller" value={count("watch")} tone={count("watch") ? "yellow" : undefined} />
+            <Stat label="À remplacer ou défaillants" value={count("replace") + count("failing")} tone={count("replace") + count("failing") ? "red" : undefined} />
           </div>
           {data.length === 0 && (
             <EmptyState icon={<HardDrive size={20} />} title="Aucune donnée SMART">
@@ -112,12 +113,12 @@ export function DisksPage() {
           )}
           {data.map((h) => (
             <section key={h.host_id} aria-label={h.host}>
-              <SectionTitle actions={<span className="font-mono text-xs text-meta">relevé {fmtAgo(h.collected_at)}</span>}>
+              <SectionTitle actions={<span className="tabular-nums text-xs text-meta">relevé {fmtAgo(h.collected_at)}</span>}>
                 <Link to={`/hosts/${h.host_id}`} className="text-inherit no-underline hover:text-accent-text">{h.host}</Link>
               </SectionTitle>
               {h.error && <Alert kind="info" title={h.error} className="mb-4" />}
               {!h.error && h.disks.length === 0 && <p className="text-sm text-meta">Aucun disque compatible SMART (machine virtuelle ?).</p>}
-              <div className="grid gap-4 lg:grid-cols-2 xl:gap-6">{h.disks.map((d) => <DiskCard key={d.name + d.serial} d={d} />)}</div>
+              <div className="grid gap-4 lg:grid-cols-2">{h.disks.map((d) => <DiskCard key={d.name + d.serial} d={d} />)}</div>
             </section>
           ))}
         </div>

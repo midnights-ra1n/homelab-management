@@ -236,7 +236,7 @@ export function AssetForm({
           <div className="mt-6">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-medium text-h1">
-                {tr("Stockage ")}<span className="ml-2 font-mono text-xs text-meta">{disks.length ? tr("total {size}", { size: formatGb(totalDisk, tr.locale) }) : ""}</span>
+                {tr("Stockage ")}<span className="ml-2 tabular-nums text-xs text-meta">{disks.length ? tr("total {size}", { size: formatGb(totalDisk, tr.locale) }) : ""}</span>
               </p>
               <Button
                 variant="ghost"

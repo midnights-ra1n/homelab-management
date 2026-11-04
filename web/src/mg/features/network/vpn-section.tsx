@@ -100,7 +100,7 @@ function Endpoint({
         {ip || "—"}
         {lan ? ` · LAN ${lan}` : ""}
       </p>
-      {routes.length > 0 && <p className="mt-1 truncate font-mono text-[0.7rem] text-body">→ {routes.join(", ")}</p>}
+      {routes.length > 0 && <p className="mt-1 truncate font-mono text-xs text-body">→ {routes.join(", ")}</p>}
     </div>
   );
 }

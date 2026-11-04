@@ -4,7 +4,7 @@ export type Theme = "dark" | "light";
 
 const KEY = "hlm-theme";
 /** theme-color de la charte : couleur de la sidebar (crust) selon le thème. */
-const COLORS: Record<Theme, string> = { dark: "#060B1F", light: "#EAEAF9" };
+const COLORS: Record<Theme, string> = { dark: "#0B1130", light: "#F5F5FE" };
 
 function syncThemeColor() {
   const color = COLORS[getEffectiveTheme()];

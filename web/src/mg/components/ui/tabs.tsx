@@ -16,7 +16,7 @@ export function LinkTabs({
   return (
     <nav
       aria-label={label}
-      className={cn("mm-segmented max-w-full overflow-x-auto", className)}
+      className={cn("mm-segmented max-w-full", className)}
     >
       {items.map((item) => {
         const isActive = item.value === active;

@@ -5,37 +5,28 @@ import { useSyncExternalStore, type ReactNode } from "react";
 import { isRail, subscribeTheme, toggleRail } from "@/lib/theme";
 import { openSearch } from "./command-palette";
 import { Logo } from "./logo";
-import { NAV_SECTIONS, isActive, type NavItem } from "./nav-items";
+import { NAV_SECTIONS, NAV_TABS, isActive, type NavItem } from "./nav-items";
 import { usePathname, useT } from "@/i18n/client";
-import { useSession } from "@/session";
-import { ArrowUpRight } from "../../../shared/icons";
-import { SEARCH_KEY, usePageAccent } from "../../../ui";
+import { IconButton, SEARCH_KEY, navActive } from "../../../ui";
 import { NotificationsButton } from "../alert-banner";
 
 /**
- * Barre latérale de la charte (.mm-sidebar) : 248 px, rail 64 px (tablette ou replié, :root[data-sidebar="rail"]),
+ * Barre latérale de la charte (.mm-sidebar) : 264 px, rail 76 px (tablette ou replié, :root[data-sidebar="rail"]),
  * masquée sous 640 px au profit de la barre basse. Pied fixe : Notifications, Paramètres puis compte.
  */
 export function AppSidebar({ userSlot }: { userSlot: ReactNode }) {
   const tr = useT();
   const pathname = usePathname();
-  usePageAccent(NAV_SECTIONS, pathname);
   return (
     <aside className="mm-sidebar" aria-label={tr("Navigation principale")}>
       <SideHead />
       <nav className="mm-sidebar__nav">
-        <button type="button" onClick={openSearch} title={`${tr("Rechercher")} (${SEARCH_KEY})`} className="mm-nav-item">
-          <Search size={16} aria-hidden="true" className="shrink-0" />
-          <span className="mm-nav-item__label">{tr("Rechercher")}</span>
-          <kbd className="mm-nav-item__count font-mono">{SEARCH_KEY}</kbd>
-        </button>
         {NAV_SECTIONS.map((section, i) => (
-          <div key={i} className="mm-sidebar__section" data-accent={section.accent}>
+          <div key={i} className="mm-sidebar__section">
             {section.label && <div className="mm-label-caps">{tr(section.label)}</div>}
             {section.items.map((item) => (
-              <SideLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+              <SideLink key={item.href} item={item} active={navActive(pathname, item.href, NAV_TABS)} />
             ))}
-            {i === 0 && <MonitoringLink />}
           </div>
         ))}
       </nav>
@@ -53,7 +44,7 @@ function SideLink({ item, active }: { item: NavItem; active: boolean }) {
   const label = tr(item.label);
   return (
     <Link href={item.href} title={label} aria-current={active ? "page" : undefined} className="mm-nav-item">
-      <item.icon size={16} aria-hidden="true" className="shrink-0" />
+      <item.icon size={20} aria-hidden="true" className="shrink-0" />
       <span className="mm-nav-item__label">{label}</span>
     </Link>
   );
@@ -61,9 +52,7 @@ function SideLink({ item, active }: { item: NavItem; active: boolean }) {
 
 function SideHead() {
   const tr = useT();
-  const VERSION = useSession().version;
   const rail = useSyncExternalStore(subscribeTheme, isRail, () => false);
-  const version = /^\d/.test(VERSION) ? `v${VERSION}` : VERSION;
   const label = rail ? tr("Déplier la barre latérale") : tr("Replier la barre latérale");
   return (
     <div className="mm-sidebar__head">
@@ -72,29 +61,15 @@ function SideHead() {
           <Logo compact />
         </span>
         <span className="grid min-w-0 leading-none">
-          <span>Homelab</span>
-          <span className="mt-1 flex items-baseline gap-1.5 text-[11px] font-medium text-meta">
-            Management
-            <span className="font-mono font-normal text-accent-text tabular-nums">{version}</span>
-          </span>
+          <span className="uppercase">Midnights</span>
+          <span className="mt-1 text-xs font-medium text-meta">Management</span>
         </span>
       </Link>
-      <button type="button" onClick={toggleRail} aria-label={label} title={label} className="mm-btn mm-btn--ghost mm-btn--sm mm-btn--icon mm-sidebar__collapse">
-        {rail ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}
-      </button>
+      <span className="flex shrink-0 items-center gap-1 [:root[data-sidebar=rail]_&]:flex-col">
+        <IconButton label={`${tr("Rechercher")} (${SEARCH_KEY})`} title={`${tr("Rechercher")} (${SEARCH_KEY})`} icon={<Search size={18} />} onClick={openSearch} />
+        <IconButton label={label} title={label} icon={rail ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />} onClick={toggleRail} className="mm-sidebar__collapse" />
+      </span>
     </div>
-  );
-}
-
-/** Shortcut to the monitoring instance (first Midnights Monitoring integration). */
-export function MonitoringLink() {
-  const { monitoringUrl } = useSession();
-  if (!monitoringUrl) return null;
-  return (
-    <a href={monitoringUrl} target="_blank" rel="noopener" title="Ouvrir le tableau de bord du monitoring" className="mm-nav-item">
-      <ArrowUpRight size={16} aria-hidden="true" className="shrink-0" />
-      <span className="mm-nav-item__label">Ouvrir le monitoring</span>
-    </a>
   );
 }
 

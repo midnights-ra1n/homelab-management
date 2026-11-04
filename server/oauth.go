@@ -200,7 +200,7 @@ func (s *Server) handleOAuthRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.getSetting("mcp_dcr", "true") != "true" {
-		oauthErr(w, 403, "access_denied", "Inscription automatique désactivée : créez un client OAuth dans les paramètres")
+		oauthErr(w, 403, "access_denied", "Inscription automatique désactivée : crée un client OAuth dans les paramètres")
 		return
 	}
 	var in struct {
@@ -255,7 +255,7 @@ func (s *Server) handleOAuthRegister(w http.ResponseWriter, r *http.Request) {
 func (s *Server) checkAuthorize(q url.Values) (*oauthClient, string, string) {
 	c, ok := s.getClient(q.Get("client_id"))
 	if !ok {
-		return nil, "", "Client OAuth inconnu : il a peut-être été révoqué, relancez la connexion depuis Claude"
+		return nil, "", "Client OAuth inconnu : il a peut-être été révoqué, relance la connexion depuis Claude"
 	}
 	redirect := q.Get("redirect_uri")
 	if redirect == "" && len(c.Redirects) == 1 {

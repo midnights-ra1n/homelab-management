@@ -87,6 +87,7 @@ func (s *Server) journal(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		defer cacheGen.Add(1)
 		li := &logInfo{}
 		r = r.WithContext(context.WithValue(r.Context(), logCtxKey{}, li))
 		rec := &statusRecorder{ResponseWriter: w}

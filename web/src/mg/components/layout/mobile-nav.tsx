@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Ellipsis, Search, Settings, X } from "../../../shared/icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { openSearch } from "./command-palette";
-import { MOBILE_TABS, NAV_ITEMS, isActive, type NavItem } from "./nav-items";
+import { MOBILE_TABS, NAV_ITEMS, NAV_SECTIONS, NAV_TABS, type NavItem } from "./nav-items";
+import { navActive } from "../../../ui";
 import { usePathname, useT } from "@/i18n/client";
 
 /**
@@ -29,8 +30,8 @@ export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
   }, [open]);
 
   const tabs = NAV_ITEMS.filter((i) => MOBILE_TABS.includes(i.href));
-  const more: NavItem[] = [...NAV_ITEMS.filter((i) => !MOBILE_TABS.includes(i.href)), { href: "/parametres", label: "Paramètres", short: "Paramètres", icon: Settings }];
-  const moreActive = more.some((i) => isActive(pathname, i.href));
+  const more: NavItem[] = [...NAV_SECTIONS.flatMap((s) => s.items).filter((i) => !MOBILE_TABS.includes(i.href)), ...NAV_ITEMS.filter((i) => i.href === "/nodejs"), { href: "/parametres", label: "Paramètres", short: "Paramètres", icon: Settings }];
+  const moreActive = more.some((i) => navActive(pathname, i.href, NAV_TABS));
 
   return (
     <>
@@ -50,7 +51,7 @@ export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
             <span className="mm-nav-item__label">{tr("Rechercher")}</span>
           </button>
           {more.map((item) => (
-            <Link key={item.href} href={item.href} className="mm-nav-item" aria-current={isActive(pathname, item.href) ? "page" : undefined}>
+            <Link key={item.href} href={item.href} className="mm-nav-item" aria-current={navActive(pathname, item.href, NAV_TABS) ? "page" : undefined}>
               <item.icon size={20} aria-hidden="true" className="shrink-0" />
               <span className="mm-nav-item__label">{tr(item.label)}</span>
             </Link>
@@ -65,7 +66,7 @@ export function MobileNav({ accountSlot }: { accountSlot: ReactNode }) {
             key={item.href}
             href={item.href}
             className="mm-bottomnav__item"
-            aria-current={isActive(pathname, item.href) && !open ? "page" : undefined}
+            aria-current={navActive(pathname, item.href, NAV_TABS) && !open ? "page" : undefined}
           >
             <span className="mm-bottomnav__pill">
               <item.icon size={22} aria-hidden="true" />

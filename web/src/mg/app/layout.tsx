@@ -4,7 +4,10 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { Toaster } from "@/components/ui/toaster";
-import { AlertStrip, NotificationsButton } from "@/components/alert-banner";
+import { NotificationsButton } from "@/components/alert-banner";
+import { NAV_ITEMS, NAV_TABS } from "@/components/layout/nav-items";
+import { usePathname } from "@/i18n/client";
+import { PageTabs } from "../../ui";
 import { TimeZoneSync } from "@/features/settings/time-zone";
 import { getTimeZone } from "@/lib/data/settings";
 import { getT } from "@/i18n/server";
@@ -13,7 +16,12 @@ function TimeZone() {
   return <TimeZoneSync tz={use(getTimeZone())} />;
 }
 
-/** Coque Midnights Classic : [sidebar | contenu] (.mm-app), barre basse sous 640 px. */
+function SectionTabs() {
+  const tr = use(getT());
+  return <PageTabs pathname={usePathname()} tabs={NAV_TABS} items={NAV_ITEMS.map((i) => ({ href: i.href, label: tr(i.label) }))} label={tr("Pages de la section")} />;
+}
+
+/** Coque Dashboard Of Midnights : [sidebar | contenu] (.mm-app), barre basse sous 640 px. */
 export default function AppLayout({ children }: LayoutProps<"/[lang]">) {
   const tr = use(getT());
   return (
@@ -39,9 +47,7 @@ export default function AppLayout({ children }: LayoutProps<"/[lang]">) {
         </Suspense>
         <div className="mm-app__main">
           <main id="contenu" className="mm-page flex-1 overflow-x-clip">
-            <Suspense fallback={null}>
-              <AlertStrip />
-            </Suspense>
+            <SectionTabs />
             {children}
           </main>
         </div>

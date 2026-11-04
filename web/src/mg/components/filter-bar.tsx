@@ -76,7 +76,7 @@ export function FilterBar({
             <X size={15} />
           </button>
         ) : (
-          <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-1.5 font-mono text-[0.7rem] text-meta sm:block">
+          <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-1.5 font-mono text-xs text-meta sm:block">
             /
           </kbd>
         )}

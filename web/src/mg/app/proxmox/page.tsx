@@ -24,7 +24,7 @@ export default function ProxmoxPage() {
     <>
       <PageHeader
         title={tr("Tous tes nœuds, sans cluster")}
-        description={tr("Agrège des hôtes Proxmox VE autonomes — sans quorum à 3 nœuds ni Proxmox Datacenter Manager : état, ressources, actions sur les invités et migration distante.")}
+        description={tr("Tes hôtes Proxmox VE autonomes réunis : état, ressources, actions sur les invités et migration distante.")}
         actions={
           <ButtonLink href="/parametres#integrations" variant="secondary" icon={<Settings size={16} />}>
             {tr("Gérer les nœuds")}</ButtonLink>
@@ -68,7 +68,7 @@ function Overview() {
   const cpuUsed = online.reduce((n, x) => n + (x.cpu ?? 0) * (x.maxcpu ?? 0), 0);
 
   return (
-    <div className="grid grid-cols-1 gap-10 xl:gap-14">
+    <div className="grid grid-cols-1 gap-8 xl:gap-14">
       {sources
         .filter((s) => !s.ok)
         .map((s) => (
@@ -77,7 +77,7 @@ function Overview() {
           </Alert>
         ))}
 
-      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 xl:gap-8">
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
         <Stat label={tr("Nœuds en ligne")} value={`${online.length}/${nodes.length}`} detail={tr("{length} intégration(s)", { length: sources.length })} />
         <Stat label={tr("Invités démarrés")} value={`${running}/${guests.length}`} detail={`${guests.filter((g) => g.type === "qemu").length} VM · ${guests.filter((g) => g.type === "lxc").length} CT`} />
         <Stat label={tr("CPU agrégé")} value={`${pct(cpuUsed, cpuTotal)} %`} detail={tr("{n} threads", { n: cpuTotal })} />
@@ -97,7 +97,7 @@ function Overview() {
                   <div className="min-w-0">
                     <p className="flex items-center gap-2">
                       <span className="relative flex h-2.5 w-2.5">
-                        {isOnline && <span className="ping absolute inset-0 rounded-full bg-green" />}
+                        
                         <span className={`relative h-2.5 w-2.5 rounded-full ${isOnline ? "bg-green" : "bg-red"}`} />
                       </span>
                       <Link href={nodeHref(n.source.id, n.node)} className="truncate text-lg font-semibold text-h1 hover:text-accent-text">{n.node}</Link>
@@ -117,7 +117,7 @@ function Overview() {
                       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                         <div>
                           <dt className="text-meta">{tr("Uptime")}</dt>
-                          <dd className="font-mono text-h2">{formatUptime(d.uptime, tr.locale)}</dd>
+                          <dd className="tabular-nums text-h2">{formatUptime(d.uptime, tr.locale)}</dd>
                         </div>
                         <div>
                           <dt className="text-meta">{tr("Charge")}</dt>
@@ -140,8 +140,8 @@ function Overview() {
                   <p className="mt-5 text-sm text-meta">{tr("Nœud injoignable depuis son API.")}</p>
                 )}
                 <div className="mt-auto flex items-center justify-between gap-2 pt-5">
-                  <span className="font-mono text-xs text-meta">
-                    {guests.filter((g) => g.integrationId === n.source.id && g.node === n.node).length} {tr("invité(s)")}</span>
+                  <span className="tabular-nums text-xs text-meta">
+                    {tr("{n} invité(s)", { n: guests.filter((g) => g.integrationId === n.source.id && g.node === n.node).length })}</span>
                   <div className="flex gap-1">
                     {isOnline && <NodeTasks integrationId={n.source.id} node={n.node} />}
                     <ButtonLink href={nodeHref(n.source.id, n.node)} variant="ghost" size="sm" icon={<Server size={14} />}>

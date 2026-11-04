@@ -122,7 +122,7 @@ func (s *Server) mgUpdateAgents(w http.ResponseWriter, r *http.Request) {
 		done = append(done, a.Name)
 		s.mgLog(r, "asset", a.AssetID, "action", "Mise à jour de l'agent de « "+a.Name+" » demandée ("+a.Version+" → "+a.Latest+")")
 	}
-	msg := fmt.Sprintf("Mise à jour demandée pour %d agent(s).", len(done))
+	msg := plural(fmt.Sprintf("Mise à jour demandée pour %d agent(s).", len(done)))
 	if len(done) == 0 && len(failed) == 0 {
 		msg = "Aucun agent à mettre à jour."
 	}

@@ -692,9 +692,9 @@ func (s *Server) mgBulkAssets(w http.ResponseWriter, r *http.Request) {
 	for _, e := range logs {
 		s.mgLog(r, "asset", e.id, e.action, e.summary)
 	}
-	msg := fmt.Sprintf("%d élément(s) modifié(s).", len(logs))
+	msg := plural(fmt.Sprintf("%d élément(s) modifié(s).", len(logs)))
 	if a.Op == "delete" {
-		msg = fmt.Sprintf("%d élément(s) supprimé(s).", len(logs))
+		msg = plural(fmt.Sprintf("%d élément(s) supprimé(s).", len(logs)))
 	}
 	writeJSON(w, 200, map[string]any{"ok": true, "message": msg})
 }

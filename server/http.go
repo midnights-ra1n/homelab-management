@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,7 +56,7 @@ func (s *Server) routes() http.Handler {
 		s.monitoringRoutes(mux)
 	}
 	mux.Handle("/", s.staticHandler())
-	return s.securityHeaders(s.journal(mux))
+	return s.securityHeaders(compress(s.journal(mux)))
 }
 
 func (s *Server) monitoringRoutes(mux *http.ServeMux) {
@@ -64,8 +65,8 @@ func (s *Server) monitoringRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/public/status", s.handlePublicStatus)
 	mux.HandleFunc("GET /api/public/wall", s.handleWall)
 
-	mux.HandleFunc("GET /api/overview", auth(s.handleOverview))
-	mux.HandleFunc("GET /api/hosts", auth(s.handleListHosts))
+	mux.HandleFunc("GET /api/overview", auth(cacheJSON(3*time.Second, s.handleOverview)))
+	mux.HandleFunc("GET /api/hosts", auth(cacheJSON(3*time.Second, s.handleListHosts)))
 	mux.HandleFunc("POST /api/hosts", auth(s.handleCreateHost))
 	mux.HandleFunc("GET /api/hosts/{id}", auth(s.handleGetHost))
 	mux.HandleFunc("PATCH /api/hosts/{id}", auth(s.handleUpdateHost))
@@ -373,4 +374,24 @@ func (l *rateLimiter) allow(key string) bool {
 	}
 	w.n++
 	return w.n <= l.max
+}
+
+var pluralMark = regexp.MustCompile(`\d+|\((s|x)\)`)
+
+// plural resolves "3 hôte(s)" with the number before each mark: French keeps 0 and 1 singular.
+func plural(text string) string {
+	count := -1
+	return pluralMark.ReplaceAllStringFunc(text, func(m string) string {
+		if m[0] != '(' {
+			count, _ = strconv.Atoi(m)
+			return m
+		}
+		switch {
+		case count < 0: // no number to agree with, like "http(s)"
+			return m
+		case count > 1:
+			return m[1:2]
+		}
+		return ""
+	})
 }

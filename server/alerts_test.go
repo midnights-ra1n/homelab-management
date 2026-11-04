@@ -37,7 +37,7 @@ func TestUpdateAlertsAreSentOnce(t *testing.T) {
 	s.notifier.mu.Lock()
 	last := s.notifier.pending[len(s.notifier.pending)-1]
 	s.notifier.mu.Unlock()
-	if last.Message != "1 nouvelle(s) mise(s) à jour de sécurité : openssh-server" {
+	if last.Message != "1 nouvelle mise à jour de sécurité : openssh-server" {
 		t.Fatalf("message %q", last.Message)
 	}
 

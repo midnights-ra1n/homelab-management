@@ -119,7 +119,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
   const stopIndex = result ? (result.hops.findIndex((h) => h.status === "fail") === -1 ? result.hops.length - 1 : result.hops.findIndex((h) => h.status === "fail")) : 0;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[24rem_1fr] xl:gap-8">
+    <div className="grid gap-6 xl:grid-cols-[24rem_1fr]">
       {/* Paramètres du paquet */}
       <div className="grid content-start gap-5 rounded-2xl border border-line-subtle bg-box p-5 sm:p-6">
         <EndpointPicker label={tr("Source")} side={src} onChange={setSrc} assets={assets} />
@@ -176,7 +176,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                   type="button"
                   onClick={() => setPort(String(p.port))}
                   className={cn(
-                    "rounded-full border px-2.5 py-1 font-mono text-[0.7rem] transition-colors",
+                    "rounded-full border px-2.5 py-1 font-mono text-xs transition-colors",
                     port === String(p.port) ? "border-accent bg-accent-soft text-accent-text" : "border-line text-body hover:text-h1",
                   )}
                 >
@@ -198,7 +198,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
 
         {history.length > 0 && (
           <div>
-            <p className="mb-2 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Scénarios récents")}</p>
+            <p className="mb-2 mm-label-caps text-meta">{tr("Scénarios récents")}</p>
             <ul className="grid gap-1">
               {history.map((h, i) => (
                 <li key={i}>
@@ -287,7 +287,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                           <Icon size={22} aria-hidden />
                           {reached && (
                             <span
-                              className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[0.65rem] font-bold"
+                              className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold"
                               style={{ background: tone, color: "var(--mm-surface)" }}
                               aria-hidden
                             >
@@ -296,7 +296,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                           )}
                         </span>
                         <span className="mt-2 block w-full truncate text-sm font-medium text-h1">{h.label}</span>
-                        {h.sub && <span className="block w-full truncate font-mono text-[0.7rem] text-meta">{tr(h.sub)}</span>}
+                        {h.sub && <span className="block w-full truncate font-mono text-xs text-meta">{tr(h.sub)}</span>}
                       </li>
                     );
                   })}
@@ -318,7 +318,7 @@ export function Simulator({ assets }: { assets: AssetOpt[] }) {
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium text-h1">{h.label}</span>
-                        {h.sub && <span className="block truncate font-mono text-[0.7rem] text-meta">{tr(h.sub)}</span>}
+                        {h.sub && <span className="block truncate font-mono text-xs text-meta">{tr(h.sub)}</span>}
                       </span>
                     </li>
                   );

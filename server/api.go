@@ -62,7 +62,7 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/overview", t("status:read hosts:read monitors:read", s.apiOverview))
 	mux.HandleFunc("GET /api/v1/status", t("status:read", s.apiStatus))
 	mux.HandleFunc("GET /api/v1/events", t("status:read", s.handleEvents))
-	mux.HandleFunc("GET /api/v1/hosts", t("hosts:read", s.handleListHosts))
+	mux.HandleFunc("GET /api/v1/hosts", t("hosts:read", cacheJSON(3*time.Second, s.handleListHosts)))
 	mux.HandleFunc("POST /api/v1/hosts", t("hosts:write", s.apiRegisterHost))
 	mux.HandleFunc("GET /api/v1/hosts/{id}", t("hosts:read", s.handleGetHost))
 	mux.HandleFunc("DELETE /api/v1/hosts/{id}", t("hosts:write", s.handleDeleteHost))
@@ -371,7 +371,7 @@ func validateTokenRequest(name string, scopes []string, expiresAt *int64) (strin
 		return "", msg
 	}
 	if len(scopes) == 0 {
-		return "", "Choisissez au moins un scope"
+		return "", "Choisis au moins un scope"
 	}
 	for _, sc := range scopes {
 		if _, ok := apiScopes[sc]; !ok {
@@ -441,7 +441,7 @@ func (s *Server) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
 	s.setCORS(w, r)
 	if !s.limiter.allow("login:" + s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessayez dans une minute")
+		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessaie dans une minute")
 		return
 	}
 	var in struct {
@@ -504,5 +504,5 @@ func (s *Server) apiOverview(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"summary": sum, "hosts": withoutPackages(hosts), "monitors": mons})
+	writeJSON(w, 200, map[string]any{"summary": sum, "hosts": listView(hosts), "monitors": mons})
 }

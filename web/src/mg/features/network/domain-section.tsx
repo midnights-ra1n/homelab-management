@@ -19,7 +19,7 @@ export function DomainSection({ domains, assets }: { domains: Domain[]; assets: 
   return (
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-mono text-xs text-meta">
+        <p className="tabular-nums text-xs text-meta">
           {tr("{total} domaine(s) · {pub} exposé(s) sur Internet", { total: domains.length, pub })}
         </p>
         <DomainDialog assets={assets} />
@@ -63,7 +63,7 @@ export function DomainSection({ domains, assets }: { domains: Domain[]; assets: 
 function Target({ label, id, name, detail }: { label: string; id: number | null; name: string | null; detail: string | null }) {
   return (
     <div className="min-w-0">
-      <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{label}</p>
+      <p className="mm-label-caps text-meta">{label}</p>
       {id ? (
         <Link href={`/inventaire/${id}`} className="block truncate text-sm font-medium text-h2 hover:text-accent-text">
           {name}

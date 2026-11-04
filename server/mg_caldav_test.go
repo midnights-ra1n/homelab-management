@@ -96,7 +96,7 @@ func TestTaskCalDAVSync(t *testing.T) {
 		"TRIGGER:-PT15M\r\nEND:VALARM\r\nEND:VTODO\r\nEND:VCALENDAR\r\n")
 	dav.put(list+"old.ics", "BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:old\r\nSUMMARY:Fini\r\nSTATUS:COMPLETED\r\nEND:VTODO\r\nEND:VCALENDAR\r\n")
 	dav.mu.Unlock()
-	if msg := sync(); !strings.Contains(msg, "1 envoyée(s)") || !strings.Contains(msg, "1 importée(s)") {
+	if msg := sync(); !strings.Contains(msg, "1 envoyée") || !strings.Contains(msg, "1 importée") {
 		t.Fatal(msg)
 	}
 	var pushed string

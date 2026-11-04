@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "../shared/icons";
 import { api, fmtAgo, fmtDate, type Install } from "../api";
 import { Alert, Badge, Button, Card, CodeBlock, Dialog, Field, IconButton, Segmented, Switch, inputClass } from "../ui";
 import { HubUrlField, KINDS, KindPicker, UNINSTALL_COMMAND, installCommand, type Kind } from "./AddHostWizard";
+import { plural } from "../shared/plural";
 
 interface EnrollToken { id: number; name: string; prefix: string; expires_at: number | null; created_at: number; last_used_at: number; uses: number }
 
@@ -66,14 +67,14 @@ export function MassDeployDialog({ open, onClose }: { open: boolean; onClose: ()
             <Segmented className="w-fit" label="Méthode" value={method} onChange={setMethod} options={[["ansible", "Ansible"], ["curl", "Commande"]]} />
             {method === "ansible" ? (
               <>
-                <p className="text-sm text-body">Dans <code className="font-mono text-xs text-h2">group_vars/&lt;groupe&gt;/main.yml</code> de votre playbook, avec le rôle <code className="font-mono text-xs text-h2">hlm_agent</code> (voir docs/ANSIBLE.md) :</p>
+                <p className="text-sm text-body">Dans <code className="font-mono text-xs text-h2">group_vars/&lt;groupe&gt;/main.yml</code> de ton playbook, avec le rôle <code className="font-mono text-xs text-h2">hlm_agent</code> (voir docs/ANSIBLE.md) :</p>
                 <CodeBlock text={[
                   `hlm_hub_url: ${install.hub_url}`,
                   `hlm_key: "${install.key}"`,
                   `hlm_agent_token: "{{ vault_hlm_agent_token }}"`,
                   `hlm_smart: ${smart}`,
                 ].join("\n")} />
-                {kind === "proxmox" && <p className="text-sm text-body">Le rôle Ansible n'installe pas l'agent dans les conteneurs LXC : une fois le Proxmox inscrit, utilisez <span className="text-h2">Passer en serveur Proxmox</span> sur sa fiche, ou la méthode Commande.</p>}
+                {kind === "proxmox" && <p className="text-sm text-body">Le rôle Ansible n'installe pas l'agent dans les conteneurs LXC : une fois le Proxmox inscrit, utilise <span className="text-h2">Passer en serveur Proxmox</span> sur sa fiche, ou la méthode Commande.</p>}
                 <p className="text-sm text-body">et dans le vault (<code className="font-mono text-xs text-h2">ansible-vault create group_vars/&lt;groupe&gt;/vault.yml</code>) :</p>
                 <CodeBlock text={`vault_hlm_agent_token: ${install.token}`} />
               </>
@@ -88,7 +89,7 @@ export function MassDeployDialog({ open, onClose }: { open: boolean; onClose: ()
         )}
 
         {tokens.length > 0 && (
-          <Card flush title="Jetons communs" sub={`${tokens.length} jeton(s)`}>
+          <Card flush title="Jetons communs" sub={plural(`${tokens.length} jeton(s)`)}>
             <div className="mm-table-wrap">
               <table className="mm-table">
                 <thead><tr><th scope="col">Nom</th><th scope="col">Expiration</th><th scope="col" className="mm-col-num">Inscriptions</th><th scope="col">Dernière</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
@@ -98,7 +99,7 @@ export function MassDeployDialog({ open, onClose }: { open: boolean; onClose: ()
                     <tr key={t.id}>
                       <td className="mm-col-strong"><span className="block">{t.name}</span><span className="block font-mono text-xs font-normal text-meta">{t.prefix}…</span></td>
                       <td>{t.expires_at == null ? "Jamais" : expired ? <Badge tone="orange" dot>Expiré</Badge> : fmtDate(t.expires_at)}</td>
-                      <td className="mm-col-num font-mono text-xs">{t.uses}</td>
+                      <td className="mm-col-num">{t.uses}</td>
                       <td className="mm-col-muted">{t.last_used_at ? fmtAgo(t.last_used_at) : "—"}</td>
                       <td className="w-px"><IconButton label={`Révoquer ${t.name}`} icon={<Trash2 size={15} />} onClick={() => api.del(`/api/enroll-tokens/${t.id}`).then(load)} /></td>
                     </tr>

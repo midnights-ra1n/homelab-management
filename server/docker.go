@@ -46,7 +46,9 @@ func clip(s string, n int) string {
 	return s
 }
 
-func (s *Server) storeDocker(id int64, hostName string, d *dockerSnapshot) error {
+// storeDocker reports whether the containers changed: the snapshot is new every minute because
+// of its CPU and memory figures, which are not worth reloading every open page at once.
+func (s *Server) storeDocker(id int64, hostName string, d *dockerSnapshot) (bool, error) {
 	if len(d.Containers) > 500 {
 		d.Containers = d.Containers[:500]
 	}
@@ -89,8 +91,9 @@ func (s *Server) storeDocker(id int64, hostName string, d *dockerSnapshot) error
 	}
 	d.CollectedAt = time.Now().Unix()
 	b, _ := json.Marshal(d)
+	changed := d.Running != prev.Running || d.UpdatesAvailable != prev.UpdatesAvailable || len(d.Containers) != len(prev.Containers) || d.Error != prev.Error
 	_, err := s.db.Exec(`INSERT INTO host_live(host_id,docker) VALUES(?,?) ON CONFLICT(host_id) DO UPDATE SET docker=excluded.docker`, id, string(b))
-	return err
+	return changed, err
 }
 
 func (s *Server) handleContainers(w http.ResponseWriter, r *http.Request) {

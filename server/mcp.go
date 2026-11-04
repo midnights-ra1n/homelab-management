@@ -304,7 +304,7 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		// No server-initiated stream: every answer comes back on the POST.
 		w.Header().Set("Allow", "POST")
-		writeErr(w, 405, "Utilisez POST")
+		writeErr(w, 405, "Utilise POST")
 		return
 	}
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))

@@ -22,7 +22,7 @@ export default function InventoryPage({ searchParams }: PageProps<"/[lang]/inven
     <>
       <PageHeader
         title={tr("Tout ton matériel, au même endroit")}
-        description={tr("Serveurs physiques, machines virtuelles, conteneurs LXC et Docker, équipements réseau — avec leur configuration matérielle et leur adressage.")}
+        description={tr("Serveurs, VM, conteneurs et équipements réseau, avec leur configuration et leur adressage.")}
         actions={
           <>
             <Suspense fallback={null}>

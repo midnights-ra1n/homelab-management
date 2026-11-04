@@ -6,6 +6,7 @@ import { api } from "../api";
 import { Popover } from "../mg/components/ui/popover";
 import { refreshPolled, usePolled } from "./poll";
 import { Badge, Button, Link, Segmented, StatusIcon, TONE_VAR, cn, inputClass } from "../ui";
+import { plural } from "./plural";
 
 export type NotifAlert = { key: string; critical: boolean; text: string; detail?: string; href: string };
 /** A host as seen by the monitoring; `key` is saved with its reminders, `href` opens its updates. */
@@ -105,7 +106,7 @@ export function NotificationsMenu<T>({ url, toFeed, floating = false, alertsLink
 }
 
 function Count({ n }: { n: number }) {
-  return <span className="font-mono text-[11px] tabular-nums text-meta">{n}</span>;
+  return <span className="text-xs tabular-nums text-meta">{n}</span>;
 }
 
 function Empty({ children }: { children: string }) {
@@ -131,8 +132,8 @@ function UpdatesPanel({ hosts, onClose, onRemind, link }: { hosts: NotifHost[]; 
       {hosts.length ? (
         <>
           <p className="px-2.5 pb-1.5 text-xs text-meta">
-            {hosts.length} hôte(s) · {packages} paquet(s){security > 0 && <>, dont <span className="text-red">{security} de sécurité</span></>}
-            {reboots > 0 && <> · {reboots} redémarrage(s)</>}
+            {plural(`${hosts.length} hôte(s) · ${packages} paquet(s)`)}{security > 0 && <>, dont <span className="text-red">{security} de sécurité</span></>}
+            {reboots > 0 && <> · {plural(`${reboots} redémarrage(s)`)}</>}
           </p>
           <ul className="max-h-[50vh] overflow-y-auto">
             {hosts.map((h) => (
@@ -199,7 +200,7 @@ function RemindersPanel({ rem, hosts, preset }: { rem: Reminders | null; hosts: 
             const late = r.due_date < today;
             return (
               <li key={r.id} className="flex items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-sm">
-                <span className="mm-badge__dot shrink-0" style={{ background: TONE_VAR[late ? "red" : r.due ? "yellow" : "muted"] }} aria-hidden="true" />
+                <span className="size-2 shrink-0 rounded-full" style={{ background: TONE_VAR[late ? "red" : r.due ? "yellow" : "muted"] }} aria-hidden="true" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-h1">{host}{r.note && <span className="text-meta"> · {r.note}</span>}</span>
                   <span className={cn("block text-xs", late ? "text-red" : r.due ? "text-yellow" : "text-meta")}>

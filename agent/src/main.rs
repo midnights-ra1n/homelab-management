@@ -135,6 +135,15 @@ fn handshake_cookie(token: &str, nonce: &[u8; 32], host: Option<&str>) -> String
     c
 }
 
+/// Sends a JSON message; a lost connection ends the session.
+macro_rules! send {
+    ($ws:expr, $msg:expr) => {
+        if let Err(e) = $ws.send(Message::Text($msg.to_string().into())).await {
+            return Failure::Retry(e.to_string());
+        }
+    };
+}
+
 async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) -> Failure {
     let mut nonce = [0u8; 32];
     if let Err(e) = getrandom::fill(&mut nonce) {
@@ -192,9 +201,7 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
     eprintln!("hlm-agent: connected, reporting every {}s", interval.as_secs());
 
     let info = serde_json::json!({"type": "info", "info": collector.info()});
-    if let Err(e) = ws.send(Message::Text(info.to_string().into())).await {
-        return Failure::Retry(e.to_string());
-    }
+    send!(ws, info);
     let mut tick = tokio::time::interval(interval);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // Pending updates change slowly; apt-daily refreshes the lists about twice a day.
@@ -240,9 +247,7 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                 if let Some(rep) = smart::read_report().filter(|r| r.collected_at != smart_sent) {
                     smart_sent = rep.collected_at;
                     let m = serde_json::json!({"type": "smart", "smart": rep});
-                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, m);
                 }
             }
             _ = smart_poll.tick(), if smart_until > actions::now() => {
@@ -250,17 +255,13 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                     smart_sent = rep.collected_at;
                     smart_until = 0;
                     let m = serde_json::json!({"type": "smart", "smart": rep});
-                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, m);
                 }
             }
             _ = pve_tick.tick() => {
                 if let Some(rep) = pve::read().filter(|r| pve_sent.as_ref() != Some(r)) {
                     let m = serde_json::json!({"type": "pve", "pve": rep});
-                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, m);
                     pve_sent = Some(rep);
                 }
                 let now = actions::now();
@@ -271,39 +272,29 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                     }
                     lxc_asked.insert(ct, now);
                     let m = serde_json::json!({"type": "lxc_token", "ct": ct, "name": name});
-                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, m);
                 }
             }
             _ = upd.tick() => {
                 if let Ok(Some(u)) = tokio::task::spawn_blocking(updates::check).await {
                     let m = serde_json::json!({"type": "updates", "updates": u});
-                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, m);
                 }
             }
             _ = tick.tick() => {
                 let m = serde_json::json!({"type": "metrics", "metrics": collector.collect()});
-                if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                    return Failure::Retry(e.to_string());
-                }
+                send!(ws, m);
             }
             _ = live_tick.tick(), if live_until > actions::now() => {
                 let m = serde_json::json!({"type": "live", "metrics": collector.collect()});
-                if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                    return Failure::Retry(e.to_string());
-                }
+                send!(ws, m);
             }
             _ = docker_tick.tick() => {
-                if let Some(mut snap) = docker::read_snapshot().filter(|s| s.collected_at != docker_sent) {
+                if let Some(mut snap) = docker::read_snapshot(docker_sent) {
                     docker_sent = snap.collected_at;
                     snap.apply(&image_cache);
                     let m = serde_json::json!({"type": "docker", "docker": snap});
-                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, m);
                 }
             }
             _ = node_tick.tick(), if node_on => {
@@ -321,20 +312,16 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                     Some((Some(id), res)) => Some(node::reply(id, res)),
                 };
                 if let Some(m) = m {
-                    if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, m);
                 }
             }
             _ = fw_poll.tick(), if fw_reads.active() => {
                 if let Some((Some(id), res)) = fw_reads.poll() {
-                    if let Err(e) = ws.send(Message::Text(node::reply(id, res).to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, node::reply(id, res));
                 }
             }
             _ = registry_tick.tick() => {
-                if let Some(snap) = docker::read_snapshot() {
+                if let Some(snap) = docker::read_snapshot(0) {
                     let images = snap.images();
                     if !images.is_empty() {
                         if let Ok(c) = tokio::task::spawn_blocking(move || docker::check_updates(images)).await {
@@ -351,18 +338,14 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                 if let Some((ok, message)) = finished {
                     apt_pending = None;
                     let r = serde_json::json!({"type": "action_result", "action": action, "state": if ok { "done" } else { "failed" }, "message": message});
-                    if let Err(e) = ws.send(Message::Text(r.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, r);
                     if action == "update_container" {
                         registry_tick.reset_immediately(); // re-check images now that one changed
                     } else if action.starts_with("node_") {
                         // The helper collected the new state before reporting.
                         if let Some(s) = node::read_snapshot() {
                             let m = serde_json::json!({"type": "node_apps", "node_apps": s});
-                            if let Err(e) = ws.send(Message::Text(m.to_string().into())).await {
-                                return Failure::Retry(e.to_string());
-                            }
+                            send!(ws, m);
                         }
                     } else {
                         upd.reset_immediately(); // report the new package list right away
@@ -392,9 +375,7 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         }
                         if let Some(e) = refused {
                             let r = serde_json::json!({"type": "node_read", "read": {"id": id, "ok": false, "error": e}});
-                            if let Err(e) = ws.send(Message::Text(r.to_string().into())).await {
-                                return Failure::Retry(e.to_string());
-                            }
+                            send!(ws, r);
                         }
                         continue;
                     }
@@ -461,9 +442,7 @@ async fn session(cfg: &Config, token: &str, collector: &mut collect::Collector) 
                         _ => ("failed", "Action inconnue".to_string()),
                     };
                     let r = serde_json::json!({"type": "action_result", "action": action, "state": state, "message": message});
-                    if let Err(e) = ws.send(Message::Text(r.to_string().into())).await {
-                        return Failure::Retry(e.to_string());
-                    }
+                    send!(ws, r);
                 }
                 Some(Ok(_)) => {}
                 Some(Err(e)) => return Failure::Retry(e.to_string()),

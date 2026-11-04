@@ -13,11 +13,11 @@
 }
 :root,
 [data-theme="dark"] {
-  --mm-neutral-soft: #EEEBFF12;
+  --mm-neutral-soft: #1A2558; /* indigo : pistes de jauge, squelettes */
   --mm-accent-border: #C3BAFE66;
 }
 [data-theme="light"] {
-  --mm-neutral-soft: #0B113012;
+  --mm-neutral-soft: #EAEAF9;
   --mm-accent-border: #5F47AE59;
 }
 @media (prefers-color-scheme: light) {
@@ -25,23 +25,6 @@
     --mm-neutral-soft: #0B113012;
     --mm-accent-border: #5F47AE59;
   }
-}
-
-/* Une couleur par section (DA : une couleur, une forme). data-accent est posé sur <html> pour la
-   page courante, et sur chaque section de la barre latérale. Les pastels --mm-* suivent le thème
-   (cran 300 la nuit, 700 à l'aube) ; menthe, grenadine et pêche restent aux statuts. */
-:root[data-accent="lavande"], [data-accent="lavande"] { --mm-accent: var(--mm-lavande); }
-:root[data-accent="ciel"], [data-accent="ciel"] { --mm-accent: var(--mm-blue); }
-:root[data-accent="rose"], [data-accent="rose"] { --mm-accent: var(--mm-pink); }
-:root[data-accent="mauve"], [data-accent="mauve"] { --mm-accent: var(--mm-purple); }
-:root[data-accent], [data-accent] {
-  --mm-accent-text: var(--mm-accent);
-  --mm-focus: var(--mm-accent);
-  --mm-accent-hover: color-mix(in oklab, var(--mm-accent) 78%, var(--mm-bright));
-  --mm-accent-active: color-mix(in oklab, var(--mm-accent) 64%, var(--mm-bright));
-  --mm-accent-soft: color-mix(in srgb, var(--mm-accent) 14%, transparent);
-  --mm-accent-border: color-mix(in srgb, var(--mm-accent) 40%, transparent);
-  --mm-selection: color-mix(in srgb, var(--mm-accent) 25%, transparent);
 }
 
 @theme inline {
@@ -84,13 +67,13 @@
   --color-purple: var(--mm-purple-text);
   --color-pink: var(--mm-pink-text);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-sm: 8px;
+  --radius-md: 8px;
   --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-2xl: 28px;
-  --radius-3xl: 36px;
-  --radius-4xl: 36px;
+  --radius-xl: 14px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-4xl: 32px;
   --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-quart: cubic-bezier(0.16, 1, 0.3, 1);
@@ -141,15 +124,15 @@ dialog::backdrop {
 }
 
 :focus-visible {
-  outline: 2px solid var(--mm-focus);
-  outline-offset: 2px;
+  outline: 3px solid var(--mm-focus);
+  outline-offset: 3px;
 }
 
 /* Fields (.mm-input of the system): contour ≥ 3:1, accent on hover, accent + 3 px halo on focus. */
 .field {
   background: var(--mm-field);
   border: 1px solid var(--mm-border-strong);
-  color: var(--mm-fg);
+  color: var(--mm-bright);
   caret-color: var(--mm-accent);
   transition:
     border-color var(--mm-duration-fast) var(--mm-ease),
@@ -193,29 +176,17 @@ select.field {
 
 /* ---------- Motion ---------- */
 
-@keyframes ping {
-  0% { opacity: 0.6; scale: 1; }
-  75%, to { opacity: 0; scale: 2.4; }
-}
 @keyframes skeleton {
   0%, to { opacity: 0.55; }
   50% { opacity: 1; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ping { animation: 2.4s cubic-bezier(0, 0, 0.2, 1) infinite ping; }
-  .skeleton { animation: 1.6s ease-in-out infinite skeleton; }
+  .skeleton { animation: 2.4s ease-in-out infinite skeleton; }
 }
-.ping { opacity: 0; }
 
 dialog::backdrop {
   background: var(--mm-scrim);
 }
-@media (prefers-reduced-motion: no-preference) {
-  dialog[open] {
-    animation: mm-in var(--mm-duration-slow) var(--mm-ease-out);
-  }
-}
-
 .theme-transition,
 .theme-transition *,
 .theme-transition *::before,
@@ -232,15 +203,6 @@ dialog::backdrop {
 @media (display-mode: standalone) {
   html, body { overscroll-behavior-y: none; }
   button, nav a { -webkit-user-select: none; user-select: none; }
-}
-
-.mm-segmented__item[aria-current="page"] {
-  background: var(--mm-accent);
-  color: var(--mm-on-accent);
-  box-shadow: var(--mm-shadow-sm);
-}
-.mm-nav-item[aria-current="page"] > svg {
-  color: var(--mm-accent-text);
 }
 
 /* ---------- uPlot charts ---------- */
@@ -301,12 +263,10 @@ dialog::backdrop {
   from {
     opacity: 0;
     translate: 0 8px;
-    filter: blur(4px);
   }
   to {
     opacity: 1;
     translate: 0 0;
-    filter: blur(0);
   }
 }
 @keyframes sim-travel {
@@ -339,7 +299,6 @@ dialog::backdrop {
   height: 0.8rem;
   border-radius: 9999px;
   background: var(--mm-accent);
-  box-shadow: 0 0 14px 4px var(--mm-accent-soft);
   translate: -50% -50%;
   opacity: 0;
   pointer-events: none;

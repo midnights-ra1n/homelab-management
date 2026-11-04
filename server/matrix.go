@@ -57,7 +57,7 @@ func (s *Server) sendMatrix(text, htmlBody string) error {
 	hs := strings.TrimRight(s.getSetting("matrix_homeserver", ""), "/")
 	token, room := s.getSetting("matrix_token", ""), s.getSetting("matrix_room", "")
 	if hs == "" || token == "" || room == "" {
-		return errors.New("Matrix non configuré : renseignez le serveur, le jeton et le salon")
+		return errors.New("Matrix non configuré : renseigne le serveur, le jeton et le salon")
 	}
 	body, _ := json.Marshal(map[string]string{"msgtype": "m.text", "body": text, "format": "org.matrix.custom.html", "formatted_body": htmlBody})
 	u := hs + "/_matrix/client/v3/rooms/" + url.PathEscape(room) + "/send/m.room.message/hlm" + strconv.FormatInt(time.Now().UnixNano(), 10)

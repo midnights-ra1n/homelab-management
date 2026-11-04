@@ -1,5 +1,5 @@
 // Shows offline.html when a page cannot be loaded (offline or server down); API calls always go to the network.
-const CACHE = "hlm-shell-v4";
+const CACHE = "hlm-shell-v5";
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/offline.html", "/theme.js", "/icon.svg", "/favicon.ico", "/manifest.webmanifest"])));
   self.skipWaiting();

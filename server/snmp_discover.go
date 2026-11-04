@@ -153,7 +153,7 @@ func snmpDiscover(ctx context.Context, m *Monitor) *snmpDevice {
 	}
 	descr := col(oidIfDescr)
 	if len(descr) == 0 {
-		d.Error = "L'équipement ne publie pas la table des interfaces (IF-MIB) : vérifiez la vue SNMP autorisée"
+		d.Error = "L'équipement ne publie pas la table des interfaces (IF-MIB) : vérifie la vue SNMP autorisée"
 		return d
 	}
 	name, alias, oper := col(oidIfName), col(oidIfAlias), col(oidIfOperStatus)

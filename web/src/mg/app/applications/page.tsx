@@ -16,7 +16,7 @@ export default function ApplicationsPage() {
             {tr("Tes services, ")}<span className="text-accent-text">{tr("à un clic")}</span>
           </>
         }
-        description={tr("La page d'accueil du homelab : raccourcis groupés, icônes Dashboard Icons ou selfh.st, et état en direct de chaque service.")}
+        description={tr("La page d'accueil du homelab : raccourcis groupés et état en direct de chaque service.")}
       />
       <Suspense fallback={<SkeletonGrid count={8} className="lg:grid-cols-4" />}>
         <Apps />

@@ -2,11 +2,9 @@
 //! a few reads in /proc and /sys.
 
 use serde::Serialize;
-use std::collections::HashSet;
-use std::time::Instant;
-use sysinfo::{
-    Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, System,
-};
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
+use sysinfo::{Components, CpuRefreshKind, DiskRefreshKind, Disks, MemoryRefreshKind, RefreshKind, System};
 
 /// Values of HOST_TYPE, same list as hostTypes in server/hosts.go ("auto" or anything else: detected).
 const HOST_TYPES: &[&str] = &["proxmox", "physical", "vm", "lxc", "vps"];
@@ -78,10 +76,17 @@ pub struct Metrics {
 pub struct Collector {
     sys: System,
     disks: Disks,
-    nets: Networks,
     comps: Components,
+    net_seen: HashMap<String, (u64, u64)>, // counters of the previous sample
     last_net: Instant,
+    last_disks: Instant,
+    last_sensor_scan: Instant,
 }
+
+/// Disk usage barely moves: the 2 s samples of the live view reuse the last reading.
+const DISKS_EVERY: Duration = Duration::from_secs(20);
+/// New sensors only appear when a driver loads.
+const SENSOR_SCAN_EVERY: Duration = Duration::from_secs(600);
 
 const PSEUDO_FS: &[&str] = &[
     "tmpfs", "devtmpfs", "overlay", "squashfs", "proc", "sysfs", "ramfs", "efivarfs", "fuse.lxcfs",
@@ -94,6 +99,19 @@ const VIRTUAL_IFACES: &[&str] = &[
     "lo", "veth", "docker", "br-", "virbr", "vmbr", "tap", "fwbr", "fwpr", "fwln", "tun", "wg",
     "cni", "flannel", "cali", "vnet",
 ];
+
+/// (interface, bytes received, bytes sent) from /proc/net/dev: one read for all interfaces,
+/// where sysinfo opens eight files per interface (a Proxmox node has one tap or veth per guest).
+fn parse_net_dev(text: &str) -> Vec<(&str, u64, u64)> {
+    text.lines()
+        .skip(2)
+        .filter_map(|l| {
+            let (name, counters) = l.split_once(':')?;
+            let mut c = counters.split_ascii_whitespace();
+            Some((name.trim(), c.next()?.parse().ok()?, c.nth(7)?.parse().ok()?))
+        })
+        .collect()
+}
 
 /// CPU temperature from the sensor that best represents the package, by driver label:
 /// AMD (k10temp Tctl/Tdie, zenpower), Intel (coretemp Package id 0), ARM SoCs (cpu_thermal),
@@ -115,6 +133,17 @@ mod tests {
     }
 
     #[test]
+    fn parses_proc_net_dev() {
+        let text = "Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo:  1000      10    0    0    0     0          0         0     2000      10    0    0    0     0       0          0
+enp1s0:123456789 1000    0    0    0     0          0         0 987654321    900    0    0    0     0       0          0
+";
+        assert_eq!(parse_net_dev(text), vec![("lo", 1000, 2000), ("enp1s0", 123456789, 987654321)]);
+        assert!(parse_net_dev("").is_empty());
+    }
+
+    #[test]
     fn picks_the_cpu_sensor() {
         assert_eq!(cpu_temp(&[t("nvme Composite", 61.0), t("k10temp Tctl", 48.5)]), Some(48.5));
         assert_eq!(cpu_temp(&[t("coretemp Core 0", 50.0), t("coretemp Package id 0", 55.0)]), Some(55.0));
@@ -133,10 +162,12 @@ impl Collector {
         );
         Collector {
             sys,
-            disks: Disks::new_with_refreshed_list(),
-            nets: Networks::new_with_refreshed_list(),
+            disks: Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage()),
             comps: Components::new_with_refreshed_list(),
+            net_seen: HashMap::new(),
             last_net: Instant::now(),
+            last_disks: Instant::now(),
+            last_sensor_scan: Instant::now(),
         }
     }
 
@@ -162,9 +193,16 @@ impl Collector {
     pub fn collect(&mut self) -> Metrics {
         self.sys.refresh_cpu_usage();
         self.sys.refresh_memory();
-        self.disks.refresh(true);
-        self.nets.refresh(true);
-        self.comps.refresh(true);
+        if self.last_disks.elapsed() >= DISKS_EVERY {
+            self.last_disks = Instant::now();
+            self.disks.refresh_specifics(true, DiskRefreshKind::nothing().with_storage());
+        }
+        if self.last_sensor_scan.elapsed() >= SENSOR_SCAN_EVERY {
+            self.last_sensor_scan = Instant::now();
+            self.comps.refresh(true);
+        } else {
+            self.comps.list_mut().iter_mut().for_each(|c| c.refresh()); // reads the temperature only
+        }
 
         let mut seen = HashSet::new();
         let mut disks = Vec::new();
@@ -193,14 +231,20 @@ impl Collector {
         self.last_net = Instant::now();
         let mut ifaces = Vec::new();
         let (mut rx, mut tx) = (0.0, 0.0);
-        for (name, n) in self.nets.list() {
-            let (r, t) = (n.received() as f64 / secs, n.transmitted() as f64 / secs);
+        let net_dev = std::fs::read_to_string("/proc/net/dev").unwrap_or_default();
+        let mut seen_now = HashMap::with_capacity(self.net_seen.len());
+        for (name, rx_total, tx_total) in parse_net_dev(&net_dev) {
+            // First sample of an interface: nothing to compare with. A reset counter reads 0.
+            let (rx_before, tx_before) = self.net_seen.get(name).copied().unwrap_or((rx_total, tx_total));
+            let (r, t) = (rx_total.saturating_sub(rx_before) as f64 / secs, tx_total.saturating_sub(tx_before) as f64 / secs);
+            seen_now.insert(name.to_string(), (rx_total, tx_total));
             if !VIRTUAL_IFACES.iter().any(|p| name.starts_with(p)) {
                 rx += r;
                 tx += t;
             }
-            ifaces.push(Iface { name: name.clone(), rx: r, tx: t });
+            ifaces.push(Iface { name: name.to_string(), rx: r, tx: t });
         }
+        self.net_seen = seen_now;
 
         let temps: Vec<Temp> = self
             .comps

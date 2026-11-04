@@ -10,9 +10,9 @@ export function BandwidthFigures({ l, compact }: { l: BandwidthLink; compact?: b
   const side = (label: string, icon: React.ReactNode, s: BandwidthLink["in"]) => s && (
     <div className="min-w-0">
       <p className="flex items-center gap-1.5 text-xs text-meta">{icon}{label}</p>
-      <p className={cn("font-mono font-semibold tabular-nums text-h1", compact ? "text-lg" : "text-2xl")}>{fmtMbps(s.current_mbps)}</p>
-      {!compact && <p className="font-mono text-xs text-meta">moy. {fmtMbps(s.avg_mbps)} · pic {fmtMbps(s.peak_mbps)}</p>}
-      <p className="font-mono text-xs text-meta">aujourd'hui {fmtOctets(s.today_octets)}{!compact && <> · ce mois {fmtOctets(s.month_octets)}</>}</p>
+      <p className={cn(" font-semibold tabular-nums text-h1", compact ? "text-lg" : "text-2xl")}>{fmtMbps(s.current_mbps)}</p>
+      {!compact && <p className="tabular-nums text-xs text-meta">moy. {fmtMbps(s.avg_mbps)} · pic {fmtMbps(s.peak_mbps)}</p>}
+      <p className="tabular-nums text-xs text-meta">aujourd'hui {fmtOctets(s.today_octets)}{!compact && <> · ce mois {fmtOctets(s.month_octets)}</>}</p>
     </div>
   );
   return (

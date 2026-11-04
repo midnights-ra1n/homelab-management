@@ -59,9 +59,9 @@ export function SshKeyList({ keys }: { keys: SshKey[] }) {
     return <p className="rounded-xl border border-dashed border-line px-4 py-4 text-center text-sm text-meta">{tr("Aucune clé SSH")}</p>;
   }
   return (
-    <ul className="grid gap-2">
+    <ul className="divide-y divide-line-subtle">
       {keys.map((k) => (
-        <li key={k.id} className="grid gap-2 rounded-xl border border-line-subtle bg-page px-4 py-3">
+        <li key={k.id} className="grid gap-2 py-3">
           <div className="flex items-center gap-3">
             <KeyRound size={16} className="shrink-0 text-meta" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium text-h1">{k.name}</span>

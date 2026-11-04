@@ -2,9 +2,10 @@
    apps look the same. Next.js pieces (next/link, server actions, i18n) are replaced by their React equivalents. */
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import uPlot from "uplot";
-import { CircleAlert, CircleCheck, CirclePause, Clock, Copy, TriangleAlert, Wrench, X } from "./shared/icons";
+import { Check, CircleAlert, CircleCheck, CirclePause, Clock, Copy, Info, Minus, TriangleAlert, Wrench, X, type IconType } from "./shared/icons";
 import { savePrefs, statusLabel, type Day, type Status } from "./api";
 import { isLive, subscribeLive, type Topic } from "./live";
+import { plural } from "./shared/plural";
 
 /** Search shortcut label: ⌘K on Apple systems, Ctrl K elsewhere. */
 export const SEARCH_KEY = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘K" : "Ctrl K";
@@ -36,15 +37,23 @@ export function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 }
 
-/** Section colours of the DA (styles.css, data-accent); status colours are kept out. */
-export type Accent = "lavande" | "ciel" | "rose" | "mauve";
+/** Sidebar budget: 8 entries. The other pages are tabs of one of them, keyed by that entry's href. */
+export type NavTabs = Record<string, string[]>;
+export const navActive = (pathname: string, href: string, tabs: NavTabs) => (tabs[href] ?? [href]).some((h) => isActive(pathname, h));
 
-/** Gives the page the colour of its navigation section (lavande outside the sections). */
-export function usePageAccent(sections: { accent: Accent; items: { href: string }[] }[], pathname: string) {
-  const accent = sections.find((s) => s.items.some((i) => isActive(pathname, i.href)))?.accent ?? "lavande";
-  useEffect(() => {
-    document.documentElement.dataset.accent = accent;
-  }, [accent]);
+/** Tabs of the current page, above its header. Shown on the tab pages only, not on their detail pages. */
+export function PageTabs({ pathname, tabs, label, items }: { pathname: string; tabs: NavTabs; label: string; items: { href: string; label: string }[] }) {
+  const group = Object.values(tabs).find((g) => g.includes(pathname));
+  if (!group) return null;
+  return (
+    <nav aria-label={label} className="mm-segmented mm-page-tabs -mb-4 flex">
+      {group.map((href) => (
+        <Link key={href} to={href} aria-current={href === pathname ? "page" : undefined} className="mm-segmented__item shrink-0 no-underline">
+          {items.find((i) => i.href === href)?.label}
+        </Link>
+      ))}
+    </nav>
+  );
 }
 
 export function Link({ to, children, ...rest }: { to: string; children: ReactNode } & React.AnchorHTMLAttributes<HTMLAnchorElement>) {
@@ -125,7 +134,7 @@ const SIDEBAR_KEY = "hlm-sidebar";
 function syncThemeColor() {
   const forced = document.documentElement.dataset.theme;
   const light = forced ? forced === "light" : matchMedia("(prefers-color-scheme: light)").matches;
-  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = light ? "#EAEAF9" : "#060B1F"));
+  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => (m.content = light ? "#F5F5FE" : "#0B1130"));
 }
 
 function getChoice(): ThemeChoice {
@@ -329,41 +338,33 @@ export function CardBody({ className, ...props }: ComponentProps<"div">) {
 }
 
 
-/** KPI tile (.mm-stat): label, 28/600 tabular value, detail. */
-export function Stat({ label, value, detail, icon, href, tone, className }: {
-  label: string; value: ReactNode; detail?: ReactNode; icon?: ReactNode; href?: string; tone?: "accent" | "red" | "yellow" | "green"; className?: string;
+/** KPI tile (StatCard): label, metric-xl tabular value, detail. The tone judges: it colours the detail. */
+export function Stat({ label, value, detail, href, tone, className }: {
+  label: string; value: ReactNode; detail?: ReactNode; href?: string; tone?: "accent" | "red" | "yellow" | "green"; className?: string;
 }) {
   const content = (
     <>
-      <div className="flex items-center justify-between gap-3">
-        <p className="mm-stat__label min-w-0 line-clamp-2 text-pretty">{label}</p>
-        {icon && (
-          <span className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-            tone === "red" ? "bg-red/12 text-red" : tone === "yellow" ? "bg-yellow/12 text-yellow" : tone === "green" ? "bg-green/12 text-green" : "bg-accent-soft text-accent-text",
-          )}>{icon}</span>
-        )}
-      </div>
+      <p className="mm-stat__label min-w-0 truncate">{label}</p>
       <p className="mm-stat__value">{value}</p>
-      {detail && <p className="mm-stat__meta line-clamp-2">{detail}</p>}
+      {detail && <p className={cn("mm-stat__meta line-clamp-2", tone && tone !== "accent" && `mm-stat__meta--${tone}`)}>{detail}</p>}
     </>
   );
   const cls = cn("mm-card mm-stat transition-colors duration-[120ms]", href && "hover:border-line-strong", className);
   return href ? <Link to={href} className={cn(cls, "text-inherit no-underline")}>{content}</Link> : <div className={cls}>{content}</div>;
 }
 
-export const STAT_GRID = "grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 xl:gap-6";
+export const STAT_GRID = "grid grid-cols-2 gap-4 min-[1100px]:grid-cols-4";
 
-/** Page header: h1 30/38 · 600 (26/34 under 640 px), straight at the top of the page. */
-export function PageHeader({ title, description, actions, crumbs }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; crumbs?: ReactNode }) {
+/** Page header: h1 in capitals, one sentence, actions on the right (at most one primary button). */
+export function PageHeader({ title, description, actions, crumbs, desktopActions }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; crumbs?: ReactNode; desktopActions?: boolean }) {
   return (
-    <header className="mm-page__head mb-6">
+    <header className="mm-page__head">
       <div className="min-w-0 grow basis-96">
         {crumbs && <nav aria-label="Fil d'Ariane" className="mb-1 flex items-center gap-1.5 text-sm text-meta">{crumbs}</nav>}
         <h1 className="mm-h1">{title}</h1>
-        {description && <div className="mt-1 text-pretty text-meta">{description}</div>}
+        {description && <div className="mt-2 max-w-[68ch] text-pretty text-body">{description}</div>}
       </div>
-      {actions && <div className="mm-btn-group min-w-0 items-center">{actions}</div>}
+      {actions && <div className={cn("mm-btn-group min-w-0 items-center", desktopActions && "max-sm:hidden")}>{actions}</div>}
     </header>
   );
 }
@@ -379,7 +380,7 @@ export function SectionTitle({ children, actions, id }: { children: ReactNode; a
 }
 
 /** Vertical rhythm between page sections. */
-export const SECTIONS = "grid grid-cols-1 gap-12 xl:gap-16";
+export const SECTIONS = "grid grid-cols-1 gap-8";
 
 export function EmptyState({ icon, title, children, action, className }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; className?: string }) {
   return (
@@ -393,17 +394,21 @@ export function EmptyState({ icon, title, children, action, className }: { icon?
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("skeleton rounded-xl bg-elevated", className)} />;
+  return <div className={cn("skeleton rounded-lg bg-muted", className)} />;
 }
 
 /* ---------- Badges and states ---------- */
 
-/** Status badge (.mm-badge, pill): colour is never alone, always with a word. */
+/** Icon of a status pill: mint and grenadine differ too little in hue to go without one. */
+const TONE_ICON: Partial<Record<Tone, IconType>> = { green: Check, yellow: Clock, orange: TriangleAlert, red: TriangleAlert, blue: Info };
+
+/** Status pill (.mm-badge): icon + word on a tinted background, never colour alone. */
 export function Badge({ tone = "muted", children, className, icon, dot, title }: { tone?: Tone; children: ReactNode; className?: string; icon?: ReactNode; dot?: boolean; title?: string }) {
+  const Glyph = dot ? (TONE_ICON[tone] ?? Minus) : undefined;
   return (
     <span className={cn("mm-badge", className)} title={title}
       style={tone === "muted" ? undefined : { color: TONE_TEXT_VAR[tone], background: `color-mix(in srgb, ${TONE_VAR[tone]} 16%, transparent)` }}>
-      {dot && <span className="mm-badge__dot" style={{ background: TONE_VAR[tone] }} />}
+      {Glyph && <Glyph aria-hidden="true" />}
       {icon}
       {children}
     </span>
@@ -412,17 +417,12 @@ export function Badge({ tone = "muted", children, className, icon, dot, title }:
 
 /** Free label (tags): mono, neutral pill. */
 export function Tag({ children, className }: { children: ReactNode; className?: string }) {
-  return <span className={cn("inline-flex h-5 items-center rounded-full bg-muted px-2 font-mono text-[0.7rem] text-body", className)}>{children}</span>;
+  return <span className={cn("inline-flex h-5 items-center rounded-full bg-muted px-2 text-xs text-body", className)}>{children}</span>;
 }
 
-/** Status dot, with an optional "ping" wave. */
-export function StatusDot({ tone, ping, className }: { tone: Tone; ping?: boolean; className?: string }) {
-  return (
-    <span className={cn("relative inline-flex h-2.5 w-2.5 shrink-0", className)} aria-hidden="true">
-      {ping && <span className="ping absolute inset-0 rounded-full" style={{ background: TONE_VAR[tone] }} />}
-      <span className="relative h-2.5 w-2.5 rounded-full" style={{ background: TONE_VAR[tone] }} />
-    </span>
-  );
+/** Status dot. */
+export function StatusDot({ tone, className }: { tone: Tone; className?: string }) {
+  return <span className={cn("inline-block h-2.5 w-2.5 shrink-0 rounded-full", className)} style={{ background: TONE_VAR[tone] }} aria-hidden="true" />;
 }
 
 export function StatusBadge({ status, label }: { status: Status; label?: string }) {
@@ -523,7 +523,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
 
 // Pill fields of 36 px (44 px on touch), textarea radius 18; 16 px on mobile (no iOS zoom).
 const fieldBase = "field w-full px-4 text-base sm:text-sm";
-export const inputClass = `${fieldBase} h-9 pointer-coarse:h-11 rounded-full`;
+export const inputClass = `${fieldBase} h-11 rounded-full`;
 export const textareaClass = `${fieldBase} min-h-22 py-2.5 rounded-[18px] resize-y leading-relaxed`;
 
 /** Labelled field: label, control, help (muted) or error (red + ✕). */
@@ -589,7 +589,7 @@ export function Segmented<T extends string>({ value, options, onChange, label, s
   value: T; options: [T, ReactNode][]; onChange: (v: T) => void; label: string; size?: "sm"; className?: string;
 }) {
   return (
-    <div className={cn("mm-segmented max-w-full overflow-x-auto", size === "sm" && "mm-segmented--sm", className)} role="radiogroup" aria-label={label}>
+    <div className={cn("mm-segmented max-w-full", size === "sm" && "mm-segmented--sm", className)} role="radiogroup" aria-label={label}>
       {options.map(([v, l]) => (
         <button key={v} type="button" role="radio" className="mm-segmented__item shrink-0 gap-1.5" aria-checked={v === value} onClick={() => onChange(v)}>{l}</button>
       ))}
@@ -605,8 +605,8 @@ export function meterTone(value: number): Tone {
   return "accent";
 }
 
-/** Horizontal gauge; the tone follows the thresholds (75 % / 90 %) unless forced. */
-export function Meter({ value, label, detail, tone, className, size = "md" }: {
+/** Horizontal gauge, 8 px; the tone follows the thresholds (75 % / 90 %) unless forced. The value is always written. */
+export function Meter({ value, label, detail, tone, className }: {
   value: number | null | undefined; label?: string; detail?: string; tone?: Tone; className?: string; size?: "sm" | "md";
 }) {
   const v = Math.max(0, Math.min(100, value ?? 0));
@@ -614,14 +614,14 @@ export function Meter({ value, label, detail, tone, className, size = "md" }: {
   return (
     <div className={cn("min-w-0", className)}>
       {(label || detail) && (
-        <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[13px]">
+        <div className="mb-2 flex items-baseline justify-between gap-2 text-[13px]">
           <span className="truncate text-body">{label}</span>
-          <span className="shrink-0 text-meta tabular-nums">{detail ?? (value == null ? "—" : `${Math.round(v)} %`)}</span>
+          <span className="shrink-0 font-semibold text-h1 tabular-nums">{detail ?? (value == null ? "—" : `${Math.round(v)} %`)}</span>
         </div>
       )}
-      <div className={cn("overflow-hidden rounded-full bg-muted", size === "md" ? "h-2" : "h-1.5")} role="meter"
+      <div className="h-2 overflow-hidden rounded-full bg-muted" role="meter"
         aria-valuenow={Math.round(v)} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
-        <div className="h-full rounded-full transition-[width] duration-[260ms] ease-[var(--ease-expo)]" style={{ width: `${v}%`, background: TONE_VAR[t] }} />
+        <div className="h-full rounded-full transition-[width] duration-[600ms] ease-[var(--ease-expo)]" style={{ width: `${v}%`, background: TONE_VAR[t] }} />
       </div>
     </div>
   );
@@ -682,7 +682,7 @@ export function UptimeBars({ days: allDays, height = 32, className }: { days: Da
   return (
     <div ref={ref} className={cn("relative", className)}>
       <div className="flex items-end gap-[2px]" style={{ height }} role="img"
-        aria-label={`Disponibilité sur ${days.length} jours : ${known.length} jour(s) mesuré(s), ${bad} jour(s) dégradé(s)`}
+        aria-label={plural(`Disponibilité sur ${days.length} jours : ${known.length} jour(s) mesuré(s), ${bad} jour(s) dégradé(s)`)}
         onPointerLeave={() => setHover(null)}>
         {days.map((d, i) => {
           const tone = d.worst === "maintenance" ? "blue" : uptimeTone(pctOf(d));
@@ -725,7 +725,7 @@ function tooltipPlugin(format: (v: number) => string): uPlot.Plugin {
     hooks: {
       init: (u) => {
         tip = document.createElement("div");
-        tip.className = "pointer-events-none absolute z-10 hidden min-w-40 rounded-xl border border-line bg-elevated px-3 py-2 text-xs shadow-[var(--mm-shadow-md)]";
+        tip.className = "pointer-events-none absolute z-10 hidden min-w-40 rounded-lg border border-line bg-elevated px-3 py-2 text-xs shadow-[var(--mm-shadow-md)]";
         tip.setAttribute("aria-hidden", "true"); // values are also reachable via the tables/KPIs
         u.over.appendChild(tip);
         u.over.addEventListener("mouseleave", () => tip.classList.add("hidden"));
@@ -748,7 +748,7 @@ function tooltipPlugin(format: (v: number) => string): uPlot.Plugin {
           const label = document.createElement("span");
           label.textContent = String(sr.label ?? "");
           const val = document.createElement("span");
-          val.className = "ml-auto pl-3 font-mono font-semibold text-h1";
+          val.className = "ml-auto pl-3 font-semibold text-h1 tabular-nums";
           val.textContent = v == null ? "—" : format(v as number);
           row.append(sw, label, val);
           tip.appendChild(row);
@@ -762,8 +762,9 @@ function tooltipPlugin(format: (v: number) => string): uPlot.Plugin {
   };
 }
 
-export function Chart({ t, series, format, height = 220, max }: {
-  t: number[]; series: ChartSeries[]; format: (v: number) => string; height?: number; max?: number;
+/** Line chart: solid, dashed, then dotted series; `area` fills the first one at 12 %. */
+export function Chart({ t, series, format, height = 220, max, area }: {
+  t: number[]; series: ChartSeries[]; format: (v: number) => string; height?: number; max?: number; area?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   // Callers pass inline formatters; a ref keeps the plot from being rebuilt on every render.
@@ -776,7 +777,7 @@ export function Chart({ t, series, format, height = 220, max }: {
     if (!node) return;
     const format = (v: number) => fmtRef.current(v);
     const grid = cssVar("--mm-chart-grid"), text = cssVar("--mm-chart-axis");
-    const axis = { stroke: text, grid: { stroke: grid, width: 1, dash: [2, 4] }, ticks: { show: false }, font: `11px ${cssVar("--mm-font-sans")}` };
+    const axis = { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { show: false }, font: `12px ${cssVar("--mm-font-sans")}` };
     const fmtTime = (span: number) => (_u: uPlot, vals: number[]) => vals.map((v) => new Date(v * 1000).toLocaleString("fr-FR",
       span > 2 * 86400 ? { day: "2-digit", month: "2-digit" } : { hour: "2-digit", minute: "2-digit" }));
     const span = t.length > 1 ? t[t.length - 1] - t[0] : 0;
@@ -796,6 +797,7 @@ export function Chart({ t, series, format, height = 220, max }: {
         { value: (_u, v) => (v == null ? "—" : new Date(v * 1000).toLocaleString("fr-FR")) },
         ...series.map((s, i) => ({
           label: s.label, stroke: cssVar(`--mm-chart-${(i % 8) + 1}`), width: 2, spanGaps: false,
+          dash: [undefined, [6, 4], [2, 4]][i % 3], fill: area && i === 0 ? `color-mix(in srgb, ${cssVar("--mm-chart-1")} 12%, transparent)` : undefined,
           points: { show: t.length < 3 }, value: (_u: uPlot, v: number | null) => (v == null ? "—" : format(v)),
         })),
       ],
@@ -804,7 +806,7 @@ export function Chart({ t, series, format, height = 220, max }: {
     const ro = new ResizeObserver(() => plot.setSize({ width: node.clientWidth, height }));
     ro.observe(node);
     return () => { ro.disconnect(); plot.destroy(); };
-  }, [t, series, height, max, themeTick]);
+  }, [t, series, height, max, area, themeTick]);
   if (!t.length) return <p className="py-10 text-center text-sm text-meta">Aucune donnée sur cette période</p>;
   return <div ref={el} className="w-full" style={{ minHeight: height }} />;
 }
@@ -818,11 +820,11 @@ export function Logo({ compact = false }: { compact?: boolean }) {
     <span className="flex items-center gap-2.5">
       <svg viewBox="0 0 224 261" className="h-7 w-auto" aria-hidden="true">
         <defs>
-          {/* Lavande sur fond sombre ; passe au cran 700 en thème clair via les tokens d'accent. */}
+          {/* Couleurs de la DA : une par application et par thème (--mm-logo-*). */}
           <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="224" y1="0" x2="0" y2="261">
-            <stop offset="0" style={{ stopColor: "var(--mm-accent-hover)" }} />
-            <stop offset="0.5" style={{ stopColor: "var(--mm-accent)" }} />
-            <stop offset="1" style={{ stopColor: "var(--mm-accent-active)" }} />
+            <stop offset="0" style={{ stopColor: "var(--mm-logo-1)" }} />
+            <stop offset="0.5" style={{ stopColor: "var(--mm-logo-2)" }} />
+            <stop offset="1" style={{ stopColor: "var(--mm-logo-3)" }} />
           </linearGradient>
         </defs>
         <g fill={`url(#${id})`}>
@@ -864,7 +866,10 @@ export const FIELD_ROW = "grid gap-5 sm:grid-cols-2";
 
 /** Product name of this server's role, for the tab title (set once the role is known). */
 export let appName = "Homelab";
-export const setAppName = (role: string) => (appName = role === "management" ? "Midnights Management" : "Midnights Monitoring");
+export const setAppName = (role: string) => {
+  appName = role === "management" ? "Midnights Management" : "Midnights Monitoring";
+  document.documentElement.dataset.app = role; // picks the logo colours (--mm-logo-*)
+};
 
 /** Browser tab title: "Page name · Midnights Monitoring". */
 export function useTitle(name: string | undefined) {

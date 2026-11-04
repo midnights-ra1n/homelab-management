@@ -151,7 +151,7 @@ type credentials struct {
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	if !s.limiter.allow("login:" + s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessayez dans une minute")
+		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessaie dans une minute")
 		return
 	}
 	var c credentials
@@ -186,7 +186,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.limiter.allow("login:" + s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessayez dans une minute")
+		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessaie dans une minute")
 		return
 	}
 	var c credentials

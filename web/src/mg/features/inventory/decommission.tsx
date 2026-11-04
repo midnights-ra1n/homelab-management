@@ -15,6 +15,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { inputClass } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toaster";
 import { formatDateTime } from "@/lib/utils";
+import { plural } from "../../../shared/plural";
 
 /** Starts the decommissioning of an item (it goes to "Retiré" with a checklist). */
 export function DecommissionButton({ id, name }: { id: number; name: string }) {
@@ -82,7 +83,7 @@ export function DecommissionPanel({ id, name, decommission: d, ips }: { id: numb
     <Card className="border-[var(--mm-yellow)]">
       <CardHeader
         overline="Décommissionnement"
-        title={`${done}/${d.steps.length} étape(s) faite(s)`}
+        title={plural(`${done}/${d.steps.length} étape(s) faite(s)`)}
         actions={
           <Button variant="ghost" size="sm" icon={<Undo2 size={14} />} disabled={!!busy} onClick={() => run("cancel", () => cancelDecommissionAction(id))}>
             Annuler le décommissionnement
@@ -94,9 +95,9 @@ export function DecommissionPanel({ id, name, decommission: d, ips }: { id: numb
           Commencé {formatDateTime(d.started_at)}
           {d.reason ? <> · {d.reason}</> : null}
         </p>
-        <ol className="grid gap-2">
+        <ol className="divide-y divide-line-subtle">
           {d.steps.map((s, i) => (
-            <li key={s.key} className="flex flex-col gap-2 rounded-xl border border-line-subtle bg-page px-4 py-3 sm:flex-row sm:items-center">
+            <li key={s.key} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center">
               <label className="flex min-w-0 flex-1 items-start gap-3">
                 {s.auto ? (
                   s.done ? <CircleCheck size={18} className="mt-0.5 shrink-0 text-green" aria-hidden="true" /> : <CircleDashed size={18} className="mt-0.5 shrink-0 text-meta" aria-hidden="true" />
@@ -143,7 +144,7 @@ export function DecommissionPanel({ id, name, decommission: d, ips }: { id: numb
             variant="danger"
             icon={<Trash2 size={15} />}
             disabled={!ready || !!busy}
-            title={ready ? undefined : "Terminez d'abord toutes les étapes"}
+            title={ready ? undefined : "Termine d'abord toutes les étapes"}
             onClick={() => run("finish", () => finishDecommissionAction(id))}
           >
             Supprimer de l'inventaire

@@ -121,7 +121,7 @@ export function CommandPalette() {
               aria-activedescendant={items[current] ? `palette-${items[current].key}` : undefined}
               className="h-12 min-w-0 flex-1 bg-transparent text-base text-h1 outline-none placeholder:text-meta"
             />
-            <kbd className="rounded-full border border-line px-2 font-mono text-[0.7rem] text-meta">Esc</kbd>
+            <kbd className="rounded-full border border-line px-2 font-mono text-xs text-meta">Esc</kbd>
           </div>
           <ul id="palette-results" role="listbox" className="max-h-[50vh] overflow-y-auto p-1.5">
             {items.length === 0 && <li className="px-3 py-6 text-center text-sm text-meta">{tr("Aucun résultat")}</li>}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Activity, ArrowUpRight, CalendarDays, Download, Plug, Send, Zap } from "../shared/icons";
+import { ArrowUpRight, Download, Plug, Send } from "../shared/icons";
 import { api, fmtNum } from "../api";
+import { plural } from "../shared/plural";
 import {
   Alert, Button, ButtonAnchor, ButtonLink, Card, CardBody, CardHeader, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, Chart, usePoll, useToast,
 } from "../ui";
@@ -23,7 +24,7 @@ export function EnergyPage({ source }: { source?: string }) {
 
   return (
     <>
-      <PageHeader title="Consommation électrique" description="Relevés des prises Meross, lus en local. Moyennes calculées sur les jours mesurés."
+      <PageHeader title="Consommation électrique" description="Relevés des prises Meross, lus en local."
         actions={<div className="mm-btn-group">
           <Segmented label="Période" value={days} onChange={setDays} options={[["7", "7 j"], ["30", "30 j"], ["90", "90 j"], ["365", "1 an"]]} />
           {!source && <>
@@ -45,9 +46,9 @@ export function EnergyPage({ source }: { source?: string }) {
       {data && data.plugs.length > 0 && (
         <div className={SECTIONS}>
           <div className={STAT_GRID}>
-            <Stat label="Puissance en direct" value={watts(data.power_w)} icon={<Activity size={16} />} detail={`${data.plugs.filter((p) => p.power_w != null).length}/${data.plugs.length} prise(s) relevée(s)`} />
-            <Stat label="Total sur la période" value={kwh(data.total_wh)} icon={<Zap size={16} />} detail={`${data.plugs.length} prise(s)`} />
-            <Stat label="Moyenne par jour" value={kwh(data.avg_day_wh)} icon={<CalendarDays size={16} />} detail="toutes prises" />
+            <Stat label="Puissance en direct" value={watts(data.power_w)} detail={plural(`${data.plugs.filter((p) => p.power_w != null).length}/${data.plugs.length} prise(s) relevée(s)`)} />
+            <Stat label="Total sur la période" value={kwh(data.total_wh)} detail={plural(`${data.plugs.length} prise(s)`)} />
+            <Stat label="Moyenne par jour" value={kwh(data.avg_day_wh)} detail="toutes prises" />
             <Stat label="Moyenne par semaine" value={kwh(data.avg_week_wh)} detail="moyenne journalière × 7" />
             <Stat label="Moyenne par mois" value={kwh(data.avg_month_wh)} detail="moyenne journalière × 30,44" />
           </div>
@@ -62,8 +63,8 @@ export function EnergyPage({ source }: { source?: string }) {
                 <tbody>{data.plugs.map((p) => (
                   <tr key={p.id}>
                     <td className="mm-col-strong">{source ? p.name : <Link to={`/monitors/${p.id}`} className="text-inherit no-underline hover:text-accent-text">{p.name}</Link>}</td>
-                    <td className="mm-col-num font-mono text-xs">{watts(p.power_w)}</td>
-                    {[p.total_wh, p.avg_day_wh, p.avg_week_wh, p.avg_month_wh].map((v, i) => <td key={i} className="mm-col-num font-mono text-xs">{kwh(v)}</td>)}
+                    <td className="mm-col-num">{watts(p.power_w)}</td>
+                    {[p.total_wh, p.avg_day_wh, p.avg_week_wh, p.avg_month_wh].map((v, i) => <td key={i} className="mm-col-num">{kwh(v)}</td>)}
                   </tr>
                 ))}</tbody>
               </table>
@@ -87,14 +88,14 @@ export function EnergyCard({ source, href }: { source?: string; href: string }) 
         <dl className="grid grid-cols-2 gap-4">
           <div>
             <dt className="text-sm text-meta">En direct</dt>
-            <dd className="font-mono text-3xl font-semibold tracking-tight text-h1 tabular-nums">{watts(data.power_w)}</dd>
+            <dd className=" text-3xl font-semibold tracking-tight text-h1 tabular-nums">{watts(data.power_w)}</dd>
           </div>
           <div>
             <dt className="text-sm text-meta">Moyenne 30 j</dt>
-            <dd className="font-mono text-3xl font-semibold tracking-tight text-h1 tabular-nums">{data.avg_day_wh == null ? "—" : watts(data.avg_day_wh / 24)}</dd>
+            <dd className=" text-3xl font-semibold tracking-tight text-h1 tabular-nums">{data.avg_day_wh == null ? "—" : watts(data.avg_day_wh / 24)}</dd>
           </div>
         </dl>
-        <p className="mt-2 text-sm text-meta">{kwh(data.avg_day_wh)} par jour · {kwh(data.avg_month_wh)} par mois · {data.plugs.length} prise(s)</p>
+        <p className="mt-2 text-sm text-meta">{kwh(data.avg_day_wh)} par jour · {kwh(data.avg_month_wh)} par mois · {plural(`${data.plugs.length} prise(s)`)}</p>
       </CardBody>
     </Card>
   );

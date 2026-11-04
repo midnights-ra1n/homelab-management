@@ -111,7 +111,7 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
                   {tr("sur ")}{asset.parent_name}
                 </Link>
               )}
-              <Badge tone={status.tone} icon={<StatusDot tone={status.tone} ping={asset.status === "online"} className="h-2 w-2" />}>
+              <Badge tone={status.tone} icon={<StatusDot tone={status.tone} className="h-2 w-2" />}>
                 {tr(status.label)}
               </Badge>
               {asset.status_source && asset.status_checked_at && (
@@ -167,7 +167,7 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-3 xl:gap-10">
+      <div className="grid gap-8 lg:grid-cols-3">
         <div className="grid min-w-0 content-start gap-6 lg:col-span-2">
           {/* Matériel / ressources */}
           {asset.kind !== "docker" && (
@@ -198,17 +198,17 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
                 <div>
                   <p className="mb-3 flex items-baseline justify-between text-sm">
                     <span className="font-medium text-h1">{tr("Stockage")}</span>
-                    <span className="font-mono text-xs text-meta">{totalDisk ? formatGb(totalDisk, tr.locale) : "—"}</span>
+                    <span className="tabular-nums text-xs text-meta">{totalDisk ? formatGb(totalDisk, tr.locale) : "—"}</span>
                   </p>
                   {asset.disks.length === 0 ? (
                     <p className="text-sm text-meta">{tr("Aucun disque renseigné.")}</p>
                   ) : (
-                    <ul className="grid gap-2">
+                    <ul className="divide-y divide-line-subtle">
                       {asset.disks.map((d, i) => (
-                        <li key={i} className="rounded-xl border border-line-subtle bg-page px-3 py-2.5">
+                        <li key={i} className="py-3">
                           <div className="flex items-center justify-between gap-3">
                             <span className="truncate text-sm text-h2">{d.name || tr("Disque {0}", { "0": i + 1 })}</span>
-                            <span className="shrink-0 font-mono text-xs text-h2">{formatGb(d.capacity_gb, tr.locale)}</span>
+                            <span className="shrink-0 tabular-nums text-xs text-h2">{formatGb(d.capacity_gb, tr.locale)}</span>
                           </div>
                           <div className="mt-1 flex items-center justify-between gap-3 text-xs text-meta">
                             <span>{DISK_TYPE_LABEL[d.type as keyof typeof DISK_TYPE_LABEL] ?? d.type}</span>
@@ -269,7 +269,7 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
                       <li key={c.id}>
                         <Link
                           href={`/inventaire/${c.id}`}
-                          className="flex items-center gap-3 rounded-xl border border-line-subtle bg-page p-3 transition-colors hover:border-line-accent"
+                          className="flex items-center gap-3 rounded-xl p-3 transition-colors duration-300 hover:bg-page"
                         >
                           <KindAvatar kind={c.kind} size="sm" />
                           <span className="min-w-0 flex-1">
@@ -311,7 +311,7 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
                   <Link
                     key={`d${d.id}`}
                     href={`/deploiements/${d.id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-line-subtle bg-page px-4 py-3 hover:border-line-accent"
+                    className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 transition-colors duration-300 hover:bg-page"
                   >
                     <span className="truncate text-sm text-h2">{d.title}</span>
                     <Badge tone={DEPLOYMENT_STATUS_META[d.status].tone}>{tr(DEPLOYMENT_STATUS_META[d.status].label)}</Badge>
@@ -321,7 +321,7 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
                   <Link
                     key={`t${t.id}`}
                     href="/taches"
-                    className="flex items-center justify-between gap-3 rounded-xl border border-line-subtle bg-page px-4 py-3 hover:border-line-accent"
+                    className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 transition-colors duration-300 hover:bg-page"
                   >
                     <span className="truncate text-sm text-h2">{t.title}</span>
                     <Badge tone={TASK_STATUS_META[t.status].tone}>{tr(TASK_STATUS_META[t.status].label)}</Badge>
@@ -352,9 +352,9 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
                 </p>
               )}
               {ips.length > 0 && (
-                <ul className="grid gap-2">
+                <ul className="divide-y divide-line-subtle">
                   {ips.map((ip) => (
-                    <li key={ip.id} className="flex items-center gap-2 rounded-xl border border-line-subtle bg-page px-3 py-2">
+                    <li key={ip.id} className="flex items-center gap-2 py-3">
                       {ip.is_primary ? (
                         <Star size={14} className="shrink-0 fill-accent text-accent" aria-label={tr("Adresse principale")} />
                       ) : (
@@ -381,7 +381,7 @@ function AssetDetail({ params }: { params: PageProps<"/[lang]/inventaire/[id]">[
               )}
               {asset.nics.length > 0 && (
                 <div>
-                  <p className="mb-2 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Interfaces")}</p>
+                  <p className="mb-2 mm-label-caps text-meta">{tr("Interfaces")}</p>
                   <dl>
                     {asset.nics.map((n, i) => (
                       <Spec key={i} label={n.name || `nic${i}`} value={`${n.mac || "—"} · ${n.speed}`} mono />
@@ -482,7 +482,7 @@ function LiveMonitoring({ asset }: { asset: Asset }) {
         {linked.error && <p className="text-sm text-red">{linked.error}</p>}
         {!agent && !linked.linked && (
           <p className="text-sm text-meta">
-            {tr("Aucun hôte Midnights Monitoring ne correspond au nom d'hôte, au nom ou à l'IP de cet élément. Installez l'agent sur la machine : elle sera reliée automatiquement.")}
+            {tr("Aucun hôte Midnights Monitoring ne correspond au nom d'hôte, au nom ou à l'IP de cet élément. Installe l'agent sur la machine : elle sera reliée automatiquement.")}
           </p>
         )}
         {agent && (
@@ -501,8 +501,8 @@ function LiveMonitoring({ asset }: { asset: Asset }) {
             <Meter label={tr("Disque")} value={pctOf(agent.latest?.disk_used, agent.latest?.disk_total)} />
             {agent.updates && (
               <p className="text-sm text-body">
-                <span className="font-mono text-h1">{agent.updates.pending}</span> {tr("mise(s) à jour dont")}{" "}
-                <span className={cn("font-mono", agent.updates.security ? "text-red" : "text-h1")}>{agent.updates.security}</span> {tr("de sécurité")}
+                <span className="text-h1">{tr("{n} mise(s) à jour", { n: agent.updates.pending })}</span> {tr("dont")}{" "}
+                <span className={cn("tabular-nums", agent.updates.security ? "text-red" : "text-h1")}>{agent.updates.security}</span> {tr("de sécurité")}
                 {agent.updates.reboot_required && <Badge tone="yellow" className="ml-2">{tr("Redémarrage requis")}</Badge>}
               </p>
             )}
@@ -512,7 +512,7 @@ function LiveMonitoring({ asset }: { asset: Asset }) {
               </Suspense>
             )}
             {agent.info?.boot_time ? (
-              <p className="font-mono text-xs text-meta">
+              <p className="tabular-nums text-xs text-meta">
                 {tr("Uptime ")}
                 {formatUptime(Math.round(Date.now() / 1000 - agent.info.boot_time), tr.locale)}
               </p>
@@ -543,7 +543,7 @@ function NodeApps({ asset }: { asset: Asset }) {
   if (!shown) return null;
   return (
     <section id="node" aria-labelledby="node-title" className="grid gap-3">
-      <h2 id="node-title" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Applications Node.js")}</h2>
+      <h2 id="node-title" className="mm-h2">{tr("Applications Node.js")}</h2>
       <NodeAppsPanel h={h} base={`/api/mg/assets/${asset.id}/node`} onChanged={invalidate} />
     </section>
   );
@@ -556,7 +556,7 @@ function Firewall({ asset }: { asset: Asset }) {
   if (!h?.connected) return null;
   return (
     <section id="iptables" aria-labelledby="fw-title" className="grid gap-3">
-      <h2 id="fw-title" className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Pare-feu (iptables)")}</h2>
+      <h2 id="fw-title" className="mm-label-caps text-meta">{tr("Pare-feu (iptables)")}</h2>
       <IptablesPanel base={`/api/mg/assets/${asset.id}/node`} />
     </section>
   );

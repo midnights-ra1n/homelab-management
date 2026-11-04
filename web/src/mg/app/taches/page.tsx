@@ -24,7 +24,7 @@ export default function TasksPage({ searchParams }: PageProps<"/[lang]/taches">)
     <>
       <PageHeader
         title={tr("Ce qu'il reste à faire")}
-        description={tr("Un tableau Kanban pour la maintenance, les idées et les corrections. Glisse les cartes d'une colonne à l'autre.")}
+        description={tr("Un tableau Kanban pour la maintenance, les idées et les corrections.")}
       />
       <Suspense fallback={<Skeleton className="h-[28rem] rounded-3xl" />}>
         <Board searchParams={searchParams} />
@@ -58,7 +58,7 @@ function Board({ searchParams }: { searchParams: PageProps<"/[lang]/taches">["se
     lists: lists.map((l) => ({ id: l.id, name: l.enabled ? l.name : tr("{name} (désactivée)", { name: l.name }) })),
   };
   return (
-    <div className="grid grid-cols-1 gap-8 xl:gap-10">
+    <div className="grid grid-cols-1 gap-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
         <FilterBar
           className="flex-1"
@@ -74,12 +74,12 @@ function Board({ searchParams }: { searchParams: PageProps<"/[lang]/taches">["se
               { value: "calendrier", label: tr("Calendrier"), icon: <CalendarDays size={13} aria-hidden />, href: href("calendrier") },
             ]}
           />
-          {counts.overdue > 0 && <span className="font-mono text-xs text-red">{counts.overdue} {tr("en retard")}</span>}
+          {counts.overdue > 0 && <span className="tabular-nums text-xs text-red">{counts.overdue} {tr("en retard")}</span>}
           {counts.done > 0 && (
             <ConfirmButton
               action={clearDoneTasksAction}
               title={tr("Archiver les tâches terminées")}
-              message={tr("Supprimer définitivement les {done} tâche(s) terminée(s) ?", { done: counts.done })}
+              message={tr("Supprimer définitivement {done} tâche(s) terminée(s) ?", { done: counts.done })}
               confirmLabel={tr("Archiver")}
               variant="secondary"
               size="md"

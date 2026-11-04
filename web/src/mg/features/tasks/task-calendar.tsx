@@ -83,7 +83,7 @@ export function TaskCalendar({ tasks, options, month, href }: { tasks: Task[]; o
               className={cn("group flex min-h-28 min-w-0 flex-col gap-1 rounded-2xl border bg-box p-2", date === today ? "border-accent" : "border-line-subtle")}
             >
               <div className="flex items-center justify-between">
-                <span className={cn("px-1 font-mono text-xs", date === today ? "text-accent-text" : "text-meta")}>{Number(date.slice(8))}</span>
+                <span className={cn("px-1 tabular-nums text-xs", date === today ? "text-accent-text" : "text-meta")}>{Number(date.slice(8))}</span>
                 <span className="opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">{add(date)}</span>
               </div>
               {items(date)}
@@ -100,7 +100,7 @@ export function TaskCalendar({ tasks, options, month, href }: { tasks: Task[]; o
           .map((date) => (
             <li key={date} className={cn("rounded-2xl border bg-box p-3", date === today ? "border-accent" : "border-line-subtle")}>
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-mono text-xs text-meta">
+                <span className="tabular-nums text-xs text-meta">
                   {dateFormat(tr.locale, { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`))}
                 </span>
                 {add(date)}

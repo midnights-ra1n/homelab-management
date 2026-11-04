@@ -195,7 +195,11 @@ func (s *Server) importBackup(ctx context.Context, doc *backupDoc) error {
 	if _, err := tx.Exec(`UPDATE hardware_items SET hl_id = printf('HL-%04d', id) WHERE hl_id = ''`); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.forgetSettings()
+	return nil
 }
 
 func (s *Server) mgStats(w http.ResponseWriter, r *http.Request) {

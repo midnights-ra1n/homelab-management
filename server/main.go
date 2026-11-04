@@ -55,9 +55,11 @@ type Server struct {
 	setupMu   sync.Mutex
 	setupOpen bool // true until the first account exists
 
-	agentsMu  sync.Mutex
-	agents    map[int64]*agentConn
-	hostPings pingCache // ping answers of hosts whose agent is down
+	agentsMu   sync.Mutex
+	settingsMu sync.Mutex
+	settings   map[string]string // see getSetting
+	agents     map[int64]*agentConn
+	hostPings  pingCache // ping answers of hosts whose agent is down
 
 	key []byte   // AES-256-GCM key for stored secrets (DATA_DIR/secret.key or APP_SECRET)
 	mg  *mgState // management role only

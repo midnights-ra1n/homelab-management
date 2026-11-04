@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, LayoutGrid, List, Pencil, Plus, Radar, ShieldAlert, Timer, Trash2 } from "../shared/icons";
+import { ChevronRight, LayoutGrid, List, Pencil, Plus, Radar, Trash2 } from "../shared/icons";
 import { api, certDays, fmtOctets, type SnmpDevice, type SnmpIface, savePrefs, fmtAgo, fmtDate, fmtMs, fmtNum, statusLabel, type Monitor, type MonitorInput, type MonitorType, type Series } from "../api";
+import { plural } from "../shared/plural";
 import {
   Alert, Badge, Button, Card, Chart, Dialog, EmptyState, Field, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, StatusBadge,
   StatusIcon, Switch, Tag, UptimeBars, cn, fmtLatency, formatPct, inputClass, kindTone, navigate, statusKind, usePoll, useTitle, useToast,
@@ -72,16 +73,16 @@ export function MonitorsPage() {
       {data && data.length > 0 && (
         <div className={SECTIONS}>
           <div className={STAT_GRID}>
-            <Stat label="Sondes" value={`${ok}/${active.length}`} detail="opérationnelle(s)" icon={<Radar size={16} />} tone={ok < active.length ? "red" : undefined} />
+            <Stat label="Sondes" value={`${ok}/${active.length}`} detail="en service" tone={ok < active.length ? "red" : undefined} />
             <Stat label="Disponibilité 90 j" value={formatPct(ups.length ? ups.reduce((a, u) => a + u, 0) / ups.length : null)} detail="moyenne des sondes" />
-            <Stat label="Latence moyenne" value={fmtMs(lat.length ? lat.reduce((a, m) => a + m.latency_ms!, 0) / lat.length : null)} icon={<Timer size={16} />} detail={`Sur ${lat.length} sonde(s)`} />
-            <Stat label="Certificats" value={certs.length ? `${certs.length - expiring}/${certs.length}` : "—"} detail={expiring ? `${expiring} à renouveler` : "valides"} icon={<ShieldAlert size={16} />} tone={expiring ? "yellow" : undefined} />
+            <Stat label="Latence moyenne" value={fmtMs(lat.length ? lat.reduce((a, m) => a + m.latency_ms!, 0) / lat.length : null)} detail={plural(`Sur ${lat.length} sonde(s)`)} />
+            <Stat label="Certificats" value={`${certs.length - expiring}/${certs.length}`} detail={expiring ? `${expiring} à renouveler` : certs.length ? "valides" : "aucun suivi"} tone={expiring ? "yellow" : undefined} />
           </div>
           <section aria-labelledby="probes-title">
             <SectionTitle id="probes-title" actions={
               <Segmented size="sm" label="Affichage" value={view} onChange={changeView}
                 options={[["cards", <><LayoutGrid size={14} aria-hidden />Tuiles</>], ["table", <><List size={14} aria-hidden />Tableau</>]]} />
-            }>{data.length} sonde(s)</SectionTitle>
+            }>{plural(`${data.length} sonde(s)`)}</SectionTitle>
             {view === "cards" ? groups.map(([cat, list]) => (
               <div key={cat}>{heading(cat)}
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -98,18 +99,18 @@ export function MonitorsPage() {
                         <StatusIcon kind={kind} size={18} />
                         <Link to={`/monitors/${m.id}`} title={m.target}
                           className="min-w-0 flex-1 truncate font-medium text-h1 no-underline after:absolute after:inset-0 after:rounded-xl">{m.name}</Link>
-                        <span className="shrink-0 rounded-full border border-line-subtle px-1.5 font-mono text-[0.65rem] uppercase text-meta">{m.type}</span>
-                        <span className="shrink-0 font-mono text-sm font-semibold text-h1">{formatPct(uptime(m, 30), 1)}</span>
+                        <span className="shrink-0 rounded-full border border-line-subtle px-1.5 font-mono text-xs uppercase text-meta">{m.type}</span>
+                        <span className="shrink-0 tabular-nums text-sm font-semibold text-h1">{formatPct(uptime(m, 30), 1)}</span>
                       </div>
                       <UptimeBars days={(m.days ?? []).slice(-30)} height={16} className="z-[1]" />
-                      <p className={cn("truncate font-mono text-xs", kind === "down" ? "text-red" : "text-meta")} title={note}>{note || "—"}</p>
+                      <p className={cn("truncate text-xs", kind === "down" ? "text-red" : "text-meta")} title={note}>{note || "—"}</p>
                     </li>
                   );
                 })}
               </ul>
               </div>
             )) : (
-              <Card flush title="Toutes les sondes" sub={`${data.length} sonde(s)`}>
+              <Card flush title="Toutes les sondes" sub={plural(`${data.length} sonde(s)`)}>
                 <div className="mm-table-wrap">
                   <table className="mm-table min-w-[56rem]">
                     <thead><tr><th scope="col">Nom</th><th scope="col">Type</th><th scope="col">État</th><th scope="col" className="mm-col-num">Latence</th><th scope="col">Certificat</th><th scope="col" className="min-w-60">30 derniers jours</th><th scope="col">Vérifiée</th></tr></thead>
@@ -126,7 +127,7 @@ export function MonitorsPage() {
                           </td>
                           <td className="mm-col-muted">{TYPES[m.type]}</td>
                           <td><StatusBadge status={m.enabled ? m.status : "unknown"} /></td>
-                          <td className="mm-col-num font-mono text-xs">{fmtMs(m.latency_ms)}</td>
+                          <td className="mm-col-num">{fmtMs(m.latency_ms)}</td>
                           <td><CertBadge m={m} /></td>
                           <td><UptimeBars days={(m.days ?? []).slice(-30)} height={20} /></td>
                           <td className="mm-col-muted">{m.enabled ? fmtAgo(m.last_check / 1000) : "Désactivée"}</td>
@@ -194,8 +195,8 @@ function SnmpFields({ m, cfg, editing, id }: { m: MonitorInput; cfg: CfgSetter; 
       )}
       {c.snmp_mode && (
         <p className="mm-help -mt-3">
-          Routeur TP-Link Omada (ER605…) : activez SNMP sur le routeur (Outils système → SNMP en mode autonome, Paramètres → Services → SNMP dans le contrôleur Omada). Le débit est calculé entre deux contrôles et le volume de données
-          est compté à chaque relevé : gardez un intervalle d'au moins 60 s, ce routeur ne rafraîchit ses compteurs que toutes les 10 à 20 s. Pour WireGuard, choisissez « État d'une interface » avec l'interface VPN (wg1…)
+          Routeur TP-Link Omada (ER605…) : active SNMP sur le routeur (Outils système → SNMP en mode autonome, Paramètres → Services → SNMP dans le contrôleur Omada). Le débit est calculé entre deux contrôles et le volume de données
+          est compté à chaque relevé : garde un intervalle d'au moins 60 s, ce routeur ne rafraîchit ses compteurs que toutes les 10 à 20 s. Pour WireGuard, choisis « État d'une interface » avec l'interface VPN (wg1…)
           et un délai sans trafic reçu, avec un keepalive activé côté pair. Sur l'ER605, le WAN est l'interface qui porte la route par défaut (souvent default/eth1, où Entrant = téléchargement),
           les inf.N sont les VLAN du LAN (sens inversé) ; le préfixe « default/ » est facultatif. Guide complet : docs/SNMP.md.
         </p>
@@ -280,7 +281,7 @@ function SnmpDiscovery({ m, cfg, id }: { m: MonitorInput; cfg: CfgSetter; id?: n
                     {f.hint && <p className="mt-1 max-w-80 text-xs text-meta">{f.hint}</p>}
                   </td>
                   <td className="text-sm">{f.status || "—"}{f.speed_mbps != null && <span className="text-meta"> · {fmtNum(f.speed_mbps, 0)} Mbit/s</span>}</td>
-                  <td className="mm-col-num font-mono text-xs">{fmtOctets(f.in_octets)} / {fmtOctets(f.out_octets)}
+                  <td className="mm-col-num">{fmtOctets(f.in_octets)} / {fmtOctets(f.out_octets)}
                     {f.probes.length > 0 && <p className="text-meta">déjà suivi : {f.probes.map((p) => p.name).join(", ")}</p>}
                   </td>
                   <td>
@@ -478,12 +479,12 @@ export function MonitorDetailPage({ id }: { id: number }) {
           <Alert kind={m.status === "degraded" ? "warning" : m.status === "maintenance" ? "info" : "error"} title={statusLabel[m.status]}>{m.message}</Alert>
         )}
         <div className={STAT_GRID}>
-          <Stat label="Dernière latence" value={fmtMs(m.latency_ms)} icon={<Timer size={16} />}
+          <Stat label="Dernière latence" value={fmtMs(m.latency_ms)}
             detail={m.last_check ? `Vérifiée ${fmtAgo(m.last_check / 1000)}` : "Jamais vérifiée"} />
           <Stat label="Latence moyenne" value={fmtMs(lat.length ? lat.reduce((a, b) => a + b, 0) / lat.length : null)} detail="sur la période" />
           <Stat label="Latence max." value={fmtMs(lat.length ? Math.max(...lat) : null)} detail="sur la période" />
           {d != null ? (
-            <Stat label="Certificat SSL" value={d <= 0 ? "Expiré" : `${d} j`} icon={<ShieldAlert size={16} />} tone={d < (m.config.warn_days ?? 14) ? "yellow" : "green"}
+            <Stat label="Certificat SSL" value={d <= 0 ? "Expiré" : `${d} j`} tone={d < (m.config.warn_days ?? 14) ? "yellow" : "green"}
               detail={`Expire le ${fmtDate(m.cert_expires_at!)}`} />
           ) : (
             <Stat label="Disponibilité 90 j" value={formatPct(uptime(m))} detail="jours mesurés" />
@@ -500,10 +501,10 @@ export function MonitorDetailPage({ id }: { id: number }) {
           </section>
         )}
         <section aria-labelledby="up-title">
-          <SectionTitle id="up-title" actions={<span className="font-mono text-sm font-semibold text-h1">{formatPct(uptime(m))}</span>}>Disponibilité sur 90 jours</SectionTitle>
+          <SectionTitle id="up-title" actions={<span className="tabular-nums text-sm font-semibold text-h1">{formatPct(uptime(m))}</span>}>Disponibilité sur 90 jours</SectionTitle>
           <Card className="p-5">
             <UptimeBars days={m.days ?? []} />
-            <div className="mt-2 flex justify-between font-mono text-xs text-meta"><span>il y a 90 j</span><span>aujourd'hui</span></div>
+            <div className="mt-2 flex justify-between text-xs text-meta"><span>il y a 90 j</span><span>aujourd'hui</span></div>
           </Card>
         </section>
       </div>

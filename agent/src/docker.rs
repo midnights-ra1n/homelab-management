@@ -70,9 +70,13 @@ fn pair(s: &str) -> (Option<f64>, Option<f64>) {
     }
 }
 
-/// Reads the root helper's snapshot; None when Docker is absent (no helper output).
-pub fn read_snapshot() -> Option<Snapshot> {
+/// Reads the root helper's snapshot, unless it is still the one of `seen`: read every 20 s for a
+/// new file every minute, and the JSON can run to megabytes. None when Docker is absent.
+pub fn read_snapshot(seen: u64) -> Option<Snapshot> {
     let collected_at = std::fs::metadata(SNAPSHOT).ok()?.modified().ok()?.duration_since(UNIX_EPOCH).ok()?.as_secs();
+    if collected_at == seen {
+        return None;
+    }
     let read_json = |f: &str| std::fs::read(format!("{SNAPSHOT}/{f}")).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok());
     let error = std::fs::read_to_string(format!("{SNAPSHOT}/error")).ok().map(|e| e.trim().to_string()).filter(|e| !e.is_empty());
 

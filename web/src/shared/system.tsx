@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bot, Database, Download, Fingerprint, KeyRound, Plus, RefreshCw, Search, Trash2 } from "./icons";
 import { api, ApiError, fmtAgo, fmtBytes } from "../api";
 import { Alert, Badge, Button, CodeBlock, EmptyState, Field, FORM_ACTIONS, inputClass, Meter, PageHeader, SettingsSection, Skeleton, Switch, textareaClass, useToast } from "../ui";
+import { plural } from "./plural";
 
 /* ---------- Database ---------- */
 
@@ -57,7 +58,7 @@ export function DatabaseSection() {
           db.uploads_bytes != null ? ["Icônes", fmtBytes(db.uploads_bytes)] : ["Disque libre", fmtBytes(db.disk_free_bytes)],
         ].map(([k, v]) => (
           <div key={k}>
-            <dt className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{k}</dt>
+            <dt className="mm-label-caps text-meta">{k}</dt>
             <dd className="mt-0.5 font-mono text-h2">{v}</dd>
           </div>
         ))}
@@ -88,8 +89,8 @@ export function DatabaseSection() {
             {tables.map((t) => (
               <tr key={t.name} className="border-t border-line-subtle">
                 <td className="py-1.5 font-mono text-h2">{t.name}</td>
-                <td className="py-1.5 text-right font-mono">{t.rows.toLocaleString("fr-FR")}</td>
-                <td className="py-1.5 text-right font-mono">{t.bytes ? fmtBytes(t.bytes) : "—"}</td>
+                <td className="py-1.5 text-right tabular-nums">{t.rows.toLocaleString("fr-FR")}</td>
+                <td className="py-1.5 text-right tabular-nums">{t.bytes ? fmtBytes(t.bytes) : "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -137,7 +138,7 @@ export function UpdateSection() {
     <SettingsSection
       id="updates"
       title="Mises à jour du serveur"
-      description={isLxc ? "Conteneur LXC Proxmox créé depuis l'image OCI : Proxmox ne remplace pas l'image d'un conteneur existant, la mise à jour se fait en recréant le CT." : isDocker ? (u.docker_auto ? "Installé avec Docker : le bouton demande à Watchtower de télécharger la nouvelle image et de recréer le conteneur." : "Installé avec Docker : l'image se met à jour avec Docker (docker compose pull puis up -d), ou depuis ce bouton si Watchtower est configuré (voir docker-compose.yml).") : isDeb ? "Installé par paquet .deb : la mise à jour télécharge le paquet de la release GitHub, vérifie son empreinte SHA-256 et l'installe." : "Installation manuelle : remplacez le binaire par celui de la dernière release."}
+      description={isLxc ? "Conteneur LXC Proxmox créé depuis l'image OCI : Proxmox ne remplace pas l'image d'un conteneur existant, la mise à jour se fait en recréant le CT." : isDocker ? (u.docker_auto ? "Installé avec Docker : le bouton demande à Watchtower de télécharger la nouvelle image et de recréer le conteneur." : "Installé avec Docker : l'image se met à jour avec Docker (docker compose pull puis up -d), ou depuis ce bouton si Watchtower est configuré (voir docker-compose.yml).") : isDeb ? "Installé par paquet .deb : la mise à jour télécharge le paquet de la release GitHub, vérifie son empreinte SHA-256 et l'installe." : "Installation manuelle : remplace le binaire par celui de la dernière release."}
       actions={
         <>
           <Button variant="secondary" icon={<RefreshCw size={15} />} loading={busy === "check"} onClick={() => run("check", "/api/system/update/check")}>
@@ -163,9 +164,9 @@ export function UpdateSection() {
       {isLxc && u.available && (
         <ol className="grid list-decimal gap-1 pl-5 text-sm text-body">
           <li>Proxmox → stockage → Modèles CT → <strong>Télécharger depuis un registre OCI</strong> : <span className="font-mono">ghcr.io/midnights-ra1n/homelab-management:{u.latest}</span></li>
-          <li>Arrêtez ce CT et notez sa configuration (réseau, variables <span className="font-mono">HLT_*</span>, point de montage de <span className="font-mono">/data</span>).</li>
-          <li>Créez un CT depuis la nouvelle image avec la même configuration, en rattachant le <strong>même volume</strong> sur <span className="font-mono">/data</span>, sans oublier <span className="font-mono">HLT_INSTALL=lxc-oci</span>.</li>
-          <li>Démarrez-le, vérifiez qu'il répond, puis supprimez l'ancien CT <strong>sans supprimer le volume</strong>.</li>
+          <li>Arrête ce CT et note sa configuration (réseau, variables <span className="font-mono">HLT_*</span>, point de montage de <span className="font-mono">/data</span>).</li>
+          <li>Crée un CT depuis la nouvelle image avec la même configuration, en rattachant le <strong>même volume</strong> sur <span className="font-mono">/data</span>, sans oublier <span className="font-mono">HLT_INSTALL=lxc-oci</span>.</li>
+          <li>Démarre-le, vérifie qu'il répond, puis supprime l'ancien CT <strong>sans supprimer le volume</strong>.</li>
         </ol>
       )}
       {isDocker && !u.docker_auto && u.available && <CodeBlock text="docker compose pull && docker compose up -d" />}
@@ -213,17 +214,17 @@ export function McpSection() {
     >
       {error && <Alert kind="error" title={error} />}
       {!st.https && <Alert kind="warning" title="HTTPS requis">
-        Ouvrez l'interface en HTTPS (reverse proxy avec certificat, HLT_TRUSTED_PROXIES renseigné) pour activer le serveur MCP et les passkeys. En HTTP, il refuse toutes les requêtes.
+        Ouvre l'interface en HTTPS (reverse proxy avec certificat, HLT_TRUSTED_PROXIES renseigné) pour activer le serveur MCP et les passkeys. En HTTP, il refuse toutes les requêtes.
         {st.proxy && <span className="mt-2 block">
-          Diagnostic : la requête arrive de <span className="font-mono">{st.proxy.peer}</span>, {st.proxy.trusted ? "adresse de confiance" : <>absente de HLT_TRUSTED_PROXIES{st.proxy.configured ? "" : " (vide)"} : ajoutez <span className="font-mono">{st.proxy.peer}/32</span></>} ;
-          {" "}{st.proxy.proto ? <>le proxy annonce <span className="font-mono">{st.proxy.proto}</span>{st.proxy.proto !== "https" && " au lieu de https"}</> : "aucun en-tête X-Forwarded-Proto reçu : configurez le proxy pour l'envoyer"}.
+          Diagnostic : la requête arrive de <span className="font-mono">{st.proxy.peer}</span>, {st.proxy.trusted ? "adresse de confiance" : <>absente de HLT_TRUSTED_PROXIES{st.proxy.configured ? "" : " (vide)"} : ajoute <span className="font-mono">{st.proxy.peer}/32</span></>} ;
+          {" "}{st.proxy.proto ? <>le proxy annonce <span className="font-mono">{st.proxy.proto}</span>{st.proxy.proto !== "https" && " au lieu de https"}</> : "aucun en-tête X-Forwarded-Proto reçu : configure le proxy pour l'envoyer"}.
           {" "}Voir la section « HTTPS derrière un reverse proxy » du README.
         </span>}
       </Alert>}
       <Switch checked={st.enabled} disabled={!st.https || busy === "enable"} onChange={(v) => config("enable", { enabled: v })}
         label="Activer le serveur MCP" hint={`Adresse : ${st.url}`} />
       {token && (
-        <Alert kind="success" title="Jeton créé : copiez-le maintenant, il ne sera plus affiché">
+        <Alert kind="success" title="Jeton créé : copie-le maintenant, il ne sera plus affiché">
           <CodeBlock text={token} />
         </Alert>
       )}
@@ -232,8 +233,8 @@ export function McpSection() {
           <div className="grid gap-2 border-t border-line-subtle pt-5">
             <p className="mm-label-caps">Connecter Claude (OAuth, sans jeton à copier)</p>
             <p className="text-sm text-body">
-              Claude (web, bureau, mobile) : Paramètres → Connecteurs → <strong>Ajouter un connecteur personnalisé</strong>, puis collez cette adresse. Claude s'inscrit tout seul
-              et ouvre une page de ce serveur où vous autorisez l'accès. Claude Code : <code className="font-mono text-xs text-h2">claude mcp add --transport http {name} {st.url}</code> puis <code className="font-mono text-xs text-h2">/mcp</code> pour vous connecter.
+              Claude (web, bureau, mobile) : Paramètres → Connecteurs → <strong>Ajouter un connecteur personnalisé</strong>, puis colle cette adresse. Claude s'inscrit tout seul
+              et ouvre une page de ce serveur où tu autorises l'accès. Claude Code : <code className="font-mono text-xs text-h2">claude mcp add --transport http {name} {st.url}</code> puis <code className="font-mono text-xs text-h2">/mcp</code> pour te connecter.
             </p>
             <CodeBlock text={st.url} />
             <Switch checked={st.dcr} disabled={busy === "dcr"} onChange={(v) => config("dcr", { dcr: v })}
@@ -245,7 +246,7 @@ export function McpSection() {
             {st.token_set ? <>
               <p className="text-sm text-body">Pour un client sans OAuth, avec l'en-tête <code className="font-mono text-xs text-h2">Authorization: Bearer …</code> :</p>
               <CodeBlock text={JSON.stringify({ mcpServers: { [name]: { type: "http", url: st.url, headers: { Authorization: `Bearer ${token ?? "mcp_…"}` } } } }, null, 2)} />
-            </> : <p className="text-sm text-meta">Aucun jeton fixe : générez-en un avec le bouton en haut de la section si un client ne gère pas OAuth.</p>}
+            </> : <p className="text-sm text-meta">Aucun jeton fixe : génères-en un avec le bouton en haut de la section si un client ne gère pas OAuth.</p>}
           </div>
         </>
       )}
@@ -290,12 +291,12 @@ function OAuthClients() {
       {error && <Alert kind="error" title={error} />}
       {list && list.length === 0 && <p className="text-sm text-meta">Aucun client pour l'instant : il apparaîtra ici dès que Claude se connectera.</p>}
       {list && list.length > 0 && (
-        <ul className="grid gap-2">
+        <ul className="divide-y divide-line-subtle">
           {list.map((c) => (
-            <li key={c.client_id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line-subtle bg-page px-3 py-2 text-sm">
+            <li key={c.client_id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
               <span className="min-w-0 flex-1">
                 <span className="block font-medium text-h1">{c.name} <Badge tone={c.dynamic ? "muted" : "accent"}>{c.dynamic ? "Automatique" : "Créé ici"}</Badge></span>
-                <span className="block truncate font-mono text-xs text-meta">{c.client_id} · {hosts(c)} · {c.last_used_at ? `utilisé ${fmtAgo(c.last_used_at)}` : "jamais utilisé"}{c.active_tokens ? ` · ${c.active_tokens} session(s)` : ""}</span>
+                <span className="block truncate font-mono text-xs text-meta">{c.client_id} · {hosts(c)} · {c.last_used_at ? `utilisé ${fmtAgo(c.last_used_at)}` : "jamais utilisé"}{c.active_tokens ? plural(` · ${c.active_tokens} session(s)`) : ""}</span>
               </span>
               <Button variant="danger-ghost" size="sm" icon={<Trash2 size={14} />} loading={busy === c.client_id} onClick={() => revoke(c)}>Révoquer</Button>
             </li>
@@ -303,7 +304,7 @@ function OAuthClients() {
         </ul>
       )}
       {made && (
-        <Alert kind="success" title="Client créé : copiez le secret maintenant, il ne sera plus affiché">
+        <Alert kind="success" title="Client créé : copie le secret maintenant, il ne sera plus affiché">
           <span className="mt-2 grid gap-2">
             <span>Dans Claude : Ajouter un connecteur personnalisé → Paramètres avancés → ID client OAuth et Secret client OAuth.</span>
             <span className="text-xs text-meta">ID client</span><CodeBlock text={made.client_id} />
@@ -312,7 +313,7 @@ function OAuthClients() {
         </Alert>
       )}
       <form className="grid gap-3" onSubmit={create}>
-        <Field label="Créer un client (ID et secret)" htmlFor="oc-name" hint="Pour renseigner vous-même l'ID et le secret dans Claude, ou pour un autre client MCP compatible OAuth">
+        <Field label="Créer un client (ID et secret)" htmlFor="oc-name" hint="Pour renseigner toi-même l'ID et le secret dans Claude, ou pour un autre client MCP compatible OAuth">
           <input id="oc-name" className={inputClass} placeholder="Mon Claude" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Adresses de redirection (facultatif)" htmlFor="oc-redir" hint="Une par ligne. Vide : celles de Claude.">
@@ -358,13 +359,13 @@ export function PasskeysSection() {
   return (
     <SettingsSection id="passkeys" title="Passkeys" description="Connexion sans mot de passe par biométrie, code de l'appareil ou clé de sécurité. Disponible uniquement en HTTPS (derrière un reverse proxy).">
       {list?.passkeys.length ? (
-        <ul className="grid gap-2">
+        <ul className="divide-y divide-line-subtle">
           {list.passkeys.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 rounded-xl border border-line-subtle bg-page px-4 py-3">
+            <li key={p.id} className="flex items-center gap-3 py-3">
               <KeyRound size={16} className="shrink-0 text-meta" aria-hidden="true" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-h1">{p.name}</span>
-                <span className="block font-mono text-xs text-meta">Ajoutée le {sqlDate(p.created_at)} · {p.last_used_at ? `utilisée le ${sqlDate(p.last_used_at)}` : "jamais utilisée"}</span>
+                <span className="block tabular-nums text-xs text-meta">Ajoutée le {sqlDate(p.created_at)} · {p.last_used_at ? `utilisée le ${sqlDate(p.last_used_at)}` : "jamais utilisée"}</span>
               </span>
               <Button variant="danger-ghost" size="sm" onClick={async () => {
                 if (!confirm(`Supprimer la passkey « ${p.name} » ? Elle ne permettra plus de se connecter.`)) return;
@@ -383,7 +384,7 @@ export function PasskeysSection() {
           <Button variant="secondary" icon={<Plus size={15} />} loading={busy} onClick={add}>Ajouter une passkey</Button>
         </div>
       ) : (
-        <p className="text-xs text-meta">Ouvrez l'interface en HTTPS pour ajouter une passkey.</p>
+        <p className="text-xs text-meta">Ouvre l'interface en HTTPS pour ajouter une passkey.</p>
       )}
     </SettingsSection>
   );
@@ -409,7 +410,7 @@ export function PasskeyLoginButton() {
   };
   return (
     <div className="mt-5 grid gap-4">
-      <div className="flex items-center gap-3 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
+      <div className="flex items-center gap-3 mm-label-caps text-meta">
         <span className="h-px flex-1 bg-line-subtle" />ou<span className="h-px flex-1 bg-line-subtle" />
       </div>
       {error && <Alert kind="error" title={error} />}
@@ -456,7 +457,7 @@ export function LogsPage({ entityHref }: { entityHref?: (e: LogItem) => string |
 
   return (
     <>
-      <PageHeader title="Journaux" description={`Tout ce qui a été fait depuis l'interface, l'API ou par les tâches automatiques, avec son auteur. Conservé ${data?.retention_days ?? 90} jours.`} />
+      <PageHeader title="Journaux" description={`Tout ce qui a été fait depuis l'interface, l'API ou les tâches automatiques, conservé ${data?.retention_days ?? 90} jours.`} />
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <label className="relative flex-1">
           <span className="sr-only">Rechercher</span>

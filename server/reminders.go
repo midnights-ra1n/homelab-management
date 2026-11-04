@@ -45,7 +45,7 @@ func (in *reminderIn) valid() string {
 	in.Host, in.HostRef, in.Note = strings.TrimSpace(in.Host), strings.TrimSpace(in.HostRef), strings.TrimSpace(in.Note)
 	switch {
 	case in.Host == "" || utf8.RuneCountInString(in.Host) > 200 || len(in.HostRef) > 200:
-		return "Choisissez un hôte"
+		return "Choisis un hôte"
 	case in.RepeatDays < 0 || in.RepeatDays > 366:
 		return "La répétition va de 0 à 366 jours"
 	case utf8.RuneCountInString(in.Note) > 500:

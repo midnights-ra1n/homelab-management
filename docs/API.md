@@ -303,7 +303,7 @@ Scope `status:read`. Résumé de l'infrastructure.
 
 ### `GET /api/v1/hosts`
 
-Scope `hosts:read`. Liste des hôtes équipés de l'agent, triée par nom. Ajoutez `?packages=1` pour inclure la liste des paquets en attente (sinon seuls les compteurs sont renvoyés).
+Scope `hosts:read`. Liste des hôtes équipés de l'agent, triée par nom. Ajoutez `?packages=1` pour inclure la liste des paquets en attente (sinon seuls les compteurs sont renvoyés). Sans ce paramètre, les applications Node.js sont allégées : dernière opération seulement, sans clés SSH. La fiche `GET /api/v1/hosts/{id}` donne tout. La liste est mise en cache 3 s au plus et se renouvelle dès qu'un état change.
 
 ```json
 [

@@ -150,7 +150,7 @@ func (s *Server) mgSaveHardware(w http.ResponseWriter, r *http.Request) {
 		if a, ok := cols["asset_id"].(int64); ok && f.check("import_components") {
 			var n int
 			if n, err = s.importAssetComponents(id, a); n > 0 {
-				summary += fmt.Sprintf(", %d composant(s) repris de l'inventaire", n)
+				summary += plural(fmt.Sprintf(", %d composant(s) repris de l'inventaire", n))
 			}
 		}
 		s.mgLog(r, "hardware", id, "create", summary)
@@ -278,7 +278,7 @@ func (s *Server) mgDeleteHardware(w http.ResponseWriter, r *http.Request) {
 	}
 	summary := fmt.Sprintf("Suppression du matériel « %s »", name)
 	if n, _ := res.RowsAffected(); n > 0 {
-		summary += fmt.Sprintf(", %d composant(s) remis en stock", n)
+		summary += plural(fmt.Sprintf(", %d composant(s) remis en stock", n))
 	}
 	s.mgLog(r, "hardware", id, "delete", summary)
 	w.WriteHeader(http.StatusNoContent)

@@ -30,7 +30,7 @@ Voir aussi : [architecture](ARCHITECTURE.md), [README](../README.md).
 
 ## Tableau de bord et applications
 
-- **Tableau de bord** : nombre d'éléments, d'adresses IP, de déploiements actifs et de tâches ouvertes ; état des nœuds Proxmox ; résumé du monitoring (sondes, systèmes, mises à jour, mises à jour de sécurité) et bandeau d'alerte quand quelque chose est en panne.
+- **Tableau de bord** : nombre d'éléments, d'adresses IP, de déploiements actifs et de tâches ouvertes ; état des nœuds Proxmox ; résumé du monitoring (sondes, systèmes, mises à jour) ; déploiements en cours et tâches à venir ; bandeau d'alerte quand quelque chose est en panne. La capacité matérielle est passée dans *Stock*.
 - **Applications** : la page d'accueil du homelab. Des raccourcis rangés en groupes (glisser pour réordonner), avec des icônes [Dashboard Icons](https://dashboardicons.com) ou [selfh.st](https://selfh.st/icons/) ou une image envoyée, et l'**état en direct** de chaque service : toute réponse HTTP inférieure à 500 compte comme joignable (401 et 403 compris).
 
 ## Inventaire

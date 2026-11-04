@@ -225,13 +225,20 @@ func capped[T any](s []T, n int) []T {
 	return s
 }
 
-// withoutPackages keeps update counts but drops package lists, for list views polled often.
-func withoutPackages(hosts []Host) []Host {
+// listView is the shape of list routes, polled often: update counts without the packages,
+// Node.js apps with their last operation only. The rest is read on GET /api/hosts/{id}.
+func listView(hosts []Host) []Host {
 	for i := range hosts {
 		if hosts[i].Updates != nil {
 			u := *hosts[i].Updates
 			u.Packages, u.AlertedSecurity = nil, nil
 			hosts[i].Updates = &u
+		}
+		if n := hosts[i].NodeApps; n != nil {
+			n.SSHKeys, n.Alerted = nil, nil
+			for j := range n.Apps {
+				n.Apps[j].History = capped(n.Apps[j].History, 1)
+			}
 		}
 	}
 	return hosts
@@ -274,7 +281,15 @@ func (s *Server) hostStatus(h *Host) string {
 	case h.AgentDown:
 		return StatusMajor
 	}
-	var m agentMetrics
+	// Only what decides the status: temps and interfaces are skipped without being decoded.
+	var m struct {
+		MemUsed  uint64 `json:"mem_used"`
+		MemTotal uint64 `json:"mem_total"`
+		Disks    []struct {
+			Used  uint64 `json:"used"`
+			Total uint64 `json:"total"`
+		} `json:"disks"`
+	}
 	if json.Unmarshal(h.Latest, &m) == nil {
 		for _, d := range m.Disks {
 			if d.Total > 0 && float64(d.Used)/float64(d.Total) >= 0.95 {
@@ -423,7 +438,7 @@ func (s *Server) handleListHosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Query().Get("packages") != "1" {
-		hosts = withoutPackages(hosts)
+		hosts = listView(hosts)
 	}
 	writeJSON(w, 200, hosts)
 }
@@ -829,15 +844,19 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 			s.setHostAction(id, m.Action, m.State, m.Message)
 			events.publish("hosts")
 		case m.Type == "docker" && m.Docker != nil:
-			if err := s.storeDocker(id, hostName, m.Docker); err != nil {
+			if changed, err := s.storeDocker(id, hostName, m.Docker); err != nil {
 				slog.Error("store docker", "err", err)
+			} else if changed {
+				events.publish("hosts")
+			} else {
+				events.publish("metrics")
 			}
-			events.publish("hosts")
 		case m.Type == "node_apps" && m.NodeApps != nil:
-			if err := s.storeNodeApps(id, hostName, m.NodeApps); err != nil {
+			if changed, err := s.storeNodeApps(id, hostName, m.NodeApps); err != nil {
 				slog.Error("store node apps", "err", err)
+			} else if changed {
+				events.publish("hosts")
 			}
-			events.publish("hosts")
 		case m.Type == "node_read" && m.Read != nil:
 			deliverNodeRead(id, m.Read)
 		case m.Type == "smart" && m.Smart != nil:
@@ -905,9 +924,9 @@ func (s *Server) storeUpdates(id int64, hostName string, u *agentUpdates) error 
 	if len(fresh) > 0 && s.getSetting("notify_security_updates", "true") == "true" {
 		list := strings.Join(fresh[:min(len(fresh), 8)], ", ")
 		if len(fresh) > 8 {
-			list += fmt.Sprintf(" et %d autre(s)", len(fresh)-8)
+			list += plural(fmt.Sprintf(" et %d autre(s)", len(fresh)-8))
 		}
-		s.notifier.add(Event{Kind: KindUpdates, Name: hostName, Message: fmt.Sprintf("%d nouvelle(s) mise(s) à jour de sécurité : %s", len(fresh), list), At: time.Now()})
+		s.notifier.add(Event{Kind: KindUpdates, Name: hostName, Message: plural(fmt.Sprintf("%d nouvelle(s) mise(s) à jour de sécurité : %s", len(fresh), list)), At: time.Now()})
 	}
 	if u.RebootRequired && !prev.RebootAlerted && s.getSetting("notify_reboot", "true") == "true" {
 		s.notifier.add(Event{Kind: KindReboot, Name: hostName, Message: "Un redémarrage est nécessaire pour appliquer les mises à jour installées", At: time.Now()})

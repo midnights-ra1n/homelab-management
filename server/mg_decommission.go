@@ -71,27 +71,27 @@ func (s *Server) decomSteps(id int64) []decomStep {
 	}
 	if a["hlm_host_id"] != nil {
 		steps = append(steps, decomStep{Key: "monitoring", Auto: true, Label: "Retirer l'hôte du monitoring",
-			Hint: "Supprime l'hôte dans Midnights Monitoring (jeton avec le scope hosts:write). Désinstallez ensuite l'agent : curl -fsSL https://raw.githubusercontent.com/midnights-ra1n/homelab-management/stable/agent/uninstall.sh | sudo sh (sur un Proxmox, aussi dans ses conteneurs LXC), apt remove hlm-agent ou hlm_agent_state: absent avec Ansible."})
+			Hint: "Supprime l'hôte dans Midnights Monitoring (jeton avec le scope hosts:write). Désinstalle ensuite l'agent : curl -fsSL https://raw.githubusercontent.com/midnights-ra1n/homelab-management/stable/agent/uninstall.sh | sudo sh (sur un Proxmox, aussi dans ses conteneurs LXC), apt remove hlm-agent ou hlm_agent_state: absent avec Ansible."})
 	} else {
 		steps = append(steps, decomStep{Key: "agent", Label: "Désinstaller l'agent de monitoring s'il est présent"})
 	}
 	if n := s.count(`SELECT COUNT(*) FROM assets WHERE parent_id = ?`, id); n > 0 {
-		steps = append(steps, decomStep{Key: "children", Auto: true, Label: fmt.Sprintf("Réaffecter les %d élément(s) hébergé(s)", n),
+		steps = append(steps, decomStep{Key: "children", Auto: true, Label: plural(fmt.Sprintf("Réaffecter les %d élément(s) hébergé(s)", n)),
 			Hint: "Ils sont rattachés à l'hôte parent de cet élément (ou détachés s'il n'en a pas)."})
 	}
 	if n := s.count(`SELECT COUNT(*) FROM domains WHERE target_asset_id = ? OR proxy_asset_id = ?`, id, id); n > 0 {
-		steps = append(steps, decomStep{Key: "domains", Auto: true, Label: fmt.Sprintf("Supprimer les %d nom(s) de domaine liés", n),
-			Hint: "Pensez aussi aux enregistrements DNS et à la configuration du reverse proxy."})
+		steps = append(steps, decomStep{Key: "domains", Auto: true, Label: plural(fmt.Sprintf("Supprimer les %d nom(s) de domaine liés", n)),
+			Hint: "Pense aussi aux enregistrements DNS et à la configuration du reverse proxy."})
 	}
 	if n := s.count(`SELECT COUNT(*) FROM firewall_rules WHERE (src_type = 'asset' AND src_value = ?) OR (dst_type = 'asset' AND dst_value = ?)`, idStr, idStr) +
 		s.count(`SELECT COUNT(*) FROM shortcuts WHERE asset_id = ?`, id); n > 0 {
-		steps = append(steps, decomStep{Key: "links", Auto: true, Label: fmt.Sprintf("Supprimer les %d règle(s) de pare-feu et raccourci(s) liés", n)})
+		steps = append(steps, decomStep{Key: "links", Auto: true, Label: plural(fmt.Sprintf("Supprimer les %d règle(s) de pare-feu et raccourci(s) liés", n))})
 	}
 	switch a["kind"] {
 	case "vm", "lxc":
 		hint := ""
 		if a["proxmox_vmid"] != nil {
-			hint = fmt.Sprintf("VMID %v : supprimez l'invité et ses disques (et ses sauvegardes si elles ne servent plus).", a["proxmox_vmid"])
+			hint = fmt.Sprintf("VMID %v : supprime l'invité et ses disques (et ses sauvegardes si elles ne servent plus).", a["proxmox_vmid"])
 		}
 		steps = append(steps, decomStep{Key: "guest", Label: "Supprimer la machine dans l'hyperviseur", Hint: hint})
 	case "physical", "network":
@@ -251,14 +251,14 @@ func (s *Server) runDecomStep(ctx context.Context, id int64, key string) (string
 			return "", err
 		}
 		n, _ := res.RowsAffected()
-		return fmt.Sprintf("%d élément(s) réaffecté(s)", n), nil
+		return plural(fmt.Sprintf("%d élément(s) réaffecté(s)", n)), nil
 	case "domains":
 		res, err := s.db.Exec(`DELETE FROM domains WHERE target_asset_id = ? OR proxy_asset_id = ?`, id, id)
 		if err != nil {
 			return "", err
 		}
 		n, _ := res.RowsAffected()
-		return fmt.Sprintf("%d domaine(s) supprimé(s)", n), nil
+		return plural(fmt.Sprintf("%d domaine(s) supprimé(s)", n)), nil
 	case "links":
 		r1, err := s.db.Exec(`DELETE FROM firewall_rules WHERE (src_type = 'asset' AND src_value = ?) OR (dst_type = 'asset' AND dst_value = ?)`, idStr, idStr)
 		if err != nil {
@@ -270,7 +270,7 @@ func (s *Server) runDecomStep(ctx context.Context, id int64, key string) (string
 		}
 		a, _ := r1.RowsAffected()
 		b, _ := r2.RowsAffected()
-		return fmt.Sprintf("%d règle(s) et %d raccourci(s) supprimé(s)", a, b), nil
+		return plural(fmt.Sprintf("%d règle(s) et %d raccourci(s) supprimé(s)", a, b)), nil
 	}
 	return "", integrationErr("Étape inconnue")
 }
@@ -306,7 +306,7 @@ func (s *Server) mgDecomFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	summary := "Décommissionnement terminé : « " + name + " » supprimé de l'inventaire"
 	if len(ips) > 0 {
-		summary += ", adresse(s) libérée(s) : " + strings.Join(ips, ", ")
+		summary += ", IP libérées : " + strings.Join(ips, ", ")
 	}
 	s.mgLog(r, "asset", id, "delete", summary)
 	formRedirect(w, "/inventaire", 0)

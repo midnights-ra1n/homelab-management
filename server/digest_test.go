@@ -74,7 +74,7 @@ func TestPendingUpdatesDigest(t *testing.T) {
 	s.db.Exec(`INSERT INTO hosts(name,token_hash,created_at,updates) VALUES('pve',x'03',0,'{"checked_at":1,"pending":4,"security":1,"reboot_required":true}')`)
 	s.db.Exec(`INSERT INTO hosts(name,token_hash,created_at,updates) VALUES('nas',x'04',0,'{"checked_at":1,"pending":0}')`)
 	evs := s.pendingUpdateEvents()
-	if len(evs) != 1 || evs[0].Name != "pve" || evs[0].Message != "4 paquet(s) à mettre à jour, dont 1 de sécurité · redémarrage requis" {
+	if len(evs) != 1 || evs[0].Name != "pve" || evs[0].Message != "4 paquets à mettre à jour, dont 1 de sécurité · redémarrage requis" {
 		t.Fatalf("got %+v", evs)
 	}
 }

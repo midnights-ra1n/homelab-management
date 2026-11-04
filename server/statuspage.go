@@ -289,7 +289,7 @@ func (s *Server) handleWall(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"title": s.getSetting("status_title", "Homelab"), "hosts": withoutPackages(hosts), "monitors": mons})
+	writeJSON(w, 200, map[string]any{"title": s.getSetting("status_title", "Homelab"), "hosts": listView(hosts), "monitors": mons})
 }
 
 func (s *Server) handleGetWallKey(w http.ResponseWriter, r *http.Request) {

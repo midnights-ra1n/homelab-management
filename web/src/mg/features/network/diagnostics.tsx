@@ -28,8 +28,8 @@ export function Diagnostics({ issues }: { issues: Issue[] }) {
   return (
     <div className="grid gap-4">
       <p className="text-sm text-body">
-        <span className="text-red">{count("error")} {tr("erreur(s)")}</span> · <span className="text-yellow">{count("warning")} {tr("avertissement(s)")}</span> ·{" "}
-        <span className="text-blue">{count("info")} {tr("info(s)")}</span>
+        <span className="text-red">{tr("{n} erreur(s)", { n: count("error") })}</span> · <span className="text-yellow">{tr("{n} avertissement(s)", { n: count("warning") })}</span> ·{" "}
+        <span className="text-blue">{tr("{n} info(s)", { n: count("info") })}</span>
       </p>
       <ul className="grid gap-2">
         {issues.map((i, idx) => {
@@ -38,7 +38,7 @@ export function Diagnostics({ issues }: { issues: Issue[] }) {
             <>
               <span
                 aria-hidden
-                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold"
+                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 style={{ background: m.tone, color: "var(--mm-surface)" }}
               >
                 {m.glyph}

@@ -20,7 +20,7 @@ export default function DeploymentsPage({ searchParams }: PageProps<"/[lang]/dep
     <>
       <PageHeader
         title={tr("Ce qui arrive dans le homelab")}
-        description={tr("Planifie les serveurs, VM, conteneurs et applications à déployer, suis leur état et la checklist de ce qu'il reste à faire.")}
+        description={tr("Planifie ce qu'il faut déployer et suis la checklist de ce qu'il reste à faire.")}
         actions={
           <ButtonLink href="/deploiements/nouveau" icon={<Plus size={16} />}>
             {tr("Nouveau déploiement")}</ButtonLink>
@@ -75,7 +75,7 @@ function Deployments({ searchParams }: { searchParams: PageProps<"/[lang]/deploi
   );
 
   return (
-    <div className="grid grid-cols-1 gap-8 xl:gap-10">
+    <div className="grid grid-cols-1 gap-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
         {modeSwitch}
         <LinkTabs

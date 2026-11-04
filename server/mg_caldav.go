@@ -681,8 +681,8 @@ func (s *Server) syncTaskList(ctx context.Context, i *integration, base *url.URL
 		s.logEvent("synchronisation", "task", id, "create", "Tâche « "+f.title+" » importée de Nextcloud")
 		imported++
 	}
-	return fmt.Sprintf("Synchronisation avec « %s » : %d envoyée(s), %d mise(s) à jour, %d importée(s), %d supprimée(s).",
-		i.Name, pushed, pulled, imported, deleted), nil
+	return plural(fmt.Sprintf("Synchronisation avec « %s » : %d envoyée(s), %d mise(s) à jour, %d importée(s), %d supprimée(s).",
+		i.Name, pushed, pulled, imported, deleted)), nil
 }
 
 func queryStrings(q execer, query string) ([]string, error) {

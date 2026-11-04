@@ -334,7 +334,7 @@ func (s *Server) testIntegration(ctx context.Context, i *integration) (string, e
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("%d tâche(s) dans cette liste", len(todos)), nil
+		return plural(fmt.Sprintf("%d tâche(s) dans cette liste", len(todos))), nil
 	case "hlm":
 		before := i.Config.LoginToken
 		d, err := s.hlmData(ctx, i)
@@ -353,7 +353,7 @@ func (s *Server) testIntegration(ctx context.Context, i *integration) (string, e
 				up++
 			}
 		}
-		return fmt.Sprintf("%d hôte(s) dont %d opérationnel(s), %d sonde(s)", len(d.Hosts), up, len(d.Monitors)), nil
+		return plural(fmt.Sprintf("%d hôte(s) dont %d opérationnel(s), %d sonde(s)", len(d.Hosts), up, len(d.Monitors))), nil
 	}
 	return "", integrationErr("Type d'intégration inconnu")
 }

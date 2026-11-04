@@ -52,7 +52,7 @@ function Detail({ params }: { params: PageProps<"/[lang]/deploiements/[id]">["pa
   };
 
   return (
-    <div className="grid grid-cols-1 gap-8 xl:gap-10">
+    <div className="grid grid-cols-1 gap-8">
       <header className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-bold tracking-tight text-h1 sm:text-4xl">{d.title}</h1>
@@ -86,7 +86,7 @@ function Detail({ params }: { params: PageProps<"/[lang]/deploiements/[id]">["pa
         <StatusSwitcher id={id} status={d.status} />
       </Card>
 
-      <div className="grid gap-8 lg:grid-cols-3 xl:gap-10">
+      <div className="grid gap-8 lg:grid-cols-3">
         <div className="grid min-w-0 content-start gap-6 lg:col-span-2">
           <Card>
             <CardHeader
@@ -144,9 +144,9 @@ function Detail({ params }: { params: PageProps<"/[lang]/deploiements/[id]">["pa
               {tasks.length === 0 ? (
                 <p className="text-sm text-meta">{tr("Aucune tâche rattachée à ce déploiement.")}</p>
               ) : (
-                <ul className="grid gap-2">
+                <ul className="divide-y divide-line-subtle">
                   {tasks.map((t) => (
-                    <li key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-line-subtle bg-page px-4 py-2.5">
+                    <li key={t.id} className="flex items-center justify-between gap-3 py-3">
                       <span className={cn("truncate text-sm", t.status === "done" ? "text-meta line-through" : "text-h2")}>{t.title}</span>
                       <Badge tone={TASK_STATUS_META[t.status].tone}>{tr(TASK_STATUS_META[t.status].label)}</Badge>
                     </li>

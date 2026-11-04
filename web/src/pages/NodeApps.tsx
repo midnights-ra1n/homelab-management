@@ -2,8 +2,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Download, ExternalLink, Eye, GitPullRequestArrow, KeyRound, LoaderCircle, Package, Plus, RotateCw, Square, Trash2, Upload } from "../shared/icons";
 import { actionBusy, api, ApiError, fmtAgo, fmtDate, type Host, type NodeAction, type NodeApp, type NodeOp } from "../api";
 import {
-  Alert, Badge, Button, ButtonAnchor, Card, Checkbox, CodeBlock, Dialog, Field, FIELD_ROW, Segmented, Skeleton, StatusIcon, cn,
-  inputClass, textareaClass, type StatusKind, type Tone, usePoll, useToast,
+  Alert, Badge, Button, ButtonAnchor, Card, Checkbox, CodeBlock, Dialog, Field, FIELD_ROW, Segmented, Skeleton, cn,
+  inputClass, textareaClass, type Tone, usePoll, useToast,
 } from "../ui";
 import { useHostAction } from "./AgentVersion";
 import { EnvVars } from "./EnvVars";
@@ -34,8 +34,6 @@ const ACTIONS: { action: NodeAction; label: string; hint: string; icon: React.Re
 const opResult = (o: NodeOp) => (o.result === "running" && Date.now() / 1000 - o.started > 3600 ? "interrupted" : o.result);
 const short = (c: string) => (c && c !== "local" ? c.slice(0, 7) : c);
 const noAnsi = (s: string) => s.replace(/\u001b\[[0-9;]*m/g, "");
-const appKind = (a: NodeApp): StatusKind =>
-  a.status === "errored" ? "down" : a.status === "online" ? (a.failed_commit ? "warn" : "ok") : a.status === "stopped" || a.status === "paused" ? "paused" : "warn";
 
 /** Address of the host for the node-app-ui link: first IPv4 that is not loopback or a bridge (as hostAddress in Go). */
 const hostAddress = (h: Host) =>
@@ -47,6 +45,22 @@ export const nodeUiUrl = (h: Host) => (h.node_apps?.ui_port ? `https://${hostAdd
 function ResultBadge({ o }: { o: NodeOp }) {
   const [label, tone] = RESULT[opResult(o)] ?? [o.result, "muted" as Tone];
   return <Badge tone={tone} dot>{label}</Badge>;
+}
+
+/** An app that needs a look: it crashed, or its last commit failed and it still runs the previous one. */
+export const appProblem = (a: NodeApp) => a.status === "errored" || !!a.failed_commit;
+/** Second line of an app: where its code comes from. */
+export const appSource = (a: NodeApp) => (a.source === "local" ? "code local" : `${a.repo.replace(/^.*[/:]([^/:]+\/[^/]+?)(\.git)?$/, "$1")} · ${a.branch}`);
+
+export function AppState({ a }: { a: NodeApp }) {
+  const [st, tone] = STATUS[a.status] ?? [a.status, "muted" as Tone];
+  return a.failed_commit && a.status === "online" ? <Badge tone="yellow" dot>Commit en échec</Badge> : <Badge tone={tone} dot>{st}</Badge>;
+}
+
+export function LastOp({ a }: { a: NodeApp }) {
+  const last = a.history[0];
+  if (!last) return <span className="text-meta">—</span>;
+  return <span className="flex items-center gap-2" title={KIND[last.kind] ?? last.kind}><ResultBadge o={last} /><span className="text-sm whitespace-nowrap text-meta">{fmtAgo(last.started)}</span></span>;
 }
 
 /** Log of one operation, followed while it runs (like node-app-ui: read from an offset every 1.5 s). */
@@ -162,7 +176,7 @@ function KeyActions({ h, app, onChanged }: { h: Host; app: string; onChanged?: (
     setBusy(true);
     try {
       await api.post(`${base}/node-apps/${app}/key`, body);
-      toast("Deploy key remplacée : ajoutez-la au dépôt", "success");
+      toast("Deploy key remplacée : ajoute-la au dépôt", "success");
       setDialog(undefined); setPriv(""); onChanged?.();
     } catch (e) { toast((e as Error).message, "error"); }
     setBusy(false);
@@ -174,7 +188,7 @@ function KeyActions({ h, app, onChanged }: { h: Host; app: string; onChanged?: (
         <Button variant="secondary" size="sm" icon={<Upload size={14} />} disabled={!!blocked} title={blocked} onClick={() => setDialog("import")}>Importer une clé</Button>
       </div>
       <Dialog open={!!dialog} onClose={() => setDialog(undefined)} size="sm" title={dialog === "new" ? "Nouvelle deploy key" : "Importer une clé SSH"}
-        description={dialog === "new" ? "L'ancienne clé est supprimée de l'hôte : ajoutez la nouvelle au dépôt avant le prochain déploiement." : "Clé privée existante (clé de compte, autre serveur), sans phrase de passe. Elle remplace la deploy key de l'app."}
+        description={dialog === "new" ? "L'ancienne clé est supprimée de l'hôte : ajoute la nouvelle au dépôt avant le prochain déploiement." : "Clé privée existante (clé de compte, autre serveur), sans phrase de passe. Elle remplace la deploy key de l'app."}
         footer={<><Button variant="secondary" onClick={() => setDialog(undefined)}>Annuler</Button>
           {dialog === "new"
             ? <Button icon={<KeyRound size={16} />} loading={busy} onClick={() => send({ regenerate: true })}>Remplacer la clé</Button>
@@ -227,7 +241,7 @@ function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => vo
   };
   return (
     <Dialog open onClose={onClose} size="lg" title={`Nouvelle application sur ${h.name}`}
-      description="Même détection que node-app new : framework, commande de démarrage, migration et port sont proposés automatiquement si vous laissez les champs vides."
+      description="Même détection que node-app new : framework, commande de démarrage, migration et port sont proposés automatiquement si tu laisses les champs vides."
       footer={warnings !== undefined ? <Button onClick={onClose}>Terminer</Button> : <><Button variant="secondary" onClick={onClose}>Annuler</Button>
         <Button type="submit" form="node-create" icon={<Plus size={16} />} loading={busy === "create"} disabled={f.env_invalid} title={f.env_invalid ? "Variables à corriger" : undefined}>Créer et déployer</Button></>}>
       {warnings !== undefined ? (
@@ -248,9 +262,9 @@ function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => vo
           </Field>
           {ssh && (
             <div className="grid gap-3 rounded-xl border border-line p-4">
-              <p className="text-sm text-body">Dépôt privé en SSH : ajoutez la deploy key de l'app au dépôt, en lecture seule (GitHub : Settings › Deploy keys).</p>
+              <p className="text-sm text-body">Dépôt privé en SSH : ajoute la deploy key de l'app au dépôt, en lecture seule (GitHub : Settings › Deploy keys).</p>
               {key ? <CodeBlock text={key} /> : (
-                <Button variant="secondary" size="sm" icon={<KeyRound size={14} />} className="justify-self-start" loading={busy === "key"} disabled={!/^[a-z0-9][a-z0-9_-]*$/.test(f.name)} title={f.name ? undefined : "Indiquez d'abord le nom"} onClick={showKey}>Afficher la deploy key</Button>
+                <Button variant="secondary" size="sm" icon={<KeyRound size={14} />} className="justify-self-start" loading={busy === "key"} disabled={!/^[a-z0-9][a-z0-9_-]*$/.test(f.name)} title={f.name ? undefined : "Indique d'abord le nom"} onClick={showKey}>Afficher la deploy key</Button>
               )}
               <details>
                 <summary className="cursor-pointer text-sm text-meta">Utiliser une clé SSH existante</summary>
@@ -289,11 +303,11 @@ function CreateAppDialog({ h, onClose, onChanged }: { h: Host; onClose: () => vo
   );
 }
 
-function Spec({ label, children }: { label: string; children: React.ReactNode }) {
+export function Spec({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="mm-label-caps">{label}</dt>
-      <dd className="mt-1 truncate text-sm text-h2">{children || <span className="text-meta">—</span>}</dd>
+      <dt className="text-sm text-meta">{label}</dt>
+      <dd className="mt-0.5 truncate font-semibold text-h1">{children || <span className="text-meta">—</span>}</dd>
     </div>
   );
 }
@@ -301,9 +315,10 @@ function Spec({ label, children }: { label: string; children: React.ReactNode })
 function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onClose: () => void; onChanged?: () => void }) {
   const { run, busy } = useHostAction(() => onChanged?.(), useContext(NodeBase));
   const base = useBase(h);
-  const [tab, setTab] = useState<"history" | "logs" | "env" | "pause">("history");
+  const [tab, setTab] = useState<"history" | "logs" | "env" | "settings">("history");
   const [picked, setPicked] = useState<string>();
   const [remove, setRemove] = useState<{ purge: boolean }>();
+  const [more, setMore] = useState(false);
   const latest = app.history[0];
   // Right after a deploy, follow the new operation without a click.
   const shown = picked ?? (latest && opResult(latest) === "running" ? latest.id : undefined);
@@ -316,27 +331,19 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
     <Dialog open onClose={onClose} size="xl" title={app.name}
       description={<span className="inline-flex flex-wrap items-center gap-2"><Badge tone={stTone} dot>{st}</Badge>{app.port > 0 && <span className="font-mono text-xs">port {app.port}</span>}{app.managed_by_ansible && <Badge tone="blue">Géré par Ansible</Badge>}</span>}>
       <div className="grid gap-6">
-        {app.managed_by_ansible && <Alert kind="info" title="Configuration écrite par le playbook">Modifiez plutôt nodejs_apps dans Ansible : la configuration de l'app est réécrite à chaque passage du playbook.</Alert>}
-        {app.failed_commit && <Alert kind="error" title={`Échec du déploiement du commit ${short(app.failed_commit)}`}>L'app tourne toujours sur le dernier commit qui fonctionnait. Consultez le journal de l'opération ci-dessous.</Alert>}
-
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-          <Spec label="Source">{app.source === "local" ? "Code copié (sans dépôt)" : <span className="font-mono text-xs" title={app.repo}>{app.repo}</span>}</Spec>
-          <Spec label="Branche">{app.branch && <span className="font-mono text-xs">{app.branch}</span>}</Spec>
-          <Spec label="Commit déployé">{app.deployed_commit && <span className="font-mono text-xs" title={app.deployed_commit}>{short(app.deployed_commit)}</span>}</Spec>
-          <Spec label="Démarrage"><span className="font-mono text-xs" title={app.start_command}>{app.start_command}</span></Spec>
-          <Spec label="Migration">{app.migrate_command && app.migrate_command !== "-" && <span className="font-mono text-xs" title={app.migrate_command}>{app.migrate_command}</span>}</Spec>
-          <Spec label="Automatique">{[app.auto_deploy && "déploiement à chaque commit", app.auto_update && "dépendances chaque semaine"].filter(Boolean).join(", ") || "désactivé"}</Spec>
-        </dl>
+        {app.managed_by_ansible && <Alert kind="info" title="Configuration écrite par le playbook">Modifie plutôt nodejs_apps dans Ansible : la configuration de l'app est réécrite à chaque passage du playbook.</Alert>}
+        {app.failed_commit && <Alert kind="error" title={`Échec du déploiement du commit ${short(app.failed_commit)}`}>L'app tourne toujours sur le dernier commit qui fonctionnait. Consulte le journal de l'opération ci-dessous.</Alert>}
 
         <div className="grid gap-3">
           <div className="flex flex-wrap gap-2">
-            {ACTIONS.map((x) => (
-              (x.action !== "node_pull" || app.source === "git") && (
-                <Button key={x.action} variant="secondary" size="sm" icon={x.icon} title={blocked ?? x.hint} disabled={!!blocked}
-                  loading={busy === `${h.id}:${x.action}:${app.name}`} onClick={() => act(x.action)}>{x.label}</Button>
-              )
-            ))}
-            <Button variant="danger-ghost" size="sm" icon={<Trash2 size={14} />} title={blocked} disabled={!!blocked} onClick={() => setRemove({ purge: false })}>Supprimer</Button>
+            {ACTIONS.filter((x) => x.action !== "node_pull" || app.source === "git").map((x) => {
+              const primary = x.action === "node_deploy";
+              return (
+                <Button key={x.action} variant={primary ? "primary" : "secondary"} size="sm" icon={x.icon} title={blocked ?? x.hint} disabled={!!blocked}
+                  className={primary || more ? undefined : "max-sm:hidden"} loading={busy === `${h.id}:${x.action}:${app.name}`} onClick={() => act(x.action)}>{x.label}</Button>
+              );
+            })}
+            <Button variant="ghost" size="sm" className="sm:hidden" aria-expanded={more} onClick={() => setMore(!more)}>{more ? "Moins d'actions" : "Autres actions"}</Button>
           </div>
           {pending && <span className="inline-flex items-center gap-1.5 text-xs text-meta"><LoaderCircle size={12} className="animate-spin" aria-hidden />Action en cours sur l'hôte…</span>}
           {a && !pending && (
@@ -348,8 +355,31 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
         </div>
 
         <div className="grid gap-4">
-          <Segmented label="Vue" value={tab} onChange={setTab} options={[["history", "Historique"], ["logs", "Logs de l'app"], ["env", "Variables"], ["pause", "Pause"]]} />
-          {tab === "pause" ? <PauseEditor base={base} app={app.name} paused={app.status === "paused"} blocked={blocked} onChanged={onChanged} /> : tab === "env" ? <EnvEditor h={h} app={app.name} /> : tab === "logs" ? <AppLogs h={h} app={app.name} /> : (
+          <Segmented label="Vue" value={tab} onChange={setTab} options={[["history", "Historique"], ["logs", "Logs"], ["env", "Variables"], ["settings", "Réglages"]]} />
+          {tab === "settings" ? (
+            <div className="grid gap-6">
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+                <Spec label="Source">{app.source === "local" ? "Code copié (sans dépôt)" : <span className="font-mono text-xs" title={app.repo}>{app.repo}</span>}</Spec>
+                <Spec label="Branche">{app.branch && <span className="font-mono text-xs">{app.branch}</span>}</Spec>
+                <Spec label="Commit déployé">{app.deployed_commit && <span className="font-mono text-xs" title={app.deployed_commit}>{short(app.deployed_commit)}</span>}</Spec>
+                <Spec label="Démarrage"><span className="font-mono text-xs" title={app.start_command}>{app.start_command}</span></Spec>
+                <Spec label="Migration">{app.migrate_command && app.migrate_command !== "-" && <span className="font-mono text-xs" title={app.migrate_command}>{app.migrate_command}</span>}</Spec>
+                <Spec label="Automatique">{[app.auto_deploy && "déploiement à chaque commit", app.auto_update && "dépendances chaque semaine"].filter(Boolean).join(", ") || "désactivé"}</Spec>
+              </dl>
+              <dl><Spec label="Redémarrages">{String(app.restarts)}</Spec></dl>
+              <PauseEditor base={base} app={app.name} paused={app.status === "paused"} blocked={blocked} onChanged={onChanged} />
+              {app.source === "git" && <GitHook base={base} app={app.name} auto={app.auto_deploy} />}
+
+              {(app.deploy_key || isSshRepo(app.repo)) && (
+                <div className="grid gap-2">
+                  <p className="font-semibold text-h1">Deploy key (à ajouter au dépôt, en lecture seule)</p>
+                  {app.deploy_key && <CodeBlock text={app.deploy_key} />}
+                  <KeyActions h={h} app={app.name} onChanged={onChanged} />
+                </div>
+              )}
+              <div><Button variant="danger-ghost" size="sm" icon={<Trash2 size={14} />} title={blocked} disabled={!!blocked} onClick={() => setRemove({ purge: false })}>Supprimer l'app</Button></div>
+            </div>
+          ) : tab === "env" ? <EnvEditor h={h} app={app.name} /> : tab === "logs" ? <AppLogs h={h} app={app.name} /> : (
             <>
               {app.history.length === 0 ? <p className="text-sm text-meta">Aucune opération enregistrée.</p> : (
                 <div className="mm-table-wrap rounded-xl border border-line">
@@ -361,7 +391,7 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
                           <td className="mm-col-strong"><button type="button" className="text-left text-inherit" onClick={() => setPicked(o.id)}>{KIND[o.kind] ?? o.kind}</button></td>
                           <td className="font-mono text-xs" title={o.commit}>{short(o.commit)}</td>
                           <td className="text-xs text-meta">{fmtDate(o.started)}</td>
-                          <td className="font-mono text-xs">{o.finished ? `${Math.max(1, Math.round((o.finished - o.started) / 60))} min` : "—"}</td>
+                          <td className="tabular-nums text-xs">{o.finished ? `${Math.max(1, Math.round((o.finished - o.started) / 60))} min` : "—"}</td>
                           <td><ResultBadge o={o} /></td>
                         </tr>
                       ))}
@@ -374,15 +404,6 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
           )}
         </div>
 
-        {app.source === "git" && <GitHook base={base} app={app.name} auto={app.auto_deploy} />}
-
-        {(app.deploy_key || isSshRepo(app.repo)) && (
-          <div className="grid gap-2">
-            <p className="mm-label-caps">Deploy key (à ajouter au dépôt, en lecture seule)</p>
-            {app.deploy_key && <CodeBlock text={app.deploy_key} />}
-            <KeyActions h={h} app={app.name} onChanged={onChanged} />
-          </div>
-        )}
       </div>
 
       <Dialog open={!!remove} onClose={() => setRemove(undefined)} size="sm" title={`Supprimer ${app.name}`}
@@ -390,7 +411,7 @@ function AppDialog({ h, app, onClose, onChanged }: { h: Host; app: NodeApp; onCl
         footer={<><Button variant="secondary" onClick={() => setRemove(undefined)}>Annuler</Button>
           <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => { const p = remove!.purge; setRemove(undefined); act(p ? "node_purge" : "node_remove"); }}>Supprimer l'app</Button></>}>
         <div className="grid gap-4 text-sm leading-relaxed text-body">
-          {app.managed_by_ansible && <Alert kind="info" title="Gérée par Ansible">Retirez-la aussi de nodejs_apps, sinon elle sera recréée au prochain passage du playbook.</Alert>}
+          {app.managed_by_ansible && <Alert kind="info" title="Gérée par Ansible">Retire-la aussi de nodejs_apps, sinon elle sera recréée au prochain passage du playbook.</Alert>}
           <Checkbox label="Supprimer aussi le code et l'historique" hint={`/srv/node-apps/${app.name} et ses journaux de déploiement`} checked={!!remove?.purge} onChange={(e) => setRemove({ purge: e.target.checked })} />
         </div>
       </Dialog>
@@ -415,43 +436,46 @@ export function NodeAppsPanel({ h, onChanged, base }: { h: Host; onChanged?: () 
           {ui && <ButtonAnchor variant="secondary" size="sm" icon={<ExternalLink size={14} />} href={ui} target="_blank" rel="noreferrer" title="Interface node-app-ui de l'hôte (certificat auto-signé à accepter au premier accès)">Ouvrir Node.js UI</ButtonAnchor>}
         </span>}>
         {snap.error && <Alert kind="error" title="node-app a signalé une erreur" className="m-4">{snap.error}</Alert>}
-        <div className="mm-table-wrap">
-          <table className="mm-table min-w-[52rem]">
+        <ul className="mm-list sm:hidden">
+          {snap.apps.length === 0 && <li className="px-6 py-8 text-center text-sm text-meta">Aucune application. Crées-en une avec « Nouvelle app ».</li>}
+          {snap.apps.map((a) => (
+            <li key={a.name}>
+              <button type="button" className="mm-list__item w-full items-center text-left" onClick={() => setOpen(a.name)}>
+                <span className="min-w-0">
+                  <span className="mm-list__title block truncate">{a.name}</span>
+                  <span className="mm-list__meta block truncate">{[a.port > 0 && `Port ${a.port}`, a.status === "online" && `${a.memory_mb} Mo`].filter(Boolean).join(" · ") || appSource(a)}</span>
+                </span>
+                <AppState a={a} />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="mm-table-wrap hidden sm:block">
+          <table className="mm-table min-w-[48rem]">
             <thead><tr><th scope="col">Application</th><th scope="col">État</th><th scope="col" className="mm-col-num">Port</th><th scope="col" className="mm-col-num">Mémoire</th><th scope="col">Dernière opération</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
-              {snap.apps.length === 0 && <tr><td colSpan={6} className="text-center text-meta">Aucune application. Créez-en une avec « Nouvelle app », ou node-app new sur l'hôte.</td></tr>}
-              {snap.apps.map((a) => {
-                const [st, stTone] = STATUS[a.status] ?? [a.status, "muted" as Tone];
-                const last = a.history[0];
-                return (
-                  <tr key={a.name}>
-                    <td className="mm-col-strong max-w-[22rem]">
-                      <span className="flex min-w-0 items-center gap-2.5 py-1.5">
-                        <StatusIcon kind={appKind(a)} />
-                        <span className="min-w-0">
-                          <span className="block truncate">{a.name}</span>
-                          <span className="block truncate font-mono text-xs font-normal text-meta" title={a.repo}>{a.source === "local" ? "code local" : `${a.repo.replace(/^.*[/:]([^/:]+\/[^/]+?)(\.git)?$/, "$1")} · ${a.branch}`}</span>
-                        </span>
-                      </span>
-                    </td>
-                    <td>
-                      <Badge tone={stTone} dot>{st}</Badge>
-                      {a.restarts > 0 && <span className="mt-0.5 block text-xs text-meta">{a.restarts} redémarrage(s)</span>}
-                      {a.failed_commit && <span className="mt-0.5 block text-xs text-red">échec de {short(a.failed_commit)}</span>}
-                    </td>
-                    <td className="mm-col-num font-mono text-xs">{a.port || "—"}</td>
-                    <td className="mm-col-num font-mono text-xs">{a.status === "online" ? `${a.memory_mb} Mo` : "—"}</td>
-                    <td>{last ? <span className="inline-flex flex-wrap items-center gap-2"><ResultBadge o={last} /><span className="text-xs text-meta">{KIND[last.kind] ?? last.kind} · {fmtAgo(last.started)}</span></span> : <span className="text-meta">—</span>}</td>
-                    <td className="w-px text-right"><Button variant="secondary" size="sm" onClick={() => setOpen(a.name)}>Gérer</Button></td>
-                  </tr>
-                );
-              })}
+              {snap.apps.length === 0 && <tr><td colSpan={6} className="text-center text-meta">Aucune application. Crées-en une avec « Nouvelle app ».</td></tr>}
+              {snap.apps.map((a) => (
+                <tr key={a.name} className="cursor-pointer" onClick={() => setOpen(a.name)}>
+                  <td className="mm-col-strong max-w-[22rem]">
+                    <span className="block truncate">{a.name}</span>
+                    <span className="block truncate font-mono text-xs font-normal text-meta" title={a.repo}>{appSource(a)}</span>
+                  </td>
+                  <td><AppState a={a} /></td>
+                  <td className="mm-col-num">{a.port || "—"}</td>
+                  <td className="mm-col-num">{a.status === "online" ? `${a.memory_mb} Mo` : "—"}</td>
+                  <td><LastOp a={a} /></td>
+                  <td className="w-px text-right"><Button variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); setOpen(a.name); }}>Gérer</Button></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </Card>
       {snap.ssh_keys.length > 0 && (
-        <Card flush title="Clés SSH" sub="Clés partagées (essayées pour tous les dépôts) et deploy keys des apps. Remplacement et import : fiche de l'app (Gérer).">
+        <details className="mm-card">
+          <summary className="cursor-pointer p-6 font-semibold text-h1">Clés SSH ({snap.ssh_keys.length})</summary>
+          <p className="px-6 pb-4 text-sm text-body">Clés partagées, essayées pour tous les dépôts, et deploy keys des apps. Remplacement et import : Gérer, Réglages.</p>
           <div className="mm-table-wrap">
             <table className="mm-table">
               <thead><tr><th scope="col">Clé</th><th scope="col">Type</th><th scope="col">Empreinte</th></tr></thead>
@@ -460,7 +484,7 @@ export function NodeAppsPanel({ h, onChanged, base }: { h: Host; onChanged?: () 
               ))}</tbody>
             </table>
           </div>
-        </Card>
+        </details>
       )}
       {current && <AppDialog h={h} app={current} onClose={() => setOpen(undefined)} onChanged={onChanged} />}
       {creating && <CreateAppDialog h={h} onClose={() => setCreating(false)} onChanged={onChanged} />}

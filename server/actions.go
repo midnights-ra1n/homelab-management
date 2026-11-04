@@ -129,7 +129,7 @@ func (s *Server) handleUpdateAllAgents(w http.ResponseWriter, r *http.Request) {
 			sent++
 		}
 	}
-	logName(r, strconv.Itoa(sent)+" agent(s)")
+	logName(r, plural(strconv.Itoa(sent)+" agent(s)"))
 	events.publish("hosts")
 	writeJSON(w, 200, map[string]int{"sent": sent, "busy": busy})
 }

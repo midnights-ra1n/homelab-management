@@ -64,7 +64,7 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[60rem] text-left text-sm">
           <thead>
-            <tr className="border-b border-line-subtle font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
+            <tr className="border-b border-line-subtle mm-label-caps text-meta">
               <th className="px-5 py-3 font-medium">{tr("Déploiement")}</th>
               <th className="px-3 py-3 font-medium">{tr("Nœud")}</th>
               <th className="px-3 py-3 font-medium">{tr("ID")}</th>
@@ -90,7 +90,7 @@ export function DeploymentList({ deployments }: { deployments: Deployment[] }) {
                           {d.title}
                         </Link>
                         <span className="mt-0.5 flex items-center gap-2">
-                          <Badge tone={DEPLOYMENT_KIND_META[d.kind].tone} className="px-2 py-0 text-[0.68rem]">
+                          <Badge tone={DEPLOYMENT_KIND_META[d.kind].tone} className="px-2 py-0 text-xs">
                             {tr(DEPLOYMENT_KIND_META[d.kind].label)}
                           </Badge>
                           {d.public_fqdn && <span className="truncate font-mono text-xs text-meta">{d.public_fqdn}</span>}

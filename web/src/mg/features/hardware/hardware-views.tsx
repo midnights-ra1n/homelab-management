@@ -71,7 +71,7 @@ function ItemActions({ item, options }: { item: HardwareItem; options: HardwareO
         action={() => deleteHardwareAction(item.id)}
         message={
           item.components > 0
-            ? tr("Supprimer « {name} » ? Ses {n} composant(s) seront remis en stock.", { name: item.name, n: item.components })
+            ? tr("Supprimer « {name} » ? {n} composant(s) remis en stock.", { name: item.name, n: item.components })
             : tr("Supprimer « {name} » du stock ?", { name: item.name })
         }
       />

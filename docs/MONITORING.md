@@ -57,7 +57,7 @@ L'état global de l'infrastructure est le pire état des hôtes et des sondes ac
 
 ## Hôtes
 
-La liste montre l'état, le système, le processeur, la mémoire, les disques et le réseau de chaque machine. La fiche d'un hôte ajoute :
+La liste montre l'état, le processeur, la mémoire, le disque et le dernier contact de chaque machine, avec un filtre *Node.js*. La fiche d'un hôte s'organise en onglets (*Aperçu*, *Applications*, *Historique*, *Disques*, *Réseau*, *Réglages*) :
 
 - **graphiques** (processeur, mémoire, swap, disque, réseau, charge, températures) sur 1 h à 90 jours ;
 - **mesures en direct** : l'agent envoie une mesure par seconde tant que la fiche est ouverte ;

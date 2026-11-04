@@ -12,7 +12,7 @@ export default function NewAssetPage({ searchParams }: PageProps<"/[lang]/invent
     <>
       <PageHeader
         title={tr("Nouvel élément")}
-        description={tr("Serveur physique, VM, conteneur LXC ou Docker, équipement réseau : renseigne son identité, son adressage et sa configuration.")}
+        description={tr("Renseigne l'identité, l'adressage et la configuration du nouvel élément.")}
       />
       <Suspense fallback={<Skeleton className="h-[40rem] rounded-2xl" />}>
         <Form searchParams={searchParams} />

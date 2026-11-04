@@ -1,10 +1,9 @@
 import { use } from "react";
 import { cn } from "@/lib/utils";
 import { getT } from "@/i18n/server";
+import { Skeleton } from "../../../ui";
 
-export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("skeleton rounded-xl bg-elevated", className)} />;
-}
+export { Skeleton };
 
 export function SkeletonGrid({ count = 6, className }: { count?: number; className?: string }) {
   const tr = use(getT());

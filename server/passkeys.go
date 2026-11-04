@@ -160,7 +160,7 @@ func (s *Server) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request
 	ip := s.clientIP(r)
 	setLogActor(r, "IP "+ip)
 	if !s.limiter.allow("login:" + ip) {
-		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessayez dans une minute")
+		writeErr(w, http.StatusTooManyRequests, "Trop de tentatives, réessaie dans une minute")
 		return
 	}
 	wa, origin, ok := s.relyingParty(r)
@@ -171,7 +171,7 @@ func (s *Server) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request
 	sess, ok := takePkSession(r.URL.Query().Get("session"), 0, origin)
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<10))
 	if !ok || err != nil {
-		writeErr(w, 400, "Demande de connexion expirée, réessayez")
+		writeErr(w, 400, "Demande de connexion expirée, réessaie")
 		return
 	}
 	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(body))
@@ -270,7 +270,7 @@ func (s *Server) handlePasskeyRegisterFinish(w http.ResponseWriter, r *http.Requ
 	uid := r.Context().Value(ctxKey{}).(int64)
 	sess, ok := takePkSession(r.URL.Query().Get("session"), uid, origin)
 	if !ok {
-		writeErr(w, 400, "Demande expirée, réessayez")
+		writeErr(w, 400, "Demande expirée, réessaie")
 		return
 	}
 	user, err := s.loadPkUser(uid)

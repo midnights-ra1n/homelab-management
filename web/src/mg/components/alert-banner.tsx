@@ -1,15 +1,13 @@
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef } from "react";
-import { AlertTriangle, ArrowUpRight } from "../../shared/icons";
+import { ArrowUpRight } from "../../shared/icons";
 import { NotificationsMenu, type NotifFeed } from "../../shared/notifications";
 import { usePolled } from "../../shared/poll";
-import { TONE_VAR } from "@/lib/constants";
 import type { MonitorAlert } from "@/lib/monitor/alerts";
-import { usePathname, useT } from "@/i18n/client";
-import { StatusIcon } from "./status-icon";
+import { useT } from "@/i18n/client";
 import { ButtonLink } from "@/components/ui/button";
+import { Alert } from "../../ui";
 import { alertsFrom } from "@/lib/monitor/alerts";
 import type { Source } from "@/lib/integrations";
 import type { HlmData } from "@/lib/integrations/hlm";
@@ -37,7 +35,6 @@ function summary(alerts: MonitorAlert[], tr: ReturnType<typeof useT>) {
   const critical = alerts.filter((a) => a.tone === "red").length;
   return {
     critical,
-    color: TONE_VAR[critical ? "red" : "yellow"],
     title: critical ? tr("{n} incident(s) en cours", { n: critical }) : tr("{n} point(s) d'attention", { n: alerts.length }),
   };
 }
@@ -48,71 +45,12 @@ export function AlertBanner({ initial }: { initial: MonitorAlert[] }) {
   // Une alerte change : on rafraîchit aussi le widget Monitoring rendu côté serveur.
   const alerts = useAlerts(initial, true);
   if (!alerts.length) return null;
-  const { critical, color, title } = summary(alerts, tr);
+  const { critical, title } = summary(alerts, tr);
   return (
-    <section
-      role={critical ? "alert" : "status"}
-      className="rounded-2xl border p-5 sm:p-6"
-      style={{
-        background: `color-mix(in srgb, ${color} 12%, var(--mm-surface))`,
-        borderColor: `color-mix(in srgb, ${color} 50%, var(--mm-border))`,
-      }}
-    >
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: color, color: "var(--mm-surface)" }}>
-          <AlertTriangle size={20} aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-lg font-semibold sm:text-xl" style={{ color }}>
-            {title}
-          </p>
-          {critical > 0 && alerts.length > critical && (
-            <p className="text-sm text-meta">{tr("+ {n} avertissement(s)", { n: alerts.length - critical })}</p>
-          )}
-        </div>
-        <ButtonLink href="/monitoring" variant="secondary" size="sm" icon={<ArrowUpRight size={14} />}>
-          {tr("Voir le monitoring")}
-        </ButtonLink>
-      </div>
-      <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
-        {alerts.slice(0, 6).map((a, i) => (
-          <li key={i}>
-            <Link href={a.href} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-page">
-              <StatusIcon kind={a.tone === "red" ? "down" : "warn"} size={15} />
-              <span className="truncate text-h1">{a.text}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** Version discrète pour les autres pages : une ligne, masquée sur le tableau de bord. */
-export function AlertStrip() {
-  const tr = useT();
-  const pathname = usePathname();
-  const alerts = useAlerts(null);
-  // Accueil et Monitoring ont leur propre bandeau d'alertes.
-  if (!alerts.length || pathname === "/" || pathname === "/monitoring") return null;
-  const { critical, color, title } = summary(alerts, tr);
-  return (
-    <Link
-      href="/monitoring"
-      role={critical ? "alert" : "status"}
-      className="mb-6 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition-colors hover:brightness-110"
-      style={{
-        background: `color-mix(in srgb, ${color} 8%, var(--mm-surface))`,
-        borderColor: `color-mix(in srgb, ${color} 35%, var(--mm-border))`,
-      }}
-    >
-      <AlertTriangle size={14} className="shrink-0" style={{ color }} aria-hidden="true" />
-      <span className="shrink-0 font-medium" style={{ color }}>
-        {title}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-meta">{alerts[0].text}</span>
-      <ArrowUpRight size={14} className="shrink-0 text-meta" aria-hidden="true" />
-    </Link>
+    <Alert kind={critical ? "error" : "warning"} title={title}
+      action={<ButtonLink href="/monitoring" variant="secondary" size="sm" icon={<ArrowUpRight size={14} />}>{tr("Voir le monitoring")}</ButtonLink>}>
+      {critical > 0 && alerts.length > critical ? tr("+ {n} avertissement(s)", { n: alerts.length - critical }) : undefined}
+    </Alert>
   );
 }
 

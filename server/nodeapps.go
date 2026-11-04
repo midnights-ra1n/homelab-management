@@ -99,7 +99,12 @@ func nodeProblem(a nodeApp) string {
 	return ""
 }
 
-func (s *Server) storeNodeApps(id int64, hostName string, d *nodeSnapshot) error {
+// nodeRefresh: an unchanged snapshot, sent every 30 s, is written this often so that its date
+// stays meaningful. Without this, every host rewrites its whole history in the WAL twice a
+// minute and reloads every open page for nothing.
+const nodeRefresh = 5 * 60
+
+func (s *Server) storeNodeApps(id int64, hostName string, d *nodeSnapshot) (bool, error) {
 	d.Apps, d.SSHKeys = capped(d.Apps, 200), capped(d.SSHKeys, 100)
 	d.Online, d.Failing = 0, 0
 	var problems, fresh []string
@@ -145,10 +150,17 @@ func (s *Server) storeNodeApps(id int64, hostName string, d *nodeSnapshot) error
 	if len(fresh) > 0 && s.getSetting("notify_node_apps", "true") == "true" {
 		s.notifier.add(Event{Kind: KindNodeApp, Name: hostName, Message: strings.Join(fresh, " ; "), At: time.Now()})
 	}
-	d.CollectedAt = time.Now().Unix()
+	now := time.Now().Unix()
+	d.CollectedAt = prev.CollectedAt
 	b, _ := json.Marshal(d)
+	changed := string(b) != raw
+	if !changed && now-prev.CollectedAt < nodeRefresh {
+		return false, nil
+	}
+	d.CollectedAt = now
+	b, _ = json.Marshal(d)
 	_, err := s.db.Exec(`UPDATE hosts SET node_apps=? WHERE id=?`, string(b), id)
-	return err
+	return changed, err
 }
 
 /* ---------- Reads on demand (logs, operation logs) ---------- */
@@ -404,7 +416,7 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal([]byte(res.Text), &out)
 	if out.NeedKey != "" {
 		logSkip(r) // nothing created yet
-		writeJSON(w, 409, map[string]string{"need_key": out.NeedKey, "error": "Ajoutez la deploy key au dépôt, puis réessayez."})
+		writeJSON(w, 409, map[string]string{"need_key": out.NeedKey, "error": "Ajoute la deploy key au dépôt, puis réessaie."})
 		return
 	}
 	writeJSON(w, 201, map[string]string{"warnings": out.Warnings})

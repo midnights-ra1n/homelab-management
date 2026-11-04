@@ -43,7 +43,7 @@ Ce guide décrit ce qu'une app native attend du hub Midnights Monitoring et comm
 
 L'app doit joindre le hub en **HTTPS** avec un certificat valide (reverse proxy, voir le [README](../README.md#https-derrière-un-reverse-proxy)). Le jeton circule dans chaque requête, et App Transport Security refuse le HTTP par défaut.
 
-Pour un hub joint uniquement sur le réseau local en HTTP : `NSAllowsLocalNetworking` autorise les noms sans domaine et en `.local` ; pour un autre nom, une exception `NSExceptionDomains` limitée à ce nom. Jamais `NSAllowsArbitraryLoads`. Le jeton circulant alors en clair, réservez ce cas à un réseau de confiance. Ajoutez `NSLocalNetworkUsageDescription` dès que le hub est joint par une adresse du réseau local.
+Pour un hub joint uniquement sur le réseau local en HTTP : `NSAllowsLocalNetworking` autorise les noms sans domaine et en `.local` ; pour un autre nom, une exception `NSExceptionDomains` limitée à ce nom. Jamais `NSAllowsArbitraryLoads`. Le jeton circulant alors en clair, réservez ce cas à un réseau de confiance. Ajoute `NSLocalNetworkUsageDescription` dès que le hub est joint par une adresse du réseau local.
 
 Rien n'est à activer dans *Réglages → API* : les jetons obtenus par connexion fonctionnent avec l'API désactivée.
 
@@ -90,7 +90,7 @@ Après redémarrage, *Réglages → API → Appareils* n'affiche plus « APNs no
 1. **Identifiant d'app** (*Certificates, Identifiers & Profiles → Identifiers*) avec les capacités *Push Notifications* et *App Groups*, plus un identifiant par extension (widgets, notification).
 2. **App Group** commun à l'app et à ses extensions : l'adresse du hub et le cache des widgets y sont partagés.
 3. **Keychain Sharing** commun : le jeton doit être lisible par l'app, l'extension de widgets et l'extension de notification.
-4. **Clé APNs** (*Keys → +*) : *Apple Push Notifications service (APNs)*, environnement *Sandbox & Production*. Le `.p8` ne se télécharge **qu'une fois** ; notez le *Key ID*.
+4. **Clé APNs** (*Keys → +*) : *Apple Push Notifications service (APNs)*, environnement *Sandbox & Production*. Le `.p8` ne se télécharge **qu'une fois** ; note le *Key ID*.
 
 | Capacité | App | Widgets | Notification |
 |---|---|---|---|
@@ -255,8 +255,8 @@ Depuis le monitoring seul, `GET /api/v1/overview` donne déjà les problèmes tr
 
 - `host_ref` (facultatif) lie le rappel à l'hôte : `h{id}` sur le monitoring, `{id de la source}:{id de l'hôte}` sur la gestion. Affichez le nom actuel de l'hôte qui porte cette référence, et `host` (le nom enregistré) seulement si aucun ne correspond : un hôte renommé garde ainsi ses rappels.
 - `repeat_days` : 0 (une fois) à 366. « Fait » reprogramme le rappel à aujourd'hui + `repeat_days`, dans le fuseau du serveur.
-- `due` et `today` sont calculés par le serveur dans son fuseau horaire : utilisez-les plutôt que la date de l'appareil.
-- Erreurs `400` : `Choisissez un hôte`, `Date invalide`, `La répétition va de 0 à 366 jours`, `500 caractères maximum pour la note`.
+- `due` et `today` sont calculés par le serveur dans son fuseau horaire : utilise-les plutôt que la date de l'appareil.
+- Erreurs `400` : `Choisis un hôte`, `Date invalide`, `La répétition va de 0 à 366 jours`, `500 caractères maximum pour la note`.
 - **Notification** : sur le monitoring, un rappel arrivé à échéance part une fois par les canaux d'alerte (push et e-mail), comme un événement `{"kind": "Rappel", "name": "nas", "message": "Mise à jour prévue le 2026-10-27 · noyau"}`. Les rappels de la gestion n'envoient rien : pour eux, l'app peut programmer une notification locale (`UNCalendarNotificationTrigger`) à la date `due_date`.
 
 **Rafraîchissement.** Le web relit les trois sources toutes les 30 s quand l'onglet est visible. L'app peut relire au retour au premier plan et sur les événements `hosts` du flux du monitoring.
@@ -346,12 +346,12 @@ Une notification par fenêtre de regroupement (60 s par défaut, *Réglages → 
 1. Lancez l'app sur un appareil réel et acceptez les notifications.
 2. *Réglages → API → Appareils* : l'appareil apparaît, avec l'étiquette « développement » pour un build Xcode.
 3. *Envoyer un test* : une notification « Notification de test » arrive. En cas d'échec, la colonne *Dernier envoi* affiche l'erreur d'Apple.
-4. Pour un vrai changement d'état, arrêtez l'agent d'un hôte (`sudo systemctl stop hlm-agent`) : après environ 3 intervalles d'agent puis la fenêtre de regroupement, la notification arrive.
+4. Pour un vrai changement d'état, arrête l'agent d'un hôte (`sudo systemctl stop hlm-agent`) : après environ 3 intervalles d'agent puis la fenêtre de regroupement, la notification arrive.
 
 ## Widgets et actions rapides
 
 - **Une seule route** : `GET /widgets` donne l'état global, les comptes par état, au plus 10 problèmes et la consommation des prises. N'enchaînez pas d'autres appels dans un widget.
-- **Cache** : gardez la dernière réponse dans l'App Group et affichez-la quand le hub est injoignable, avec un indicateur discret plutôt qu'une erreur.
+- **Cache** : garde la dernière réponse dans l'App Group et affichez-la quand le hub est injoignable, avec un indicateur discret plutôt qu'une erreur.
 - **Budget** : WidgetKit limite les rafraîchissements (quelques dizaines par jour) ; 15 min est une demande, pas une garantie. L'extension de notification et le retour de l'app au premier plan gardent les widgets à jour entre deux créneaux.
 - **Écran verrouillé** : le jeton doit être lisible après le premier déverrouillage (`AfterFirstUnlockThisDeviceOnly`) pour que les widgets fonctionnent.
 - **Boutons de widget et Raccourcis** (App Intents) : la maintenance d'un hôte ou d'une sonde passe par `PUT /hosts/{id}/maintenance` ou `PUT /monitors/{id}/maintenance` (scope `maintenance:write`). Après l'action, la timeline relit `/widgets`, où l'élément sort des problèmes.
@@ -366,14 +366,14 @@ Une notification par fenêtre de regroupement (60 s par défaut, *Réglages → 
 | `monitors_view` | oui | `cards`, `table` |
 | `ios.*` (ex. `ios.home.sections`) | non | libres, propres à l'app |
 
-Préfixez les clés propres à l'app : le web les ignore, sans risque de collision avec une future clé. Relisez les préférences au lancement et au retour au premier plan ; gardez une copie locale pour le mode hors ligne.
+Préfixez les clés propres à l'app : le web les ignore, sans risque de collision avec une future clé. Relisez les préférences au lancement et au retour au premier plan ; garde une copie locale pour le mode hors ligne.
 
 ## Format des réponses
 
 - Noms de champs en `snake_case`. Ne convertissez pas automatiquement les clés en camelCase : la conversion toucherait aussi les clés de dictionnaires (`by_status.major_outage`, clés des préférences). Déclarez les correspondances champ par champ.
 - Horodatages en **secondes Unix**, sauf les champs signalés en millisecondes dans la [référence](API.md#conventions).
-- États : `operational`, `degraded`, `minor_outage`, `major_outage`, `maintenance`, `unknown` ([valeurs d'état](API.md#valeurs-détat)). Prévoyez une valeur inconnue : de nouveaux états ou champs peuvent être ajoutés sans changer de version.
-- Erreurs : `{"error": "…"}`, message en français prêt à afficher. `429` porte `Retry-After` ; ne réessayez que les `429`, `502` et erreurs réseau.
+- États : `operational`, `degraded`, `minor_outage`, `major_outage`, `maintenance`, `unknown` ([valeurs d'état](API.md#valeurs-détat)). Prévois une valeur inconnue : de nouveaux états ou champs peuvent être ajoutés sans changer de version.
+- Erreurs : `{"error": "…"}`, message en français prêt à afficher. `429` porte `Retry-After` ; ne réessaie que les `429`, `502` et erreurs réseau.
 
 ## Sécurité
 
@@ -383,7 +383,7 @@ Préfixez les clés propres à l'app : le web les ignore, sans risque de collisi
 - **HTTPS avec un certificat valide.** Ne désactivez pas la validation TLS ; préférez un certificat Let's Encrypt sur le reverse proxy.
 - **Pas de CORS** : une app native n'est pas un navigateur ; laissez *Origines autorisées* vide pour elle.
 - **Écran verrouillé** : le texte des notifications peut contenir des noms d'hôtes et des messages d'erreur ; l'utilisateur peut masquer les aperçus dans les réglages du système.
-- **Clé APNs** : elle permet d'envoyer des notifications à toutes vos apps. Lisible seulement par l'utilisateur du serveur, hors de tout dépôt Git ; révoquez-la dans le compte développeur en cas de fuite.
+- **Clé APNs** : elle permet d'envoyer des notifications à toutes vos apps. Lisible seulement par l'utilisateur du serveur, hors de tout dépôt Git ; révoque-la dans le compte développeur en cas de fuite.
 
 ## Dépannage
 

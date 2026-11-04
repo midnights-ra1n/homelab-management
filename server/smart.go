@@ -97,22 +97,22 @@ func analyzeDisk(d smartDisk) diskHealth {
 		raise(DiskFailing, fmt.Sprintf("Réserve de cellules épuisée (%.0f %%, seuil %.0f %%)", *d.SparePct, *d.SpareThreshPct))
 	}
 	if n := v(d.Pending); n > 0 {
-		raise(DiskReplace, fmt.Sprintf("%.0f secteur(s) illisible(s) en attente de réallocation", n))
+		raise(DiskReplace, plural(fmt.Sprintf("%.0f secteur(s) illisible(s) en attente de réallocation", n)))
 	}
 	if n := v(d.OfflineUncorr); n > 0 {
-		raise(DiskReplace, fmt.Sprintf("%.0f secteur(s) irrécupérable(s)", n))
+		raise(DiskReplace, plural(fmt.Sprintf("%.0f secteur(s) irrécupérable(s)", n)))
 	}
 	if n := v(d.ReportedUncorr); n > 0 {
-		raise(DiskReplace, fmt.Sprintf("%.0f erreur(s) de lecture non corrigée(s)", n))
+		raise(DiskReplace, plural(fmt.Sprintf("%.0f erreur(s) de lecture non corrigée(s)", n)))
 	}
 	if n := v(d.MediaErrors); n > 0 {
-		raise(DiskReplace, fmt.Sprintf("%.0f erreur(s) d'intégrité du support", n))
+		raise(DiskReplace, plural(fmt.Sprintf("%.0f erreur(s) d'intégrité du support", n)))
 	}
 	switch n := v(d.Reallocated); {
 	case n >= 100:
 		raise(DiskReplace, fmt.Sprintf("%.0f secteurs déjà remplacés : la surface se dégrade", n))
 	case n > 0:
-		raise(DiskWatch, fmt.Sprintf("%.0f secteur(s) remplacé(s) : à surveiller", n))
+		raise(DiskWatch, plural(fmt.Sprintf("%.0f secteur(s) remplacé(s) : à surveiller", n)))
 	}
 	if w := d.WearUsedPct; w != nil {
 		switch {
@@ -123,7 +123,7 @@ func analyzeDisk(d smartDisk) diskHealth {
 		}
 	}
 	if n := v(d.CRCErrors); n > 0 {
-		raise(DiskWatch, fmt.Sprintf("%.0f erreur(s) de transmission : vérifiez le câble SATA", n))
+		raise(DiskWatch, plural(fmt.Sprintf("%.0f erreur(s) de transmission : vérifie le câble SATA", n)))
 	}
 	if t := d.TemperatureC; t != nil {
 		limit := 50.0
@@ -172,7 +172,7 @@ func analyzeDisk(d smartDisk) diskHealth {
 	}
 
 	if h.Health == DiskGood && h.LifeLeftDays != nil && *h.LifeLeftDays < 365 {
-		raise(DiskWatch, "Fin de vie estimée dans moins d'un an : prévoyez le remplacement")
+		raise(DiskWatch, "Fin de vie estimée dans moins d'un an : prévois le remplacement")
 		h.Score = min(h.Score, 85)
 		h.Usable = true
 	}
@@ -180,8 +180,8 @@ func analyzeDisk(d smartDisk) diskHealth {
 	h.Summary = map[string]string{
 		DiskGood:    "Bon état, utilisable sans réserve.",
 		DiskWatch:   "Utilisable, à surveiller.",
-		DiskReplace: "Encore lisible mais à remplacer rapidement : sauvegardez les données.",
-		DiskFailing: "Défaillance en cours : sauvegardez et remplacez immédiatement.",
+		DiskReplace: "Encore lisible mais à remplacer rapidement : sauvegarde les données.",
+		DiskFailing: "Défaillance en cours : sauvegarde et remplace immédiatement.",
 	}[h.Health]
 	return h
 }

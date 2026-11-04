@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { CircleAlert, Container, Download, LoaderCircle, Server } from "../shared/icons";
+import { Container, Download, LoaderCircle } from "../shared/icons";
 import { actionBusy, api, fmtAgo, fmtBytes, fmtPct, type DockerContainer, type Host } from "../api";
 import {
-  Alert, Badge, Button, Card, Dialog, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, StatusIcon, cn,
+  Alert, Badge, Button, Card, Dialog, EmptyState, Link, PageHeader, SECTIONS, STAT_GRID, SectionTitle, Segmented, Skeleton, Stat, cn,
   type StatusKind, type Tone, usePoll,
 } from "../ui";
 import { useHostAction } from "./AgentVersion";
+import { plural } from "../shared/plural";
 
 const STATE: Record<string, [string, Tone]> = {
   running: ["En cours", "green"], exited: ["Arrêté", "muted"], restarting: ["Redémarre", "yellow"],
@@ -61,22 +62,19 @@ export function ContainersTable({ h, filter = "all", onChanged }: { h: Host; fil
               return (
                 <tr key={c.id}>
                   <td className="mm-col-strong max-w-[20rem]">
-                    <span className="flex min-w-0 items-center gap-2.5 py-1.5">
-                      <StatusIcon kind={containerKind(c)} />
-                      <span className="min-w-0">
-                        <span className="block truncate">{c.name}</span>
-                        {c.compose_project && <span className="block truncate font-mono text-xs font-normal text-meta">{c.compose_project} / {c.compose_service}</span>}
-                      </span>
+                    <span className="block min-w-0 py-1.5">
+                      <span className="block truncate">{c.name}</span>
+                      {c.compose_project && <span className="block truncate font-mono text-xs font-normal text-meta">{c.compose_project} / {c.compose_service}</span>}
                     </span>
                   </td>
                   <td>
                     <Badge tone={stTone} dot>{c.health && c.health !== "healthy" ? `${st} · ${c.health}` : st}</Badge>
-                    {c.restart_count > 0 && <span className="mt-0.5 block text-xs text-meta">{c.restart_count} redémarrage(s)</span>}
+                    {c.restart_count > 0 && <span className="mt-0.5 block text-xs text-meta">{plural(`${c.restart_count} redémarrage(s)`)}</span>}
                   </td>
                   <td className="max-w-64 truncate font-mono text-xs text-meta" title={c.image}>{c.image}</td>
-                  <td className="mm-col-num font-mono text-xs">{c.state === "running" ? fmtPct(c.cpu_pct) : "—"}</td>
-                  <td className="mm-col-num font-mono text-xs">{c.state === "running" && c.mem_used != null ? fmtBytes(c.mem_used) : "—"}</td>
-                  <td className="mm-col-num font-mono text-xs">{c.state === "running" && c.net_rx != null ? `${fmtBytes(c.net_rx)} / ${fmtBytes(c.net_tx)}` : "—"}</td>
+                  <td className="mm-col-num">{c.state === "running" ? fmtPct(c.cpu_pct) : "—"}</td>
+                  <td className="mm-col-num">{c.state === "running" && c.mem_used != null ? fmtBytes(c.mem_used) : "—"}</td>
+                  <td className="mm-col-num">{c.state === "running" && c.net_rx != null ? `${fmtBytes(c.net_rx)} / ${fmtBytes(c.net_tx)}` : "—"}</td>
                   <td><Badge tone={upTone} title={upHint}>{up}</Badge></td>
                   <td className="w-px text-right"><ContainerAction h={h} c={c} onAsk={() => setConfirm(c)} /></td>
                 </tr>
@@ -105,17 +103,17 @@ export function ContainersPage() {
   const updates = all.filter((c) => c.update === "available").length;
   return (
     <>
-      <PageHeader title="Conteneurs" description="Conteneurs Docker de chaque hôte, relevés toutes les minutes. Les images sont comparées à leur registre toutes les 6 heures."
+      <PageHeader title="Conteneurs" description="Conteneurs Docker de chaque hôte, relevés toutes les minutes."
         actions={<Segmented label="Filtre" value={filter} onChange={setFilter} options={[["all", "Tous"], ["updates", "Mises à jour"], ["stopped", "Arrêtés"]]} />} />
       {error && <Alert kind="error" title="Impossible de charger les conteneurs" className="mb-6">{error}</Alert>}
       {!data && !error && <Skeleton className="h-64" />}
       {data && (
         <div className={SECTIONS}>
           <div className={STAT_GRID}>
-            <Stat label="Conteneurs" value={`${running}/${all.length}`} detail={`actifs · ${hosts.length} hôte(s) avec Docker`} icon={<Container size={16} />} />
-            <Stat label="Arrêtés ou en erreur" value={failing} icon={<CircleAlert size={16} />} tone={failing ? "red" : undefined} />
-            <Stat label="Images à mettre à jour" value={updates} icon={<Download size={16} />} tone={updates ? "yellow" : undefined} />
-            <Stat label="Hôtes Docker" value={hosts.length} icon={<Server size={16} />} />
+            <Stat label="Conteneurs" value={`${running}/${all.length}`} detail={plural(`actifs · ${hosts.length} hôte(s) avec Docker`)} />
+            <Stat label="Arrêtés ou en erreur" value={failing} tone={failing ? "red" : undefined} />
+            <Stat label="Images à mettre à jour" value={updates} tone={updates ? "yellow" : undefined} />
+            <Stat label="Hôtes Docker" value={hosts.length} />
           </div>
           {hosts.length === 0 && (
             <EmptyState icon={<Container size={20} />} title="Aucun hôte avec Docker">
@@ -124,7 +122,7 @@ export function ContainersPage() {
           )}
           {hosts.map((h) => (
             <section key={h.id} aria-label={h.name}>
-              <SectionTitle actions={<span className="font-mono text-xs text-meta">relevé {fmtAgo(h.docker!.collected_at)}</span>}>
+              <SectionTitle actions={<span className="tabular-nums text-xs text-meta">relevé {fmtAgo(h.docker!.collected_at)}</span>}>
                 <Link to={`/hosts/${h.id}`} className="text-inherit no-underline hover:text-accent-text">{h.name}</Link>
                 <span className="text-meta"> · {h.docker!.running}/{h.docker!.containers.length} actifs</span>
               </SectionTitle>

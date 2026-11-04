@@ -249,7 +249,7 @@ func (s *Server) sendMail(subject, htmlBody string) error {
 	user, pass := s.getSetting("smtp_user", ""), s.getSetting("smtp_pass", "")
 	from, err := mail.ParseAddress(s.getSetting("smtp_from", ""))
 	if err != nil || host == "" {
-		return errors.New("SMTP non configuré : renseignez le serveur et l'expéditeur")
+		return errors.New("SMTP non configuré : renseigne le serveur et l'expéditeur")
 	}
 	to, err := mail.ParseAddressList(s.getSetting("smtp_to", ""))
 	if err != nil || len(to) == 0 {

@@ -148,7 +148,7 @@ const AssetNodeView = memo(function AssetNodeView({ data, selected }: NodeProps<
     <div
       className={cn(
         "flex items-center gap-3 rounded-2xl border bg-box px-3 py-2.5 transition-[opacity,box-shadow] duration-200",
-        selected ? "border-accent shadow-[0_0_24px_4px_var(--mm-accent-soft)]" : "border-line",
+        selected ? "border-accent ring-1 ring-accent" : "border-line",
         data.dimmed && "opacity-25",
       )}
       style={{ width: NODE_W, minHeight: NODE_H, borderLeft: `4px solid ${vlanTone}` }}
@@ -165,7 +165,7 @@ const AssetNodeView = memo(function AssetNodeView({ data, selected }: NodeProps<
           <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[status.tone] }} title={tr(status.label)} />
           <span className="truncate text-sm font-medium text-h1">{data.name}</span>
         </span>
-        <span className="block truncate font-mono text-[0.68rem] text-meta">
+        <span className="block truncate font-mono text-xs text-meta">
           {data.ip ?? data.hostname ?? tr(ASSET_KIND_META[data.kind].label)}
           {data.vlan ? ` · v${data.vlan}` : ""}
         </span>
@@ -190,7 +190,7 @@ const ExternalNodeView = memo(function ExternalNodeView({ data, selected }: Node
       <Globe size={15} className="text-purple" aria-hidden />
       <span>
         <span className="block text-sm font-medium text-h1">{data.label}</span>
-        <span className="block font-mono text-[0.65rem] text-meta">{tr(data.sub)}</span>
+        <span className="block font-mono text-xs text-meta">{tr(data.sub)}</span>
       </span>
       <Handle type="source" position={Position.Bottom} className="!h-2 !w-2" isConnectable={false} />
     </div>
@@ -387,7 +387,7 @@ function Flow({
 
         {/* Barre d'outils */}
         <Panel position="top-left" className="!m-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2">
-          <div className="flex flex-wrap items-center gap-1 rounded-full border border-line bg-page/90 p-1 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-1 rounded-full border border-line bg-page p-1">
             {ASSET_KINDS.filter((k) => assets.some((a) => a.kind === k)).map((k) => {
               const hidden = hiddenKinds.has(k);
               return (
@@ -418,7 +418,7 @@ function Flow({
               aria-label={tr("Mettre en évidence un VLAN")}
               value={vlanFilter ?? ""}
               onChange={(e) => setVlanFilter(e.target.value ? Number(e.target.value) : null)}
-              className="field rounded-full bg-page/90 px-4 py-2 text-xs backdrop-blur"
+              className="field rounded-full bg-page px-4 py-2 text-xs"
             >
               <option value="">{tr("Tous les VLAN")}</option>
               {vlans.map((v) => (
@@ -431,7 +431,7 @@ function Flow({
         </Panel>
 
         <Panel position="top-right" className="!m-3 flex items-center gap-2">
-          <label className="flex items-center gap-2 rounded-full border border-line bg-page/90 py-1 pl-3 pr-1 text-xs text-meta backdrop-blur">
+          <label className="flex items-center gap-2 rounded-full border border-line bg-page py-1 pl-3 pr-1 text-xs text-meta">
             {tr("Nouveau lien")}<select
               value={linkKind}
               onChange={(e) => setLinkKind(e.target.value as LinkKind)}
@@ -447,7 +447,7 @@ function Flow({
           <Button
             variant="secondary"
             size="icon"
-            className="bg-page/90 backdrop-blur"
+            className="bg-page"
             title={tr("Ajuster à l'écran")}
             aria-label={tr("Ajuster à l'écran")}
             onClick={() => fitView({ padding: 0.2, maxZoom: 1, duration: 600 })}
@@ -456,7 +456,7 @@ function Flow({
           <Button
             variant="secondary"
             size="icon"
-            className="bg-page/90 backdrop-blur"
+            className="bg-page"
             title={tr("Disposition automatique")}
             aria-label={tr("Disposition automatique")}
             onClick={() =>
@@ -478,7 +478,7 @@ function Flow({
               {selectedAsset && (
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">
+                    <p className="mm-label-caps text-meta">
                       {tr(ASSET_KIND_META[selectedAsset.kind].label)}
                     </p>
                     <p className="mt-1 truncate font-semibold text-h1">{selectedAsset.name}</p>
@@ -505,7 +505,7 @@ function Flow({
               {selectedLink && (
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{tr("Lien")}</p>
+                    <p className="mm-label-caps text-meta">{tr("Lien")}</p>
                     <p className="mt-1 truncate text-sm text-h1">
                       {assets.find((a) => a.id === selectedLink.source_id)?.name} →{" "}
                       {assets.find((a) => a.id === selectedLink.target_id)?.name}

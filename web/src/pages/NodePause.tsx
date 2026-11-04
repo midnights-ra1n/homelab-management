@@ -117,7 +117,7 @@ export function GitHook({ base, app, auto }: { base: string; app: string; auto: 
     <div className="grid gap-2">
       <p className="mm-label-caps">Déployer à chaque git push</p>
       <p className="text-sm text-meta">
-        {auto ? "L'hôte vérifie déjà les nouveaux commits toutes les 2 minutes. Pour déployer dès le push, ajoutez cette adresse aux webhooks du dépôt (événement push, GitHub, GitLab, Gitea ou Forgejo). Le hub doit être joignable depuis la forge."
+        {auto ? "L'hôte vérifie déjà les nouveaux commits toutes les 2 minutes. Pour déployer dès le push, ajoute cette adresse aux webhooks du dépôt (événement push, GitHub, GitLab, Gitea ou Forgejo). Le hub doit être joignable depuis la forge."
           : "Le déploiement automatique est désactivé pour cette app : le webhook et la vérification périodique sont sans effet."}
       </p>
       {error && <Alert kind="error" title="Adresse indisponible">{error}</Alert>}

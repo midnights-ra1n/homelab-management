@@ -104,7 +104,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
   const checked = Object.keys(probes).length;
 
   return (
-    <div className="grid grid-cols-1 gap-8 xl:gap-10">
+    <div className="grid grid-cols-1 gap-8">
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="relative flex-1">
           <Search size={18} className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-meta" aria-hidden="true" />
@@ -121,7 +121,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
             aria-label={tr("Rechercher une application")}
             className="field w-full rounded-full py-3.5 pl-13 pr-14 text-base"
           />
-          <kbd className="pointer-events-none absolute right-5 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-1.5 font-mono text-[0.7rem] text-meta sm:block">
+          <kbd className="pointer-events-none absolute right-5 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-1.5 font-mono text-xs text-meta sm:block">
             /
           </kbd>
         </div>
@@ -213,8 +213,8 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
                       rel="noreferrer"
                       aria-disabled={editing}
                       className={cn(
-                        "flex h-full items-center gap-4 rounded-2xl border border-line-subtle bg-box p-4 transition-all duration-200",
-                        !editing && "hover:-translate-y-0.5 hover:border-line-accent hover:shadow-[0_0_24px_2px_var(--mm-accent-soft)]",
+                        "flex h-full items-center gap-4 rounded-2xl border border-line-subtle bg-box p-4 transition-colors duration-300",
+                        !editing && "hover:border-line-accent",
                       )}
                     >
                       <AppIcon type={s.icon_type} value={s.icon_value} name={s.name} size={40} />
@@ -237,7 +237,7 @@ export function AppsHome({ shortcuts, groups, uploads, assets }: Props) {
                         </span>
                       </span>
                       {probe?.up && !editing && (
-                        <span className="hidden font-mono text-[0.65rem] text-meta group-hover:block">{probe.ms} {tr("ms")}</span>
+                        <span className="hidden font-mono text-xs text-meta group-hover:block">{probe.ms} {tr("ms")}</span>
                       )}
                     </a>
                     {editing && (

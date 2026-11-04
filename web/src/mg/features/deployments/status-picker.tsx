@@ -26,7 +26,7 @@ export function StatusPicker({ id, status }: { id: number; status: DeploymentSta
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={tr("État : {label}. Changer l'état", { label: tr(meta.label) })}
-        className="inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-[filter] hover:brightness-110"
+        className="inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-opacity duration-300 hover:opacity-80"
         style={{
           color: TONE_TEXT_VAR[meta.tone],
           background: `color-mix(in srgb, ${TONE_VAR[meta.tone]} 12%, transparent)`,

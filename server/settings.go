@@ -39,7 +39,7 @@ var settingDefs = map[string]string{
 	"status_enabled":          "false",
 	"status_title":            "Homelab",
 	"status_description":      "",
-	"dashboard_layout":        "",
+	"dashboard_layout_v2":     "",
 	"email_mode":              "blocks",
 	"email_blocks":            defaultEmailBlocks,
 	"status_layout":           "",
@@ -261,6 +261,7 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
+	s.forgetSettings()
 	s.loadTimezone()
 	if s.cfg.Role == RoleManagement {
 		s.handleMgSettings(w, r)
@@ -343,11 +344,13 @@ func (s *Server) retentionQueries() []retentionQuery {
 		return common
 	}
 	return append(common,
-		retentionQuery{`DELETE FROM host_metrics WHERE ts<?`, days("retention_metrics_days")},
-		retentionQuery{`DELETE FROM monitor_results WHERE ts<?`, days("retention_results_days") * 1000},
-		retentionQuery{`DELETE FROM monitor_daily WHERE day<?`, days("retention_daily_days")},
-		retentionQuery{`DELETE FROM host_daily WHERE day<?`, days("retention_daily_days")},
-		retentionQuery{`DELETE FROM traffic_hourly WHERE hour<?`, days("retention_daily_days")},
+		// Through the primary key (id, time): a plain time filter would scan the whole table
+		// every hour, with every other query of the server waiting on the single connection.
+		retentionQuery{`DELETE FROM host_metrics WHERE host_id IN (SELECT id FROM hosts) AND ts<?`, days("retention_metrics_days")},
+		retentionQuery{`DELETE FROM monitor_results WHERE monitor_id IN (SELECT id FROM monitors) AND ts<?`, days("retention_results_days") * 1000},
+		retentionQuery{`DELETE FROM monitor_daily WHERE monitor_id IN (SELECT id FROM monitors) AND day<?`, days("retention_daily_days")},
+		retentionQuery{`DELETE FROM host_daily WHERE host_id IN (SELECT id FROM hosts) AND day<?`, days("retention_daily_days")},
+		retentionQuery{`DELETE FROM traffic_hourly WHERE monitor_id IN (SELECT id FROM monitors) AND hour<?`, days("retention_daily_days")},
 	)
 }
 
@@ -417,5 +420,5 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		serverErr(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"status": overallStatus(statuses), "hosts": withoutPackages(hosts), "monitors": mons, "latency": series, "bandwidth": bw})
+	writeJSON(w, 200, map[string]any{"status": overallStatus(statuses), "hosts": listView(hosts), "monitors": mons, "latency": series, "bandwidth": bw})
 }

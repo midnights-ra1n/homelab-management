@@ -100,7 +100,7 @@ function App() {
   return (
     <>
       {devBanner}
-      <AppShell username={auth.username} version={auth.dev_mode ? "dev" : auth.version} onLogout={logout}>{page}</AppShell>
+      <AppShell username={auth.username} onLogout={logout}>{page}</AppShell>
     </>
   );
 }

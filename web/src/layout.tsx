@@ -2,14 +2,15 @@
    .mm-app [sidebar | content], bottom bar under 640 px, ⌘K search and the alert strip. */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  AlertTriangle, ArrowDownUp, ArrowUpRight, ChevronsUpDown, Container, Plug, CornerDownLeft, Ellipsis, FileBarChart, Globe, HardDrive, LayoutDashboard, ListTree, Network,
+  ArrowDownUp, ChevronsUpDown, Container, Plug, CornerDownLeft, Ellipsis, FileBarChart, HardDrive, LayoutDashboard, ListTree, Network,
   PackageCheck, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Radar, ScrollText, Search, Server, Settings, Siren, X, type IconType,
 } from "./shared/icons";
 import { api, type Overview } from "./api";
 import { incidents } from "./pages/Incidents";
 import { NotificationsMenu, type NotifFeed } from "./shared/notifications";
 import { usePolled } from "./shared/poll";
-import { Link, Logo, StatusDot, StatusIcon, STATUS_TONE, ThemeSwitch, TONE_VAR, SEARCH_KEY, cn, isActive, navigate, toggleRail, usePageAccent, usePath, useRail, type Accent } from "./ui";
+import { Alert, IconButton, Link, Logo, PageTabs, StatusDot, STATUS_TONE, ThemeSwitch, SEARCH_KEY, cn, isActive, navActive, navigate, toggleRail, usePath, useRail, type NavTabs } from "./ui";
+import { plural } from "./shared/plural";
 
 type NavItem = { href: string; label: string; short: string; icon: IconType };
 
@@ -31,12 +32,17 @@ const NAV_ITEMS: NavItem[] = [
 ];
 const byHref = (href: string) => NAV_ITEMS.find((i) => i.href === href)!;
 
-const NAV_SECTIONS: { label?: string; accent: Accent; items: NavItem[] }[] = [
-  { accent: "lavande", items: ["/", "/incidents"].map(byHref) },
-  { label: "Infrastructure", accent: "ciel", items: ["/hosts", "/supervision", "/map", "/containers", "/disks"].map(byHref) },
-  { label: "Surveillance", accent: "rose", items: ["/monitors", "/bandwidth", "/updates", "/reports", "/energy", "/logs"].map(byHref) },
-  { label: "Public", accent: "mauve", items: ["/status-page"].map(byHref) },
+const NAV_SECTIONS: { label?: string; items: NavItem[] }[] = [
+  { items: ["/", "/incidents"].map(byHref) },
+  { label: "Infrastructure", items: ["/hosts", "/map", "/monitors"].map(byHref) },
+  { label: "Suivi", items: ["/updates", "/reports", "/logs"].map(byHref) },
 ];
+/** The pages without a sidebar entry, as tabs of the entry they belong to. */
+const NAV_TABS: NavTabs = {
+  "/hosts": ["/hosts", "/supervision", "/containers", "/disks"],
+  "/monitors": ["/monitors", "/bandwidth", "/energy"],
+  "/reports": ["/reports", "/status-page"],
+};
 /** Main tabs of the mobile bar (the rest is under "Plus"). */
 const MOBILE_TABS = ["/", "/hosts", "/monitors", "/incidents"];
 const SETTINGS: NavItem = { href: "/settings", label: "Paramètres", short: "Paramètres", icon: Settings };
@@ -44,15 +50,16 @@ const SETTINGS: NavItem = { href: "/settings", label: "Paramètres", short: "Par
 const SEARCH_EVENT = "hlm:search";
 const openSearch = () => window.dispatchEvent(new Event(SEARCH_EVENT));
 
-export function AppShell({ username, version, onLogout, children }: { username: string; version: string; onLogout: () => void; children: ReactNode }) {
+export function AppShell({ username, onLogout, children }: { username: string; onLogout: () => void; children: ReactNode }) {
+  const pathname = usePath();
   return (
     <>
       <a href="#contenu" className="mm-btn mm-btn--primary sr-only z-[70] focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Aller au contenu</a>
       <div className="mm-app" data-mobile-nav="bottom">
-        <AppSidebar version={version} account={<AccountButton username={username} onLogout={onLogout} />} />
+        <AppSidebar account={<AccountButton username={username} onLogout={onLogout} />} />
         <div className="mm-app__main">
           <main id="contenu" className="mm-page flex-1 overflow-x-clip">
-            <AlertStrip />
+            <PageTabs pathname={pathname} tabs={NAV_TABS} items={NAV_ITEMS} label="Pages de la section" />
             {children}
           </main>
         </div>
@@ -66,28 +73,17 @@ export function AppShell({ username, version, onLogout, children }: { username: 
 
 /* ---------- Sidebar ---------- */
 
-function AppSidebar({ version, account }: { version: string; account: ReactNode }) {
+function AppSidebar({ account }: { account: ReactNode }) {
   const pathname = usePath();
-  usePageAccent(NAV_SECTIONS, pathname);
+  const alerts = useIncidents().filter((i) => i.status !== "maintenance").length;
   return (
     <aside className="mm-sidebar" aria-label="Navigation principale">
-      <SideHead version={version} />
+      <SideHead />
       <nav className="mm-sidebar__nav">
-        <button type="button" onClick={openSearch} title={`Rechercher (${SEARCH_KEY})`} className="mm-nav-item">
-          <Search size={16} aria-hidden="true" className="shrink-0" />
-          <span className="mm-nav-item__label">Rechercher</span>
-          <kbd className="mm-nav-item__count font-mono">{SEARCH_KEY}</kbd>
-        </button>
         {NAV_SECTIONS.map((section, i) => (
-          <div key={i} className="mm-sidebar__section" data-accent={section.accent}>
+          <div key={i} className="mm-sidebar__section">
             {section.label && <div className="mm-label-caps">{section.label}</div>}
-            {section.items.map((item) => <SideLink key={item.href} item={item} active={isActive(pathname, item.href)} />)}
-            {section.label === "Public" && (
-              <a href="/status" target="_blank" rel="noopener" title="Voir la page publique" className="mm-nav-item">
-                <Globe size={16} aria-hidden="true" className="shrink-0" />
-                <span className="mm-nav-item__label">Voir la page publique</span>
-              </a>
-            )}
+            {section.items.map((item) => <SideLink key={item.href} item={item} active={navActive(pathname, item.href, NAV_TABS)} count={item.href === "/incidents" ? alerts : 0} />)}
           </div>
         ))}
       </nav>
@@ -100,34 +96,32 @@ function AppSidebar({ version, account }: { version: string; account: ReactNode 
   );
 }
 
-function SideLink({ item, active }: { item: NavItem; active: boolean }) {
+function SideLink({ item, active, count = 0 }: { item: NavItem; active: boolean; count?: number }) {
   return (
     <Link to={item.href} title={item.label} aria-current={active ? "page" : undefined} className="mm-nav-item">
-      <item.icon size={16} aria-hidden="true" className="shrink-0" />
+      <item.icon size={20} aria-hidden="true" className="shrink-0" />
       <span className="mm-nav-item__label">{item.label}</span>
+      {count > 0 && <span className="mm-nav-item__count" aria-label={`${count} en cours`}>{count}</span>}
     </Link>
   );
 }
 
-function SideHead({ version }: { version: string }) {
+function SideHead() {
   const rail = useRail();
-  const v = /^v?\d/.test(version) ? (version.startsWith("v") ? version : `v${version}`) : version;
   const label = rail ? "Déplier la barre latérale" : "Replier la barre latérale";
   return (
     <div className="mm-sidebar__head">
       <Link to="/" aria-label="Vue d'ensemble" className="mm-sidebar__brand no-underline">
         <span className="flex size-6 shrink-0 items-center justify-center [&_svg]:h-6"><Logo compact /></span>
         <span className="grid min-w-0 leading-none">
-          <span>Homelab</span>
-          <span className="mt-1 flex items-baseline gap-1.5 text-[11px] font-medium text-meta">
-            Monitoring
-            <span className="font-mono font-normal text-accent-text tabular-nums">{v}</span>
-          </span>
+          <span className="uppercase">Midnights</span>
+          <span className="mt-1 text-xs font-medium text-meta">Monitoring</span>
         </span>
       </Link>
-      <button type="button" onClick={toggleRail} aria-label={label} title={label} className="mm-btn mm-btn--ghost mm-btn--sm mm-btn--icon mm-sidebar__collapse">
-        {rail ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}
-      </button>
+      <span className="flex shrink-0 items-center gap-1 [:root[data-sidebar=rail]_&]:flex-col">
+        <IconButton label={`Rechercher (${SEARCH_KEY})`} title={`Rechercher (${SEARCH_KEY})`} icon={<Search size={18} />} onClick={openSearch} />
+        <IconButton label={label} title={label} icon={rail ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />} onClick={toggleRail} className="mm-sidebar__collapse" />
+      </span>
     </div>
   );
 }
@@ -206,8 +200,8 @@ function MobileNav({ account }: { account: ReactNode }) {
   }, [open]);
 
   const tabs = MOBILE_TABS.map(byHref);
-  const more = [...NAV_ITEMS.filter((i) => !MOBILE_TABS.includes(i.href)), SETTINGS];
-  const moreActive = more.some((i) => isActive(pathname, i.href));
+  const more = [...NAV_SECTIONS.flatMap((s) => s.items).filter((i) => !MOBILE_TABS.includes(i.href)), SETTINGS];
+  const moreActive = more.some((i) => navActive(pathname, i.href, NAV_TABS));
 
   return (
     <>
@@ -220,22 +214,18 @@ function MobileNav({ account }: { account: ReactNode }) {
             <span className="mm-nav-item__label">Rechercher</span>
           </button>
           {more.map((item) => (
-            <Link key={item.href} to={item.href} className="mm-nav-item" aria-current={isActive(pathname, item.href) ? "page" : undefined}>
+            <Link key={item.href} to={item.href} className="mm-nav-item" aria-current={navActive(pathname, item.href, NAV_TABS) ? "page" : undefined}>
               <item.icon size={20} aria-hidden="true" className="shrink-0" />
               <span className="mm-nav-item__label">{item.label}</span>
             </Link>
           ))}
-          <a href="/status" target="_blank" rel="noopener" className="mm-nav-item">
-            <Globe size={20} aria-hidden="true" className="shrink-0" />
-            <span className="mm-nav-item__label">Voir la page publique</span>
-          </a>
           <div className="mm-sheet__sep" />
           {account}
         </div>
       )}
       <nav className="mm-bottomnav" aria-label="Navigation principale">
         {tabs.map((item) => (
-          <Link key={item.href} to={item.href} className="mm-bottomnav__item no-underline" aria-current={isActive(pathname, item.href) && !open ? "page" : undefined}>
+          <Link key={item.href} to={item.href} className="mm-bottomnav__item no-underline" aria-current={navActive(pathname, item.href, NAV_TABS) && !open ? "page" : undefined}>
             <span className="mm-bottomnav__pill"><item.icon size={22} aria-hidden="true" /></span>
             <span className="mm-bottomnav__label">{item.short}</span>
           </Link>
@@ -311,7 +301,7 @@ function CommandPalette() {
               aria-label="Rechercher" role="combobox" aria-expanded="true" aria-controls="palette-results"
               aria-activedescendant={items[current] ? `palette-${items[current].key}` : undefined}
               className="h-12 min-w-0 flex-1 bg-transparent text-base text-h1 outline-none placeholder:text-meta" />
-            <kbd className="rounded-full border border-line px-2 font-mono text-[0.7rem] text-meta">Esc</kbd>
+            <kbd className="rounded-full border border-line px-2 font-mono text-xs text-meta">Esc</kbd>
           </div>
           <ul id="palette-results" role="listbox" className="max-h-[50vh] overflow-y-auto p-1.5">
             {items.length === 0 && <li className="px-3 py-6 text-center text-sm text-meta">Aucun résultat</li>}
@@ -348,42 +338,18 @@ const isCritical = (i: Incident) => i.status === "major_outage" || i.status === 
 
 function summary(list: Incident[]) {
   const critical = list.filter(isCritical).length;
-  return {
-    critical,
-    color: TONE_VAR[critical ? "red" : "yellow"],
-    title: critical ? `${critical} incident(s) en cours` : `${list.length} point(s) d'attention`,
-  };
+  return { critical, title: critical ? plural(`${critical} incident(s) en cours`) : plural(`${list.length} point(s) d'attention`) };
 }
 
-/** Overview banner: large, lists the alerts. */
+/** Overview banner: the title and a link. The list itself is the "Incidents" card below it. */
 export function AlertBanner({ list }: { list: Incident[] }) {
   const shown = list.filter((i) => i.status !== "maintenance");
   if (!shown.length) return null;
-  const { critical, color, title } = summary(shown);
+  const { critical, title } = summary(shown);
   return (
-    <section role={critical ? "alert" : "status"} className="rounded-2xl border p-5 sm:p-6"
-      style={{ background: `color-mix(in srgb, ${color} 12%, var(--mm-surface))`, borderColor: `color-mix(in srgb, ${color} 50%, var(--mm-border))` }}>
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: color, color: "var(--mm-surface)" }}>
-          <AlertTriangle size={20} aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-lg font-semibold sm:text-xl" style={{ color }}>{title}</p>
-          {critical > 0 && shown.length > critical && <p className="text-sm text-meta">+ {shown.length - critical} avertissement(s)</p>}
-        </div>
-        <Link to="/incidents" className="mm-btn mm-btn--secondary mm-btn--sm no-underline"><ArrowUpRight size={14} />Voir les incidents</Link>
-      </div>
-      <ul className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        {shown.slice(0, 6).map((a) => (
-          <li key={a.key}>
-            <Link to={a.to} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm no-underline hover:bg-page">
-              <StatusIcon status={a.status} size={15} />
-              <span className="truncate text-h1">{a.name}{a.detail ? <span className="text-meta"> · {a.detail}</span> : null}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <Alert kind={critical ? "error" : "warning"} title={title} action={<Link to="/incidents" className="mm-btn mm-btn--secondary mm-btn--sm no-underline">Voir les incidents</Link>}>
+      {critical > 0 && shown.length > critical ? plural(`+ ${shown.length - critical} avertissement(s)`) : undefined}
+    </Alert>
   );
 }
 
@@ -400,22 +366,4 @@ const toFeed = (d: Overview): NotifFeed => ({
 
 function NotificationsButton({ floating = false }: { floating?: boolean }) {
   return <NotificationsMenu url="/api/overview" toFeed={toFeed} floating={floating} alertsLink={["/incidents", "Voir les incidents"]} updatesLink={["/updates", "Voir les mises à jour"]} />;
-}
-
-/** Discreet one-line version for the other pages (the overview and incidents pages have their own). */
-function AlertStrip() {
-  const pathname = usePath();
-  const list = useIncidents().filter((i) => i.status !== "maintenance");
-  if (!list.length || pathname === "/" || pathname === "/incidents") return null;
-  const { critical, color, title } = summary(list);
-  return (
-    <Link to="/incidents" role={critical ? "alert" : "status"}
-      className="mb-6 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm no-underline transition-colors hover:brightness-110"
-      style={{ background: `color-mix(in srgb, ${color} 8%, var(--mm-surface))`, borderColor: `color-mix(in srgb, ${color} 35%, var(--mm-border))` }}>
-      <AlertTriangle size={14} className="shrink-0" style={{ color }} aria-hidden="true" />
-      <span className="shrink-0 font-medium" style={{ color }}>{title}</span>
-      <span className="min-w-0 flex-1 truncate text-meta">{list[0].name}{list[0].detail ? ` · ${list[0].detail}` : ""}</span>
-      <ArrowUpRight size={14} className="shrink-0 text-meta" aria-hidden="true" />
-    </Link>
-  );
 }

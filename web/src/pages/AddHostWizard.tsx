@@ -53,7 +53,7 @@ export function installCommand(i: Install, o: InstallOptions) {
 
 function ansibleVars(name: string, i: Install, o: InstallOptions) {
   return [
-    `# host_vars/${name || "mon-hote"}.yml — chiffrez-le : ansible-vault encrypt host_vars/${name || "mon-hote"}.yml`,
+    `# host_vars/${name || "mon-hote"}.yml — chiffre-le : ansible-vault encrypt host_vars/${name || "mon-hote"}.yml`,
     `hlm_hub_url: ${i.hub_url}`,
     `hlm_agent_token: ${i.token}`,
     `hlm_key: "${i.key}"`,
@@ -84,7 +84,7 @@ export function InstallInstructions({ install: initial, name, options = { smart:
       <Segmented className="w-fit" label="Méthode d'installation" value={method} onChange={setMethod} options={[["curl", "Commande"], ["ansible", "Ansible"], ["manual", "Paquet .deb"]]} />
       {method === "curl" && (
         <>
-          <p className="text-sm text-body">Collez cette ligne dans un terminal de la machine (Debian, avec sudo). Le script télécharge le binaire, vérifie son empreinte SHA-256, crée l'utilisateur hlm-agent et démarre le service.</p>
+          <p className="text-sm text-body">Colle cette ligne dans un terminal de la machine (Debian, avec sudo). Le script télécharge le binaire, vérifie son empreinte SHA-256, crée l'utilisateur hlm-agent et démarre le service.</p>
           {options.lxc && (
             <Alert kind="info" title="Conteneurs LXC inclus">Après le Proxmox, le script installe l'agent dans chaque conteneur Debian démarré (copie par pct push, sans accès Internet nécessaire dans les conteneurs). Chacun reçoit son propre jeton du hub et apparaît sous son nom. Les conteneurs créés plus tard sont équipés automatiquement en quelques minutes.</Alert>
           )}
@@ -93,16 +93,16 @@ export function InstallInstructions({ install: initial, name, options = { smart:
       )}
       {method === "ansible" && (
         <>
-          <p className="text-sm text-body">Avec le rôle <code className="font-mono text-xs text-h2">deploy/ansible/roles/hlm_agent</code>, ajoutez ces variables pour cet hôte puis lancez le playbook. Pour tout un parc, utilisez plutôt un jeton commun : bouton « Déploiement en masse » de la page Hôtes.</p>
+          <p className="text-sm text-body">Avec le rôle <code className="font-mono text-xs text-h2">deploy/ansible/roles/hlm_agent</code>, ajoute ces variables pour cet hôte puis lance le playbook. Pour tout un parc, utilise plutôt un jeton commun : bouton « Déploiement en masse » de la page Hôtes.</p>
           <CodeBlock text={ansibleVars(name, install, options)} />
           <CodeBlock text="ansible-playbook -i inventory.ini deploy/ansible/site.yml --ask-vault-pass --limit NOM_DE_L_HOTE" />
         </>
       )}
       {method === "manual" && (
         <>
-          <p className="text-sm text-body">Créez d'abord <code className="font-mono text-xs text-h2">/etc/hlm-agent/agent.env</code> (root, 0640) :</p>
+          <p className="text-sm text-body">Crée d'abord <code className="font-mono text-xs text-h2">/etc/hlm-agent/agent.env</code> (root, 0640) :</p>
           <CodeBlock text={envFile(install, options)} />
-          <p className="text-sm text-body">puis installez le paquet <code className="font-mono text-xs text-h2">hlm-agent_…_amd64.deb</code> ou <code className="font-mono text-xs text-h2">_arm64.deb</code> de la dernière release GitHub. L'agent installé par paquet ne se met pas à jour seul : utilisez le bouton « Mettre à jour l'agent » de sa fiche, Ansible ou un nouveau paquet.</p>
+          <p className="text-sm text-body">puis installe le paquet <code className="font-mono text-xs text-h2">hlm-agent_…_amd64.deb</code> ou <code className="font-mono text-xs text-h2">_arm64.deb</code> de la dernière release GitHub. L'agent installé par paquet ne se met pas à jour seul : utilise le bouton « Mettre à jour l'agent » de sa fiche, Ansible ou un nouveau paquet.</p>
           <CodeBlock text={`sudo apt install ./hlm-agent_*_$(dpkg --print-architecture).deb`} />
         </>
       )}
@@ -273,7 +273,7 @@ export function AddHostWizard({ open, onClose, hosts = [] }: { open: boolean; on
               <ul className="m-0 grid list-disc gap-1 pl-5 text-sm text-body">
                 <li><code className="font-mono text-xs text-h2">hub rejected TOKEN (401)</code> : jeton mal copié ou régénéré depuis.</li>
                 <li><code className="font-mono text-xs text-h2">hub signature invalid</code> : la clé KEY ne correspond pas à ce hub.</li>
-                <li><code className="font-mono text-xs text-h2">HUB_URL uses plain http</code> : ajoutez ALLOW_INSECURE=true.</li>
+                <li><code className="font-mono text-xs text-h2">HUB_URL uses plain http</code> : ajoute ALLOW_INSECURE=true.</li>
                 <li>Délai dépassé : la machine ne joint pas {created?.install.hub_url} (pare-feu, DNS).</li>
               </ul>
             </>

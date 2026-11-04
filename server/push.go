@@ -176,9 +176,9 @@ func pushPayload(evs []Event) []byte {
 		}
 		lines = []string{evs[0].Message}
 	} else if down > 0 {
-		title = fmt.Sprintf("%d service(s) en panne", down)
+		title = plural(fmt.Sprintf("%d service(s) en panne", down))
 	} else {
-		title = fmt.Sprintf("%d changement(s) d'état", len(evs))
+		title = plural(fmt.Sprintf("%d changement(s) d'état", len(evs)))
 	}
 	if lines[0] == "" {
 		lines[0] = evs[0].Kind
@@ -198,7 +198,7 @@ func pushPayload(evs []Event) []byte {
 
 func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 	if apnsConfig() == nil {
-		writeErr(w, 400, "Notifications push non configurées : définissez HLT_APNS_KEY, HLT_APNS_KEY_ID, HLT_APNS_TEAM_ID et HLT_APNS_TOPIC")
+		writeErr(w, 400, "Notifications push non configurées : définis HLT_APNS_KEY, HLT_APNS_KEY_ID, HLT_APNS_TEAM_ID et HLT_APNS_TOPIC")
 		return
 	}
 	s.push([]Event{{Kind: "Test", Name: "Midnights Monitoring", Message: "Notification de test", At: time.Now()}})

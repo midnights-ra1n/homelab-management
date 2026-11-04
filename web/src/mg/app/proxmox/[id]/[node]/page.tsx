@@ -34,6 +34,7 @@ import { ApiError, InfoList, PveTable, RrdGrid, TaskTable, TimeframeTabs, attemp
 import { cn, dateFormat, formatBytes, formatUptime, pct } from "@/lib/utils";
 import { getT } from "@/i18n/server";
 import type { Translate } from "@/i18n/translate";
+import { plural } from "../../../../../shared/plural";
 
 type Props = PageProps<"/[lang]/proxmox/[id]/[node]">;
 
@@ -130,7 +131,7 @@ function Summary({ i, node, tf, base, tr }: TabProps & { tf: Timeframe; base: st
   if (!status.ok) return <ApiError error={status.error} />;
   const d = status.data;
   return (
-    <div className="grid gap-10">
+    <div className="grid gap-8">
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="grid content-start gap-4 p-5">
           <Meter label="CPU" value={d.cpu * 100} detail={`${(d.cpu * 100).toFixed(1)} % · ${d.cpuinfo.cpus} threads`} />
@@ -141,10 +142,10 @@ function Summary({ i, node, tf, base, tr }: TabProps & { tf: Timeframe; base: st
         <Card className="p-5 lg:col-span-2">
           <InfoList
             items={[
-              [tr("Uptime"), <span key="u" className="font-mono">{formatUptime(d.uptime, tr.locale)}</span>],
+              [tr("Uptime"), <span key="u" className="tabular-nums">{formatUptime(d.uptime, tr.locale)}</span>],
               [tr("Charge (1, 5, 15 min)"), <span key="l" className="font-mono">{d.loadavg?.join(" · ")}</span>],
               [tr("Processeur"), d.cpuinfo.model],
-              [tr("Topologie"), `${d.cpuinfo.sockets} socket(s) · ${d.cpuinfo.cores} cœurs · ${d.cpuinfo.cpus} threads`],
+              [tr("Topologie"), plural(`${d.cpuinfo.sockets} socket(s) · ${d.cpuinfo.cores} cœurs · ${d.cpuinfo.cpus} threads`)],
               [tr("Fréquence"), `${Math.round(Number(d.cpuinfo.mhz))} MHz`],
               [tr("Noyau"), <span key="k" className="font-mono">{d["current-kernel"]?.release ?? d.kversion.split(" ")[2]}</span>],
               [tr("Version PVE"), <span key="v" className="font-mono">{d.pveversion}</span>],
@@ -242,7 +243,7 @@ function Storage({ i, node, tr, base, selected }: TabProps & { base: string; sel
   const content = current ? use(attempt(storageContent(i, node, current.storage))) : null;
   const fmt = dateFormat(tr.locale, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
   return (
-    <div className="grid gap-10">
+    <div className="grid gap-8">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {r.data.map((s) => (
           <Link key={s.storage} href={`${base}?tab=stockage&storage=${encodeURIComponent(s.storage)}`} scroll={false}>

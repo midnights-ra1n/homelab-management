@@ -18,7 +18,7 @@ export default function MapPage() {
     <>
       <PageHeader
         title={tr("La topologie du homelab")}
-        description={tr("Hôtes, invités, conteneurs et tunnels VPN reliés automatiquement. Déplace les nœuds, relie-les par glisser depuis les poignées, filtre par type ou VLAN.")}
+        description={tr("Hôtes, invités, conteneurs et tunnels VPN reliés automatiquement, à réorganiser à la souris.")}
       />
       <Suspense fallback={<Skeleton className="h-[36rem] rounded-3xl" />}>
         <MapView />

@@ -69,7 +69,7 @@ function LinkTitle({ l }: { l: BandwidthLink }) {
   return (
     <span className="flex items-center gap-2.5">
       <StatusIcon status={l.status} size={18} /><span className="font-mono">{l.interface}</span><StatusBadge status={l.status} />
-      {l.speed_mbps != null && <span className="font-mono text-xs font-normal text-meta">lien {l.speed_mbps >= 1000 ? `${fmtNum(l.speed_mbps / 1000, 1)} Gbit/s` : `${fmtNum(l.speed_mbps, 0)} Mbit/s`}</span>}
+      {l.speed_mbps != null && <span className="tabular-nums text-xs font-normal text-meta">lien {l.speed_mbps >= 1000 ? `${fmtNum(l.speed_mbps / 1000, 1)} Gbit/s` : `${fmtNum(l.speed_mbps, 0)} Mbit/s`}</span>}
     </span>
   );
 }

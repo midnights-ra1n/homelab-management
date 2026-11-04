@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Plus, Trash2, Upload } from "../shared/icons";
 import { Button, IconButton, cn, inputClass, textareaClass, useToast } from "../ui";
 import { blankRow, envProblems, envTabular, mergeEnv, parseEnv, serializeEnv, type EnvDoc, type EnvRow } from "./envFile";
+import { plural } from "../shared/plural";
 
 const withBlank = (d: EnvDoc): EnvDoc => (d.rows.length ? d : { ...d, rows: [blankRow()] });
 const ROW = "grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_2.25rem] items-center gap-2";
@@ -29,9 +30,9 @@ export function EnvVars({ initial = "", onChange }: { initial?: string; onChange
   const removeRow = (id: number) => setDoc(withBlank({ ...doc, rows: doc.rows.filter((r) => r.id !== id) }));
   const addText = (t: string) => {
     const add = parseEnv(t);
-    if (!envTabular(add)) return toast("Ce .env a des valeurs sur plusieurs lignes : collez-le en mode texte", "error");
+    if (!envTabular(add)) return toast("Ce .env a des valeurs sur plusieurs lignes : colle-le en mode texte", "error");
     setDoc(withBlank(mergeEnv(doc, add)));
-    toast(`${add.rows.length} variable(s) importée(s)`, "success");
+    toast(plural(`${add.rows.length} variable(s) importée(s)`), "success");
   };
   const toggle = () => {
     if (raw === null) return setRaw(text);
@@ -79,7 +80,7 @@ export function EnvVars({ initial = "", onChange }: { initial?: string; onChange
         {raw === null && (
           <>
             <Button variant="secondary" size="sm" icon={<Upload size={14} />} onClick={() => file.current?.click()}>Importer un .env</Button>
-            <span className="text-xs text-meta">ou collez-le dans un champ Nom</span>
+            <span className="text-xs text-meta">ou colle-le dans un champ Nom</span>
           </>
         )}
         <Button variant="ghost" size="sm" className="ml-auto" onClick={toggle}>{raw === null ? "Mode texte" : "Mode blocs"}</Button>

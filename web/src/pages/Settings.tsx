@@ -8,6 +8,7 @@ import {
 import { EmailEditor } from "./EmailEditor";
 import { ApiSection } from "./ApiTokens";
 import { DatabaseSection, McpSection, PasskeysSection, UpdateSection } from "../shared/system";
+import { plural } from "../shared/plural";
 
 type S = Record<string, string>;
 interface SettingsResp { settings: S; db_size: number; version: string }
@@ -57,12 +58,12 @@ export function SettingsPage({ version }: { version: string }) {
       <PageHeader title="Configuration" description="Apparence, collecte et rétention, notifications, page de statut, API, sauvegardes et compte." />
       {error && <Alert kind="error" title="Enregistrement impossible" className="mb-6">{error}</Alert>}
       <div className={SECTIONS}>
-        <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
+        <div className="grid gap-8 lg:grid-cols-2">
           <section aria-labelledby="appearance">
             <SectionTitle id="appearance">Apparence</SectionTitle>
             <Card>
               <CardBody className="grid gap-4">
-                <p className="text-sm text-body">Interface Midnights Classic. « Auto » suit le réglage clair / sombre du système. Mémorisée sur cet appareil.</p>
+                <p className="text-sm text-body">« Auto » suit le réglage clair / sombre du système. Mémorisée sur cet appareil.</p>
                 <ThemeSwitch className="w-fit" />
                 <Field label="Fuseau horaire" htmlFor="s-tz" hint={`Heures des e-mails, des rapports et des messages des sondes. Heure actuelle : ${tzNow}`}>
                   <select id="s-tz" className={inputClass} value={v("timezone")} onChange={set("timezone")}>
@@ -85,7 +86,7 @@ export function SettingsPage({ version }: { version: string }) {
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                   {[["Version", version], ["Base de données", fmtBytes(data.db_size)], ["Intervalle des agents", `${v("agent_interval_s")} s`], ["Rétention des métriques", `${v("retention_metrics_days")} j`]].map(([k, val]) => (
                     <div key={k} className="min-w-0">
-                      <dt className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{k}</dt>
+                      <dt className="mm-label-caps text-meta">{k}</dt>
                       <dd className="mt-0.5 truncate font-mono text-h2" title={val}>{val}</dd>
                     </div>
                   ))}
@@ -195,7 +196,7 @@ export function SettingsPage({ version }: { version: string }) {
         </SettingsSection>
 
         <SettingsSection id="matrix" title="Notifications Matrix"
-          description="Envoie les mêmes alertes regroupées dans un salon Matrix, sur matrix.org ou sur votre propre serveur. Le compte du jeton doit avoir rejoint le salon ; mise en place détaillée dans le guide du monitoring (docs/MONITORING.md, section Alertes)."
+          description="Envoie les mêmes alertes regroupées dans un salon Matrix, sur matrix.org ou sur ton propre serveur. Le compte du jeton doit avoir rejoint le salon ; mise en place détaillée dans le guide du monitoring (docs/MONITORING.md, section Alertes)."
           actions={<>
             <Button variant="secondary" icon={<Send size={16} />} loading={busy === "testmx"} onClick={async () => {
               setBusy("testmx");
@@ -206,7 +207,7 @@ export function SettingsPage({ version }: { version: string }) {
           </>}>
           <Switch label="Activer les notifications Matrix" checked={bool("matrix_enabled")} onChange={(c) => setDraft({ ...draft, matrix_enabled: String(c) })} />
           <div className={FIELD_ROW}>
-            {input("matrix_homeserver", "Serveur (homeserver)", { placeholder: "https://matrix.example.fr" }, "Adresse de l'API client de votre nœud")}
+            {input("matrix_homeserver", "Serveur (homeserver)", { placeholder: "https://matrix.example.fr" }, "Adresse de l'API client de ton nœud")}
             {input("matrix_room", "Identifiant du salon", { placeholder: "!abcdef:example.fr" }, "Paramètres du salon › Avancé")}
           </div>
           {input("matrix_token", "Jeton d'accès", { type: "password", autoComplete: "new-password", placeholder: data.settings.matrix_token_set === "true" ? "Inchangé" : "" }, "Celui d'un compte dédié aux alertes, de préférence")}
@@ -218,7 +219,7 @@ export function SettingsPage({ version }: { version: string }) {
           <EmailEditor draft={draft} setDraft={setDraft} save={save} busy={busy} />
         </section>
 
-        <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
+        <div className="grid gap-8 lg:grid-cols-2">
           <SettingsSection id="status" title="Page de statut publique" description="Compose la page avec des blocs : services, disponibilité, graphiques, textes."
             actions={<>
               <ButtonAnchor variant="ghost" href="/status" target="_blank" rel="noopener" icon={<ExternalLink size={16} />}>Ouvrir la page</ButtonAnchor>
@@ -257,7 +258,7 @@ export function SettingsPage({ version }: { version: string }) {
 
         <ApiSection draft={draft} setDraft={setDraft} save={save} busy={busy} />
 
-        <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
+        <div className="grid gap-8 lg:grid-cols-2">
           <ImportExportSection />
           <PasswordSection />
         </div>
@@ -340,7 +341,7 @@ function ImportExportSection() {
     try {
       const doc = JSON.parse(await f.text());
       const r = await api.post<{ monitors_added: number; settings_applied: number }>("/api/import", doc);
-      setMsg({ tone: "success", text: `${r.monitors_added} sonde(s) ajoutée(s), ${r.settings_applied} réglage(s) appliqué(s). Rechargez la page pour voir les changements.` });
+      setMsg({ tone: "success", text: plural(`${r.monitors_added} sonde(s) ajoutée(s), ${r.settings_applied} réglage(s) appliqué(s). Recharge la page pour voir les changements.`) });
     } catch (err) {
       setMsg({ tone: "danger", text: (err as Error).message });
     }

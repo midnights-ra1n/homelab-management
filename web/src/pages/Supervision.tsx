@@ -1,5 +1,5 @@
 /* Supervision: every sensor of the homelab on one screen, in the manner of PRTG's device tree.
-   Each machine is a row of coloured sensors (agent, CPU, memory, each disk, temperature,
+   Each machine is a row of sensors, neutral while healthy, coloured when not (agent, CPU, memory, each disk, temperature,
    updates, Docker, the probes that target it); Proxmox nodes unfold into their VMs and
    containers, and the probes that target no machine are grouped by category. */
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
@@ -9,10 +9,11 @@ import { Alert, ButtonLink, EmptyState, IconButton, Link, Logo, PageHeader, Skel
 import { containerKind } from "./Containers";
 import { guestCount, guestId, proxmoxTree } from "./Hosts";
 import { hostRole, targetHost } from "./Map";
+import { plural } from "../shared/plural";
 
 type Sensor = { id: string; label: string; value: string; kind: StatusKind; href: string; title?: string };
 
-const KINDS: [StatusKind, string][] = [["down", "En panne"], ["warn", "Dégradé"], ["ok", "Opérationnel"], ["pending", "En attente"], ["maintenance", "Maintenance"], ["paused", "En pause"]];
+const KINDS: [StatusKind, string][] = [["down", "En panne"], ["warn", "Dégradé(s)"], ["ok", "Opérationnel(s)"], ["pending", "En attente"], ["maintenance", "Maintenance"], ["paused", "En pause"]];
 const SEVERITY: StatusKind[] = ["ok", "paused", "pending", "maintenance", "warn", "down"];
 const worst = (ks: StatusKind[]) => ks.reduce<StatusKind>((w, k) => (SEVERITY.indexOf(k) > SEVERITY.indexOf(w) ? k : w), "ok");
 /** Usage sensor: warning from `warn` %, down from `down` %. */
@@ -46,7 +47,7 @@ function hostSensors(h: Host, probes: Monitor[]): Sensor[] {
     const u = h.updates;
     out.push({
       id: "upd", label: "Mises à jour", href: "/updates", kind: u.security || u.reboot_required ? "warn" : "ok",
-      value: u.reboot_required ? "Redémarrage requis" : u.pending ? `${u.pending} (${u.security} sécu.)` : "À jour",
+      value: u.reboot_required ? "À redémarrer" : u.pending ? `${u.pending} (${u.security} sécu.)` : "À jour",
     });
   }
   const cs = h.docker?.containers ?? [];
@@ -67,13 +68,14 @@ function Go({ wall, to, className, title, style, children }: { wall: boolean; to
 
 function SensorTile({ s, wall }: { s: Sensor; wall: boolean }) {
   const tone = kindTone(s.kind);
+  const quiet = s.kind === "ok"; // what works stays silent: colour only marks what needs a look
   return (
     <Go wall={wall} to={s.href} title={s.title ? `${s.label} · ${s.title}` : s.label}
-      className={cn("flex min-w-0 flex-col gap-0.5 rounded-lg border-l-4 px-2.5 py-1.5 text-inherit no-underline transition-[filter] hover:brightness-110", wall ? "w-44" : "w-36")}
-      style={{ borderColor: tone, background: `color-mix(in srgb, ${tone} 14%, transparent)` }}>
+      className={cn("flex min-w-0 flex-col gap-0.5 rounded-lg border-l-4 border-line-subtle px-2.5 py-1.5 text-inherit no-underline transition-colors duration-300 hover:border-line-strong", wall ? "w-44" : "w-36")}
+      style={quiet ? undefined : { borderColor: tone, background: `color-mix(in srgb, ${tone} 14%, transparent)` }}>
       <span className={cn("truncate text-meta", wall ? "text-sm" : "text-xs")}>{s.label}</span>
       <span className={cn("flex min-w-0 items-center gap-1.5 font-medium text-h1", wall ? "text-base" : "text-sm")}>
-        <StatusIcon kind={s.kind} size={wall ? 15 : 13} /><span className="truncate tabular-nums">{s.value}</span>
+        {!quiet && <StatusIcon kind={s.kind} size={wall ? 15 : 13} />}<span className="truncate tabular-nums">{s.value}</span>
       </span>
     </Go>
   );
@@ -100,9 +102,9 @@ function DeviceBlock({ d, depth, open, toggle, visible, wall }: { d: Device; dep
         <span className="ml-auto flex gap-1.5 text-xs tabular-nums" aria-label="Capteurs par état">
           {KINDS.map(([k, label]) => {
             const n = d.sensors.filter((s) => s.kind === k).length;
-            return n > 0 && k !== "ok" ? <span key={k} title={label} className="rounded-full px-1.5" style={{ color: kindTone(k), background: `color-mix(in srgb, ${kindTone(k)} 14%, transparent)` }}>{n}</span> : null;
+            return n > 0 && k !== "ok" ? <span key={k} title={plural(`${n} ${label.toLowerCase()}`)} className="rounded-full px-1.5" style={{ color: kindTone(k), background: `color-mix(in srgb, ${kindTone(k)} 14%, transparent)` }}>{n}</span> : null;
           })}
-          <span className="text-meta">{d.sensors.length} capteur(s)</span>
+          <span className="text-meta">{plural(`${d.sensors.length} capteur(s)`)}</span>
         </span>
       </div>
       {isOpen && (
@@ -158,7 +160,7 @@ export default function SupervisionPage() {
   const { data, error } = usePoll(() => api.get<Overview>("/api/overview"), 15000, [], ["hosts", "monitors", "metrics"]);
   return (
     <>
-      <PageHeader title="Supervision" description="Tous les capteurs du homelab sur un écran : chaque machine avec ses mesures et les sondes qui la visent, les Proxmox dépliés sur leurs VM et conteneurs."
+      <PageHeader title="Supervision" description="Tous les capteurs du homelab sur un écran, machine par machine."
         actions={<ButtonLink variant="secondary" to="/status-page" icon={<Tv size={16} />}>Écran mural</ButtonLink>} />
       {error && <Alert kind="error" title="Impossible de charger la supervision" className="mb-6">{error}</Alert>}
       {!data && !error && <Skeleton className="h-96" />}
@@ -188,7 +190,7 @@ export function WallPage() {
       <header className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
         <Logo />
         <h1 className="text-2xl font-semibold text-h1">{data?.title ?? "Supervision"}</h1>
-        <span className="ml-auto font-mono text-2xl tabular-nums text-h1">{time(now)}</span>
+        <span className="ml-auto text-2xl tabular-nums text-h1">{time(now)}</span>
         <span className="text-sm text-meta">{seen ? `Mis à jour à ${time(seen)}` : "Chargement…"}</span>
         <IconButton label="Plein écran" icon={<Maximize size={18} />} onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} />
       </header>
@@ -242,9 +244,9 @@ function Board({ data, wall = false }: { data: Data; wall?: boolean }) {
                 const n = all.filter((s) => s.kind === k).length;
                 return n > 0 && (
                   <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(filter === k ? null : k)}
-                    className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm tabular-nums", filter === k ? "border-accent" : "border-transparent")}
-                    style={{ color: kindTone(k), background: `color-mix(in srgb, ${kindTone(k)} 14%, transparent)` }}>
-                    <StatusIcon kind={k} size={14} />{n} {label.toLowerCase()}
+                    className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm tabular-nums", filter === k ? "border-accent" : k === "ok" ? "border-line-subtle text-meta hover:text-h1" : "border-transparent")}
+                    style={k === "ok" ? undefined : { color: kindTone(k), background: `color-mix(in srgb, ${kindTone(k)} 14%, transparent)` }}>
+                    {k !== "ok" && <StatusIcon kind={k} size={14} />}{plural(`${n} ${label.toLowerCase()}`)}
                   </button>
                 );
               })}

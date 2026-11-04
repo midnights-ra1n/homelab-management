@@ -36,6 +36,9 @@ var events = &eventBus{subs: map[chan string]struct{}{}}
 // publish never blocks: a client too slow to drain its buffer simply misses the topic,
 // and the next flush or its safety reload catches up.
 func (b *eventBus) publish(topic string) {
+	if topic != "metrics" {
+		cacheGen.Add(1)
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for ch := range b.subs {

@@ -47,7 +47,7 @@ function Settings() {
   );
 
   return (
-    <div className="grid grid-cols-1 gap-12 xl:gap-16">
+    <div className="grid grid-cols-1 gap-8">
       <section id="integrations" aria-labelledby="integrations-title" className="scroll-mt-32">
         <SectionTitle id="integrations-title">{tr("Intégrations")}</SectionTitle>
         <InventorySync />
@@ -71,9 +71,9 @@ function Settings() {
                   {items.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-line px-4 py-4 text-center text-sm text-meta">{tr("Non connecté")}</p>
                   ) : (
-                    <ul className="grid gap-2">
+                    <ul className="divide-y divide-line-subtle">
                       {items.map((i) => (
-                        <li key={i.id} className="flex items-center gap-3 rounded-xl border border-line-subtle bg-page px-4 py-2.5">
+                        <li key={i.id} className="flex items-center gap-3 py-3">
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium text-h1">{i.name}</span>
                             <span className="block truncate font-mono text-xs text-meta">{i.url}</span>
@@ -108,12 +108,12 @@ function Settings() {
         </Card>
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-2 xl:gap-10">
+      <div className="grid gap-8 lg:grid-cols-2">
         <section aria-labelledby="appearance">
           <SectionTitle id="appearance">{tr("Apparence")}</SectionTitle>
           <Card>
             <CardBody className="grid gap-4">
-              <p className="text-sm text-body">{tr("Interface Midnights Classic. « Auto » suit le réglage clair / sombre du système.")}</p>
+              <p className="text-sm text-body">{tr("« Auto » suit le réglage clair / sombre du système.")}</p>
               <ThemeSwitch className="w-fit" />
               <TimeZoneSelect value={use(getTimeZone())} options={timeZones()} />
             </CardBody>
@@ -133,7 +133,7 @@ function Settings() {
                   [tr("Suivi"), tr("{deployments} déploiement(s) · {tasks} tâche(s)", { deployments: counts.deployments, tasks: counts.tasks })],
                 ].map(([k, v]) => (
                   <div key={k} className="min-w-0">
-                    <dt className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-meta">{k}</dt>
+                    <dt className="mm-label-caps text-meta">{k}</dt>
                     <dd className="mt-0.5 truncate font-mono text-h2" title={v}>
                       {v}
                     </dd>
@@ -165,7 +165,7 @@ function Settings() {
             <BackupForms />
           </CardBody>
         </Card>
-        <p className="mt-3 font-mono text-xs text-meta">
+        <p className="mt-3 tabular-nums text-xs text-meta">
           {tr("Dernière modification de l'inventaire :")}{" "}
           {counts.last_asset_update ? timeAgo(counts.last_asset_update, tr.locale) : "—"}
         </p>

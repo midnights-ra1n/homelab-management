@@ -63,9 +63,9 @@ export function RrdChart({
           <path d={d} fill="none" stroke="var(--mm-accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
           {hover != null && <line x1={x(hover)} x2={x(hover)} y1={0} y2={H} stroke="var(--mm-border-strong)" strokeWidth={1} vectorEffect="non-scaling-stroke" />}
         </svg>
-        <span className="pointer-events-none absolute left-1 top-0 font-mono text-[0.7rem] tabular-nums text-meta">{fmt(top)}</span>
+        <span className="pointer-events-none absolute left-1 top-0 font-mono text-xs tabular-nums text-meta">{fmt(top)}</span>
         {hover != null && times[hover] && (
-          <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-elevated px-1.5 py-0.5 font-mono text-[0.7rem] text-body">
+          <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-elevated px-1.5 py-0.5 font-mono text-xs text-body">
             {time.format(new Date(times[hover] * 1000))}
           </span>
         )}

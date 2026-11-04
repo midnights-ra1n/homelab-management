@@ -18,6 +18,7 @@ import type { HardwareItem } from "@/lib/data/hardware";
 import { getAsset, type Asset } from "@/lib/data/assets";
 import { formatGb } from "@/lib/utils";
 import { useT } from "@/i18n/client";
+import { plural } from "../../../shared/plural";
 
 export type HardwareOptions = {
   machines: { id: number; name: string }[];
@@ -28,7 +29,7 @@ export type HardwareOptions = {
 function fromAsset(a: Asset): Record<string, string> {
   const cpu = a.cpu_model && ((a.cpu_sockets ?? 1) > 1 ? `${a.cpu_sockets} × ${a.cpu_model}` : a.cpu_model);
   const ram = a.ram_gb ? `${formatGb(a.ram_gb)} ${a.ram_type}`.trim() : "";
-  const disks = a.disks.length ? `${a.disks.length} disque(s)` : "";
+  const disks = a.disks.length ? plural(`${a.disks.length} disque(s)`) : "";
   return {
     name: a.display_name,
     brand: a.manufacturer,

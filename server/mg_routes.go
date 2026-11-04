@@ -1,6 +1,9 @@
 package main
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 // mgRoutes registers the management API. Forms are posted as FormData and answer a FormState;
 // writes are journaled by the handlers (mgLog) with homelab-management's wording.
@@ -122,13 +125,13 @@ func (s *Server) mgRoutes(mux *http.ServeMux) {
 	h("GET /api/mg/ssh-keys", s.mgListSSHKeys)
 	h("POST /api/mg/ssh-keys", s.mgSaveSSHKey)
 	h("DELETE /api/mg/ssh-keys/{id}", s.mgDelete("ssh_keys", "system", "name", "Clé SSH « %s » supprimée"))
-	h("GET /api/mg/monitoring", s.mgMonitoring)
+	h("GET /api/mg/monitoring", cacheJSON(5*time.Second, s.mgMonitoring))
 	h("GET /api/mg/monitoring/bandwidth/live", s.mgLiveBandwidth)
 	h("GET /api/mg/energy", s.mgEnergy)
-	h("GET /api/mg/webmin", s.mgWebmin)
+	h("GET /api/mg/webmin", cacheJSON(10*time.Second, s.mgWebmin))
 
 	// Proxmox
-	h("GET /api/mg/proxmox", s.mgProxmox)
+	h("GET /api/mg/proxmox", cacheJSON(5*time.Second, s.mgProxmox))
 	h("POST /api/mg/proxmox/migrate", s.mgPveMigrate)
 	h("GET /api/mg/proxmox/{id}", s.mgProxmoxOne)
 	h("GET /api/mg/proxmox/{id}/targets", s.mgPveTargets)
